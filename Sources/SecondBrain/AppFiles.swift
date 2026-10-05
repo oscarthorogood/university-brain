@@ -17,16 +17,47 @@ enum AppFiles {
         return "\(i?["CFBundleShortVersionString"] as? String ?? "0.0.0")+\(i?["CFBundleVersion"] as? String ?? "0")"
     }
 
-    /// Copies the bundled folder into the vault when this app version hasn't done so yet. Returns the vault paths it wrote, or nil if nothing was due.
+    /// What the last install did, kept so Settings (and the Activity Log) can say so. Nothing here is a secret.
+    struct Report: Codable {
+        var version: String, date: Date, updated: Int, unchanged: Int, problems: [String]
+        var text: String {
+            "Templates and Agents, version \(version.split(separator: "+").first.map(String.init) ?? version), \(date.formatted(date: .abbreviated, time: .shortened)): "
+                + "\(updated) file\(updated == 1 ? "" : "s") updated, \(unchanged) already current"
+                + (problems.isEmpty ? "." : "; \(problems.count) problem\(problems.count == 1 ? "" : "s"), it will try again next launch (first: \(problems[0])).")
+        }
+    }
+    private static let reportKey = "appFilesReport"
+    static var lastReport: Report? { UserDefaults.standard.data(forKey: reportKey).flatMap { try? JSONDecoder().decode(Report.self, from: $0) } }
+
+    /// Copies the bundled folder into the vault when this app version hasn't done so yet (or when `force` is set). Returns the vault paths it wrote, or nil if nothing was due.
     /// A vault folder that doesn't exist yet is left alone (the app never creates one), and the install happens once it does.
+    /// The version is recorded only if every file went in, so a problem is tried again on the next launch instead of being forgotten.
     @discardableResult
-    static func installIfNeeded(source: URL? = bundled, version: String = AppFiles.version, into root: URL = Vault.root) -> [String]? {
+    static func installIfNeeded(source: URL? = bundled, version: String = AppFiles.version, into root: URL = Vault.root, force: Bool = false) -> [String]? {
         guard let source, FileManager.default.fileExists(atPath: root.path),
-              (try? String(contentsOf: root.appending(path: stamp), encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) != version
+              force || (try? String(contentsOf: root.appending(path: stamp), encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) != version
         else { return nil }
-        guard let written = try? install(from: source, into: root) else { return nil }   // no stamp, so the next launch tries again
-        try? version.write(to: root.appending(path: stamp), atomically: true, encoding: .utf8)
-        return written
+        let r = install(from: source, into: root)
+        if r.problems.isEmpty { try? version.write(to: root.appending(path: stamp), atomically: true, encoding: .utf8) }
+        if root.standardizedFileURL == Vault.root.standardizedFileURL,   // a self-check on a throwaway vault isn't the real install
+           let d = try? JSONEncoder().encode(Report(version: version, date: .now, updated: r.written.count, unchanged: r.unchanged, problems: r.problems)) {
+            UserDefaults.standard.set(d, forKey: reportKey)
+        }
+        return r.written
+    }
+
+    /// What Settings shows: whether this copy of the app carries the files, and what the last install did.
+    static func statusLine() -> String {
+        if bundled == nil { return "This copy of the app has no Templates and Agents folder inside it (a build run from the command line), so there is nothing to install." }
+        return lastReport?.text ?? "Not installed yet. It happens the next time the app opens, or press Reinstall Now."
+    }
+    /// Installs now whether or not this version already has, and says what happened (Settings → Rules → Reinstall Now, and `--install-files` in Terminal).
+    @discardableResult
+    static func reinstall() -> String {
+        guard bundled != nil else { return statusLine() }
+        guard FileManager.default.fileExists(atPath: Vault.root.path) else { return "The vault folder \(Vault.root.path) doesn’t exist, so nothing was installed." }
+        let wrote = installIfNeeded(force: true) ?? []
+        return (lastReport?.text ?? "Nothing was installed.") + (wrote.isEmpty ? "" : "\nUpdated: " + wrote.prefix(12).joined(separator: ", ") + (wrote.count > 12 ? ", and \(wrote.count - 12) more" : ""))
     }
 
     /// Lists, one vault path per line, the shipped files that are only a starting copy (the agents' memory, the course briefings, the synced timetable…):
@@ -35,29 +66,32 @@ enum AppFiles {
 
     /// Always overwrites: a file that differs is replaced, its old text kept in `.history/`. Files the app doesn't ship are never touched or deleted,
     /// and neither are the ones named in `seed.txt` once they exist. A template that now ships inside Items/, Files/ or Apps/ has its old loose copy
-    /// in `Templates/Claude/` moved to `.trash/` so Obsidian doesn't list it twice.
-    static func install(from source: URL, into root: URL) throws -> [String] {
+    /// in `Templates/Claude/` moved to `.trash/` so Obsidian doesn't list it twice. A file that can't be written is reported and the rest carry on.
+    static func install(from source: URL, into root: URL) -> (written: [String], unchanged: Int, problems: [String]) {
         let fm = FileManager.default, src = source.resolvingSymlinksInPath()
         let seeds = Set(((try? String(contentsOf: src.appending(path: seedList), encoding: .utf8)) ?? "").split(whereSeparator: \.isNewline).map { String($0).trimmingCharacters(in: .whitespaces) })
-        var written: [String] = []
-        for rel in (try fm.subpathsOfDirectory(atPath: src.path)).sorted() {
+        guard let rels = try? fm.subpathsOfDirectory(atPath: src.path) else { return ([], 0, ["couldn’t read the folder inside the app"]) }
+        var written: [String] = [], unchanged = 0, problems: [String] = []
+        for rel in rels.sorted() {
             let parts = rel.split(separator: "/")
             guard !parts.contains(where: { $0.hasPrefix(".") || $0 == ".." }), rel != seedList else { continue }   // .DS_Store and the like
-            if seeds.contains(rel), fm.fileExists(atPath: root.appending(path: rel).path) { continue }
+            if seeds.contains(rel), fm.fileExists(atPath: root.appending(path: rel).path) { unchanged += 1; continue }
             let from = src.appending(path: rel)
             guard (try? from.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else { continue }
-            let data = try Data(contentsOf: from), to = root.appending(path: rel)
-            retireLooseTemplate(rel, in: root)
-            if let old = fm.contents(atPath: to.path) {
-                if old == data { continue }
-                try? Vault.snapshot(to, root: root)
-            } else {
-                try fm.createDirectory(at: to.deletingLastPathComponent(), withIntermediateDirectories: true)
-            }
-            try data.write(to: to, options: .atomic)
-            written.append(rel)
+            do {
+                let data = try Data(contentsOf: from), to = root.appending(path: rel)
+                retireLooseTemplate(rel, in: root)
+                if let old = fm.contents(atPath: to.path) {
+                    if old == data { unchanged += 1; continue }
+                    try? Vault.snapshot(to, root: root)
+                } else {
+                    try fm.createDirectory(at: to.deletingLastPathComponent(), withIntermediateDirectories: true)
+                }
+                try data.write(to: to, options: .atomic)
+                written.append(rel)
+            } catch { problems.append("\(rel): \(error.localizedDescription)") }
         }
-        return written
+        return (written, unchanged, problems)
     }
 
     /// `Templates/Claude/Items/Lecture Template.md` shipped → the old `Templates/Claude/Lecture Template.md` goes to `.trash/`.

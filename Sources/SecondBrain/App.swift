@@ -82,6 +82,8 @@ enum Tab: String, CaseIterable {
 struct SecondBrainApp: App {
     init() {
         if CommandLine.arguments.contains("--check") { Check.run(); exit(0) }
+        // `--install-files`: copies the Templates and Agents folder inside the app into the vault now (SECOND_BRAIN_VAULT to try it on a copy) and says what it did.
+        if CommandLine.arguments.contains("--install-files") { print(AppFiles.reinstall()); exit(0) }
         // `--sync-calendar`: fetches the feeds and rewrites Calendar Sync.md (use SECOND_BRAIN_VAULT to test on a copy).
         if CommandLine.arguments.contains("--sync-calendar") {
             let done = DispatchSemaphore(value: 0)
@@ -374,7 +376,7 @@ struct SecondBrainApp: App {
     var activity: [Activity] = Activity.load()
     init() {
         // a new app version brings its Templates and Agents files into the vault (see AppFiles.swift)
-        if let n = AppFiles.installIfNeeded()?.count, n > 0 { log("manager", "Updated \(n) Templates and Agents file\(n == 1 ? "" : "s") in the vault to version \(AppFiles.version.split(separator: "+")[0]).") }
+        if AppFiles.installIfNeeded() != nil, let r = AppFiles.lastReport { log("manager", r.text) }
         rewatch(); computeNeeds(); scheduleAutopilot(after: 8)
     }
     func rewatch() {

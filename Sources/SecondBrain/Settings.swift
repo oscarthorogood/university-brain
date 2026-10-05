@@ -115,8 +115,17 @@ struct AgentSettings: View {
 }
 
 struct RulesSettings: View {
+    @State private var installed = AppFiles.statusLine()
     var body: some View {
         Form {
+            LabeledContent("Templates and Agents:") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(installed).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+                    Button("Reinstall Now") { installed = AppFiles.reinstall() }
+                    Text("Each new version of the app copies its templates and the agents’ instructions into your vault. This does it again now; the old text of anything replaced stays in the vault’s .history folder.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+            }.padding(.bottom, 8)
             LabeledContent("Vault rules:") {
                 VStack(alignment: .leading, spacing: 6) {
                     open("Open AGENTS.md", "Agents/Shared Agents/AGENTS.md")
