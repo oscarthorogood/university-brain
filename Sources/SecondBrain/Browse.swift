@@ -206,6 +206,7 @@ struct FileRow: View {
 /// Everything waiting in Unsorted, laid out like an Items page: one sortable table. A note opens in the note page, any other file in a preview.
 struct InboxPage: View {
     @Environment(Store.self) private var store
+    @AppStorage("viewMode") private var viewMode = ViewMode.gallery
     @State private var query = ""
     @State private var key = "Date"
     @State private var up = false   // newest first
@@ -242,6 +243,7 @@ struct InboxPage: View {
                     RoundButton(icon: "arrow.up.doc", label: "Add file") { store.addFile() }
                     RoundButton(icon: "link", label: "Add link") { store.addLink() }
                     RoundButton(icon: "mic", label: "Voice memo") { store.voiceMemo = true }
+                    ViewModePicker(mode: $viewMode)
                     PageTools(title: "Unsorted", finder: Vault.root.appending(path: "Unsorted"))
                 }
             }
@@ -253,7 +255,12 @@ struct InboxPage: View {
                         TextField("Filter", text: $query).textFieldStyle(.plain)
                     }.font(.system(size: 13)).glassField().padding(.horizontal, 12).padding(.vertical, 10)
                     if rows.isEmpty { Text("No matches").font(.system(size: 13)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity, maxHeight: .infinity) }
-                    else {
+                    else if viewMode != .list {
+                        NoteGallery(items: rows.map { r in
+                            GalleryItem(id: r.url, title: r.title, subtitle: [r.type, r.course.isEmpty ? nil : r.course].compactMap { $0 }.joined(separator: " · "),
+                                        code: r.code, open: { store.page = .unsorted(r.url) }, menu: AnyView(UnsortedMenu(url: r.url)))
+                        }, compact: viewMode == .grid)
+                    } else {
                         HStack(spacing: 8) {
                             Color.clear.frame(width: 22, height: 1)
                             ForEach(Self.columns, id: \.self) { c in
@@ -298,6 +305,7 @@ private struct UnsortedRow: View {
 struct ItemsPage: View {
     @Environment(Store.self) private var store
     let title: String; let folders: [String]
+    @AppStorage("viewMode") private var viewMode = ViewMode.gallery
     @State private var showAll = false
     @State private var course: String?   // nil = every course
     @State private var query = ""
@@ -335,6 +343,7 @@ struct ItemsPage: View {
                     } else {   // this semester's three courses, as on Home
                         Pills(options: [(nil, "All")] + ["MSOA", "SM", "TEM"].compactMap { code in Vault.courses.first { $0.value == code }.map { (String?.some($0.key), code) } } as [(String?, String)], selection: $course)
                     }
+                    ViewModePicker(mode: $viewMode)
                     PageTools(title: title, finder: Vault.root.appending(path: Vault.dir(folders[0])), seasonal: true)
                 }
             }
@@ -344,7 +353,14 @@ struct ItemsPage: View {
                     TextField("Filter notes", text: $query).textFieldStyle(.plain)
                 }.font(.system(size: 13)).glassField().padding(.horizontal, 12).padding(.vertical, 10)
                 if rows.isEmpty { Text("No notes").font(.system(size: 13)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity, maxHeight: .infinity) }
-                else {
+                else if viewMode != .list {
+                    NoteGallery(items: rows.map { r in
+                        GalleryItem(id: r.note.id, title: r.note.display,
+                                    subtitle: [r.course, r.note.when.map { $0.formatted(.dateTime.day().month(.abbreviated)) }].compactMap { $0 }.joined(separator: " · "),
+                                    code: r.note.course, done: r.note.done,
+                                    open: { store.page = .note(r.note.id) }, menu: AnyView(NoteMenu(note: r.note)))
+                    }, compact: viewMode == .grid)
+                } else {
                     HStack(spacing: 8) {
                         Color.clear.frame(width: 22, height: 1)
                         ForEach(Self.columns, id: \.self) { c in
