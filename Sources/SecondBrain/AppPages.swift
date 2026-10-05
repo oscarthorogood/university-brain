@@ -408,6 +408,21 @@ struct AppSubPage: View {
     }
 }
 
+/// What an app's note shows when the page can't use it yet: what is missing and how to add it. The Markdown stays behind "Edit note".
+struct EmptyAppNote: View {
+    @Environment(Store.self) private var store
+    let url: URL
+    let icon: String, title: String, hint: String
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: icon).font(.system(size: 40)).foregroundStyle(Color.ink2.opacity(0.7))
+            Text(title).font(.system(size: 18, weight: .semibold, design: .serif))
+            Text(hint).font(.system(size: 13)).foregroundStyle(Color.ink2).multilineTextAlignment(.center).frame(maxWidth: 420)
+            Button { store.editingApps.insert(url) } label: { Label("Edit note", systemImage: "square.and.pencil") }.buttonStyle(.glassAction(.header, prominent: true))
+        }.padding(40).frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
 /// The top of an app's note page: back, the note's name and course, and Edit note (the only way to see the Markdown).
 struct AppNoteHeader: View {
     @Environment(Store.self) private var store

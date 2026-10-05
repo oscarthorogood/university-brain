@@ -516,7 +516,7 @@ struct ContentView: View {
                 .frame(width: collapsed ? 80 : 240, alignment: .leading)
                 .clipShape(.rect(cornerRadius: DS.Radius.pane))
                 .modifier(GlassPane())
-                if store.page.isNote && store.appKind(for: store.page) == nil && store.sheetKind(for: store.page) == nil {
+                if store.page.isNote && store.appKind(for: store.page) == nil {
                     // A note draws its own two panes: the document, and the inspector as a sidebar of its own.
                     MainPanel().frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -868,9 +868,7 @@ struct MainPanel: View {
         case .agent(let c): AgentPage(code: c)
         case .messages: MessagesPage()
         case .note(let url):
-            if let kind = store.appKind(for: .note(url)) { AppSubPage(url: url, kind: kind).id(url) }
-            else if let kind = store.sheetKind(for: .note(url)) { SheetPage(url: url, kind: kind).id(url) }
-            else { NotePage(url: url).id(url) }
+            if let kind = store.appKind(for: .note(url)) { AppSubPage(url: url, kind: kind).id(url) } else { NotePage(url: url).id(url) }
         case .file(let url): FilePage(url: url)
         case .tags: TagsPage()
         case .newTab: NewTabPage()
