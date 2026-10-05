@@ -74,7 +74,7 @@ struct WindowTabBar: View {
         let count = store.notices().count
         HStack(spacing: 0) {
             HStack(spacing: 0) {
-                Color.clear.frame(width: 88, height: 1)   // the window buttons
+                Color.clear.frame(width: 98, height: 1)   // the window buttons
                 GlassEffectContainer(spacing: 0) {
                     HStack(spacing: 2) {
                         ChromeButton(icon: "sidebar.left", help: collapsed ? "Show Sidebar" : "Hide Sidebar") { withAnimation(.spring(duration: 0.45, bounce: 0.15)) { collapsed.toggle() } }
