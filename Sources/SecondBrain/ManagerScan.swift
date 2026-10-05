@@ -330,6 +330,7 @@ extension Store {
         if agent == "writer" { spendDeep() }
         if agent == "researcher" { spendResearch() }
         log(Agent.manager.id, "Assigned to \(Agent.role(agent).name) (\(Manager.workTier(agent).rawValue)): \(item.title) — \(item.reason ?? "")")
+        say(Agent.manager.id, "@\(Agent.role(agent).name) can you take “\(clipped(item.title, 70))”?" + (item.reason.map { " \($0)" } ?? ""))
         inbox.append(item); saveInbox()
         let rel0 = item.paths.first
         if item.kind == .work, let p = rel0 { claim(p) }   // the note shows Agent In Progress while a helper has it
@@ -351,7 +352,7 @@ extension Store {
                 thinking.insert(c)
                 let a = await Agent.consult(c, helper: agent, job: item.title, note: rel0, root: root)
                 thinking.remove(c)
-                if let a { parts.append("\(Agent.role(c).name): \(a)"); log(c, "Advised \(Agent.role(agent).name) on “\(item.title)”: \(String(a.split(separator: "\n").first ?? "").prefix(140))") }
+                if let a { parts.append("\(Agent.role(c).name): \(a)"); say(c, "@\(Agent.role(agent).name) on “\(clipped(item.title, 50))”: \(clipped(String(a.split(separator: "\n").first ?? ""), 220))"); log(c, "Advised \(Agent.role(agent).name) on “\(item.title)”: \(String(a.split(separator: "\n").first ?? "").prefix(140))") }
             }
             advice = parts.isEmpty ? nil : parts.joined(separator: "\n\n")
             update { $0.advice = advice }
@@ -415,6 +416,7 @@ extension Store {
             update { $0.state = byYou ? .dismissed : .failed; $0.result = summary }
             markHandled(item.key); startCooling(agent, rel0 ?? item.key)
             log(agent, (byYou ? "Stopped: " : "Didn’t finish: ") + item.title)
+            say(agent, byYou ? "Stopped “\(clipped(item.title, 60))”." : "I couldn't finish “\(clipped(item.title, 60))”.")
             return
         }
 
@@ -427,6 +429,7 @@ extension Store {
         if !stopped, (!verdict.ok || !verdict.flags.isEmpty), item.kind == .work, case .work(let n, let w, _, _) = job, let s = session {
             let why = (verdict.problems + verdict.flags).map { "- " + $0 }.joined(separator: "\n")
             log(Agent.manager.id, "Sent “\(item.title)” back to \(Agent.role(agent).name): \(verdict.problems.first ?? verdict.flags.first ?? "")")
+            say(Agent.manager.id, "@\(Agent.role(agent).name) I'm sending “\(clipped(item.title, 50))” back: \(clipped(verdict.problems.first ?? verdict.flags.first ?? "", 200))")
             update { $0.state = .working }; thinking.remove(Agent.manager.id); thinking.insert(agent)
             let r = await Agent.doWork(role: w.role, task: w.task, note: n.id, extra: "", advice: advice, creating: w.creates, sections: w.sections, feedback: why, session: s, root: root)
             thinking.remove(agent); thinking.insert(Agent.manager.id)
@@ -476,12 +479,16 @@ extension Store {
             update { $0.state = stopped ? .dismissed : .rejected }
             if !stopped { recordReview(agent, passed: false) }   // a stop is your choice, not the helper failing
             log(Agent.manager.id, stopped ? "Stopped “\(item.title)” and put back what it had changed." : "Rejected “\(item.title)” and put it back: \(reasons)")
+            say(Agent.manager.id, stopped ? "@\(Agent.role(agent).name) you've been stopped, and I've put back what you changed." : "@\(Agent.role(agent).name) I've put “\(clipped(item.title, 50))” back: \(clipped(reasons, 200))")
         } else {
             let line = summary.split(separator: "\n").map { $0.trimmingCharacters(in: CharacterSet(charactersIn: " -*•#")) }.first { !$0.isEmpty }.map { String($0.prefix(150)) }
             let note = verdict.flags.isEmpty ? "checked" : "flagged: " + verdict.flags.joined(separator: "; ")
             update { $0.state = .done; $0.verdict = verdict.flags.isEmpty ? "Checked: fine" : "Flagged: " + verdict.flags.joined(separator: "; ") }
             recordReview(agent, passed: true)
             log(agent, "\(item.title)\(line.map { " — " + $0 } ?? "") · Manager \(note)" + (advice == nil ? "" : " · \(courses.map { Agent.role($0).name }.joined(separator: ", ")) advised"), undo: hasUndo ? id : nil)
+            say(agent, "Done with “\(clipped(item.title, 60))”. I've messaged Oscar.")
+            // and the agent texts you, in your private chat with them
+            chats[agent, default: []].append(Message(fromAgent: true, text: "I've finished “\(item.title)”\(line.map { ": " + $0 } ?? "")." + (verdict.flags.isEmpty ? "" : " The Manager flagged: \(verdict.flags.joined(separator: "; "))") + (hasUndo ? " Undo is in the Activity Log." : "")))
             scheduleAutopilot(after: 3)   // what it just did may be what the next helper was waiting for (Sorter files slides → Scribe; Planner fills a brief → Writer)
         }
     }

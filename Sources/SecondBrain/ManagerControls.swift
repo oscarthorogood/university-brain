@@ -67,7 +67,7 @@ extension Store {
     ]
 
     // MARK: Daily caps and the loop breaker
-    func dailyCap(_ agent: String) -> Int { ["writer": 3, "researcher": 3, "analyst": 6, "sorter": 12][agent] ?? 20 }
+    func dailyCap(_ agent: String) -> Int { ["writer": 5, "researcher": 5, "analyst": 10, "sorter": 20][agent] ?? 30 }
     private func dayKey(_ agent: String) -> String { "jobsToday-\(agent)-" + Date.now.formatted(.iso8601.year().month().day()) }
     func jobsToday(_ agent: String) -> Int { d.integer(forKey: dayKey(agent)) }
     func spendJob(_ agent: String) { d.set(jobsToday(agent) + 1, forKey: dayKey(agent)) }

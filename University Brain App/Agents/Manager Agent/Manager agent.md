@@ -46,7 +46,7 @@ Each can be switched off in the **Manager menu** (top right of the Agents page).
 ## Limits and safeguards
 
 - **Budget.** It reads the real Claude plan usage. Background jobs start only below the budget preset: Cautious 50%, Balanced 60% (default), Generous 75% of the 5-hour window, with the week at 60 / 70 / 85%; Opus jobs below 30 / 40 / 55%. A runaway guard of 12 jobs an hour always applies, and a Claude usage limit pauses it for an hour.
-- **Daily caps per agent** (Writer 3, Researcher 3, Analyst 6, Sorter 12, others 20).
+- **Daily caps per agent** (Writer 5, Researcher 5, Analyst 10, Sorter 20, others 30).
 - **Loop breaker.** The same helper isn't put on the same note again for six hours; three failed reviews in a row pause that helper for a day.
 - **Leave it alone.** A note Oscar changed in the last five minutes, or has open, is skipped.
 - **Pause, quiet hours, battery.** From the Manager menu: pause (an hour, four hours, until tomorrow), quiet hours, pause on battery or in Low Power Mode. The calendar sync carries on.
