@@ -16,9 +16,21 @@ xattr -dr com.apple.quarantine "/Applications/University Brain.app"
 
 The arrow icon next to Settings, at the top left of the window, checks GitHub for a newer release. The app also checks shortly after launch and every six hours, and the icon fills in when one is waiting. **Install and Relaunch** downloads the new DMG, checks its SHA-256, swaps the app in place (the old one goes to the Trash) and reopens it. Updates installed this way don't need **Open Anyway** again.
 
+## Templates and Agents
+
+The `University Brain App/` folder in this repo holds the vault's `Templates/` and `Agents/` files. `bundle.sh` packs it into the app, and the first time each new version runs it copies the folder into the vault (`~/Documents/University`, or the folder chosen in Settings), so the templates and the agents' instructions always match the installed version.
+
+- It **overwrites**: a shipped file that differs from the vault's is replaced, and the old text is kept in the vault's `.history/` (the Activity Log notes how many files were updated).
+- Files the folder doesn't contain are never touched or deleted.
+- `University Brain App/seed.txt` lists files that are only a starting copy: `memory.md`, `open-items.md`, the course briefings, `Calendar Sync.md`, `Learn.md` and the agents' work notes. They are installed when the vault doesn't have them yet and never overwritten. Delete a line from `seed.txt` to make that file overwrite on every update. (`seed.txt` itself isn't copied.)
+- Templates are grouped in `Templates/Claude/Items/`, `Files/` and `Apps/` (`Course Template.md` is directly in `Templates/Claude/`). When an update ships a template in one of those folders, an old loose copy in `Templates/Claude/` moves to the vault's `.trash/`.
+- The agent files (`<Name> agent.md`) are shipped, so anything an agent wrote into its own file is replaced on an update (the old text stays in `.history/`).
+- Edits made to the repo's folder go out like any other app change: merging into `main` cuts a release.
+- The copy is skipped if the vault folder doesn't exist yet, and tried again on the next launch.
+
 ## Releasing
 
-Every merge into `main` that changes the app (`Sources/`, `Package.swift`, `Icon/`, `bundle.sh` or `make-dmg.sh`) cuts a release automatically: the patch number goes up by one (`1.0.3` → `1.0.4`). Edits to docs or the workflow alone don't.
+Every merge into `main` that changes the app (`Sources/`, `University Brain App/`, `Package.swift`, `Icon/`, `bundle.sh` or `make-dmg.sh`) cuts a release automatically: the patch number goes up by one (`1.0.3` → `1.0.4`). Edits to docs or the workflow alone don't.
 
 For a bigger jump, use **Actions → Release → Run workflow** and type the version (`1.1.0`, `2.0.0`); later merges count on from there. Pushing a tag such as `v1.1.0` does the same.
 

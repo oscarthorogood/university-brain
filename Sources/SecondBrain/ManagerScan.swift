@@ -71,13 +71,13 @@ extension Store {
             guard !Task.isCancelled, let self else { return }
             // The tick runs in a task of its own. Every vault reload reschedules (and so cancels) this timer; if the tick ran inside it,
             // a reload part-way through would cancel the tick's own network calls, and the review would read the cancelled link checks as dead links.
-            Task { await self.autopilotTick() }
+            Task { await Agent.$background.withValue(true) { await self.autopilotTick() } }   // tagged, so pausing can stop exactly what the Manager started
         }
     }
     func setAutopilot(_ on: Bool) {
         autopilotOn = on
         UserDefaults.standard.set(on, forKey: "autopilotOn")
-        if on { scheduleAutopilot(after: 2) } else { autopilotTimer?.cancel() }
+        if on { scheduleAutopilot(after: 2) } else { autopilotTimer?.cancel(); Agent.stopBackgroundRuns() }
     }
 
     // MARK: Budget
@@ -172,7 +172,7 @@ extension Store {
     /// Run a job now, from a button (Sort Now, File Now, a note's page): waits its turn, ignores the budget and the pause, and goes through the same consult, work and review.
     func manualJob(_ job: Job) async {
         while agentBusy { try? await Task.sleep(for: .milliseconds(400)) }
-        await runJob(job)
+        await Agent.$button.withValue(true) { await runJob(job) }   // tagged, so Stop can end it (pausing leaves it alone)
     }
 
     // MARK: Finding work
@@ -221,7 +221,7 @@ extension Store {
         var researchText: String?, revisionText: String?   // read once, only if needed
         // a revision set is only made for the newest written-up lecture of each course, so a batch of lectures doesn't become a batch of jobs
         let newestLecture = Dictionary(grouping: notes.filter { $0.folder == "Lectures" && !$0.unfilled && $0.course != nil && ($0.when.map { (-5...0).contains(days($0)) } ?? false) }, by: \.course)
-            .compactMapValues { $0.max { $0.when! < $1.when! }?.id }
+            .compactMapValues { $0.max { $0.whenOrFar < $1.whenOrFar }?.id }
         for n in notes where n.course != nil {
             guard !inUse(n.id) else { continue }
             let text = (try? String(contentsOf: n.id, encoding: .utf8)) ?? ""
@@ -360,7 +360,7 @@ extension Store {
         // work: the helper does it, with no tick
         update { $0.state = .working }
         thinking.insert(agent)
-        var summary = "", planText = "", ok = true, nothing = false, session: String?, moved: [[String]] = [], work: AgentWork?
+        var summary = "", planText = "", ok = true, nothing = false, stopped = false, session: String?, moved: [[String]] = [], work: AgentWork?
         switch job {
         case .sorting(let files, _):
             // exact copies of files already in Resources/ are decided here, byte for byte: Claude never sees them
@@ -387,7 +387,8 @@ extension Store {
                 }
                 let r = await Agent.approveFiling(session: planSession, moved: done, root: root)
                 ok = r.session != nil; session = r.session
-                summary = (ok ? "Filed \(done.count) file\(done.count == 1 ? "" : "s")" : "Didn’t finish") + (failed.isEmpty ? "" : "; \(failed.count) not moved") + ". " + r.text
+                if r.stopped { ok = true; stopped = true }   // stopped part-way: carries on to the undo below, which puts back the moves and the notes it named
+                summary = stopped ? "Stopped by you, so what had been done was put back." : (ok ? "Filed \(done.count) file\(done.count == 1 ? "" : "s")" : "Didn’t finish") + (failed.isEmpty ? "" : "; \(failed.count) not moved") + ". " + r.text
                 if r.limited { pauseForLimit() }
             }
             if ok && !nothing { summary = dupSummary + summary }
@@ -402,16 +403,18 @@ extension Store {
                 }.joined()
             }.value
             let team = Agent.teamLog(activity), r = await Agent.doWork(role: w.role, task: w.task, note: n.id, extra: extra + (team.isEmpty ? "" : "\n\n" + team), advice: advice, creating: w.creates, sections: w.sections, feedback: nil, session: nil, root: root)
-            if r.session == nil { ok = false; summary = r.text; if r.limited { pauseForLimit() } }
+            if r.stopped { ok = true; stopped = true; summary = Agent.stoppedText }
+            else if r.session == nil { ok = false; summary = r.text; if r.limited { pauseForLimit() } }
             else if r.text.hasPrefix("NOTHING:") { nothing = true } else { summary = r.text; session = r.session }
         case .learn: return
         }
         thinking.remove(agent)
         if nothing { inbox.removeAll { $0.id == id }; saveInbox(); markHandled(item.key); return }
         guard ok else {
-            update { $0.state = .failed; $0.result = summary }
+            let byYou = summary == Agent.stoppedText   // stopped while only reading: nothing to put back, and not a failure
+            update { $0.state = byYou ? .dismissed : .failed; $0.result = summary }
             markHandled(item.key); startCooling(agent, rel0 ?? item.key)
-            log(agent, "Didn’t finish: \(item.title)")
+            log(agent, (byYou ? "Stopped: " : "Didn’t finish: ") + item.title)
             return
         }
 
@@ -419,8 +422,9 @@ extension Store {
         update { $0.state = .checking }
         thinking.insert(Agent.manager.id)
         reload()
-        var verdict = await reviewJob(item, work: work, started: started, before: before, moved: moved, root: root)
-        if (!verdict.ok || !verdict.flags.isEmpty), item.kind == .work, case .work(let n, let w, _, _) = job, let s = session {
+        var verdict = Review.Verdict(problems: stopped ? ["you stopped it"] : [])
+        if !stopped { verdict = await reviewJob(item, work: work, started: started, before: before, moved: moved, root: root) }
+        if !stopped, (!verdict.ok || !verdict.flags.isEmpty), item.kind == .work, case .work(let n, let w, _, _) = job, let s = session {
             let why = (verdict.problems + verdict.flags).map { "- " + $0 }.joined(separator: "\n")
             log(Agent.manager.id, "Sent “\(item.title)” back to \(Agent.role(agent).name): \(verdict.problems.first ?? verdict.flags.first ?? "")")
             update { $0.state = .working }; thinking.remove(Agent.manager.id); thinking.insert(agent)
@@ -467,11 +471,11 @@ extension Store {
 
         if !verdict.ok {
             let reasons = verdict.problems.joined(separator: "; ")
-            update { $0.verdict = "Rejected: " + reasons }
+            update { $0.verdict = stopped ? "Stopped by you" : "Rejected: " + reasons }
             if hasUndo { undoJob(id) }
-            update { $0.state = .rejected }
-            recordReview(agent, passed: false)
-            log(Agent.manager.id, "Rejected “\(item.title)” and put it back: \(reasons)")
+            update { $0.state = stopped ? .dismissed : .rejected }
+            if !stopped { recordReview(agent, passed: false) }   // a stop is your choice, not the helper failing
+            log(Agent.manager.id, stopped ? "Stopped “\(item.title)” and put back what it had changed." : "Rejected “\(item.title)” and put it back: \(reasons)")
         } else {
             let line = summary.split(separator: "\n").map { $0.trimmingCharacters(in: CharacterSet(charactersIn: " -*•#")) }.first { !$0.isEmpty }.map { String($0.prefix(150)) }
             let note = verdict.flags.isEmpty ? "checked" : "flagged: " + verdict.flags.joined(separator: "; ")

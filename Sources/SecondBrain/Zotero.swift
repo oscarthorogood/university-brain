@@ -100,6 +100,11 @@ enum Zotero {
     }
 
     // MARK: Web API
+    /// One element of a listing that may fail to decode on its own (an odd field in a single item) without taking the other 99 with it.
+    struct Lossy<T: Decodable>: Decodable {
+        let value: T?
+        init(from decoder: Decoder) throws { value = try? T(from: decoder) }
+    }
     struct Failure: LocalizedError {
         let code: Int, message: String
         var errorDescription: String? {
@@ -146,10 +151,28 @@ enum Zotero {
                                             headers: start == 0 ? since.map { ["If-Modified-Since-Version": "\($0)"] } ?? [:] : [:])
                 if r.statusCode == 304 { return nil }
                 if start == 0 { version = Int(r.value(forHTTPHeaderField: "Last-Modified-Version") ?? "") ?? 0 }
-                let page = try JSONDecoder().decode([T].self, from: d)
-                out += page; start += page.count
+                let page = try JSONDecoder().decode([Lossy<T>].self, from: d)   // an item that doesn't decode is skipped, not fatal to the whole sync
+                out += page.compactMap(\.value); start += page.count
                 if page.isEmpty || start >= (Int(r.value(forHTTPHeaderField: "Total-Results") ?? "") ?? 0) { return (out, version) }
             }
+        }
+
+        /// MD5 and byte count of a file, reading 1 MB at a time.
+        static func md5AndSize(_ url: URL) throws -> (md5: String, size: Int) {
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+            var hash = Insecure.MD5(), size = 0
+            while let piece = try handle.read(upToCount: 1 << 20), !piece.isEmpty { hash.update(data: piece); size += piece.count }
+            return (hash.finalize().map { String(format: "%02x", $0) }.joined(), size)
+        }
+        /// Writes `prefix`, then the file, then `suffix` to `out`, copying the file 1 MB at a time.
+        static func compose(prefix: Data, file: URL, suffix: Data, into out: URL) throws {
+            guard FileManager.default.createFile(atPath: out.path, contents: nil) else { throw CocoaError(.fileWriteUnknown) }
+            let dst = try FileHandle(forWritingTo: out), src = try FileHandle(forReadingFrom: file)
+            defer { try? dst.close(); try? src.close() }
+            try dst.write(contentsOf: prefix)
+            while let piece = try src.read(upToCount: 1 << 20), !piece.isEmpty { try dst.write(contentsOf: piece) }
+            try dst.write(contentsOf: suffix)
         }
 
         static func json(_ x: Any) -> Data { (try? JSONSerialization.data(withJSONObject: x)) ?? Data() }
@@ -168,18 +191,21 @@ enum Zotero {
 
         /// Uploads a file to an existing attachment item (Zotero's authorise, upload, register steps).
         func upload(_ key: String, file: URL) async throws {
-            let data = try Data(contentsOf: file)
-            let md5 = Insecure.MD5.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            let (md5, size) = try Self.md5AndSize(file)   // read in pieces: a 200 MB PDF is never held in memory
             let mtime = Int(((try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .now).timeIntervalSince1970 * 1000)
             let urlencoded = "application/x-www-form-urlencoded"
             struct Slot: Decodable { var url: String?, contentType: String?, prefix: String?, suffix: String?, uploadKey: String?, exists: Int? }
-            let (d, _) = try await call("POST", "/items/\(key)/file", body: Self.form([("md5", md5), ("filename", file.lastPathComponent), ("filesize", "\(data.count)"), ("mtime", "\(mtime)")]),
+            let (d, _) = try await call("POST", "/items/\(key)/file", body: Self.form([("md5", md5), ("filename", file.lastPathComponent), ("filesize", "\(size)"), ("mtime", "\(mtime)")]),
                                         type: urlencoded, headers: ["If-None-Match": "*"])
             let slot = try JSONDecoder().decode(Slot.self, from: d)
             if slot.exists == 1 { return }
             guard let u = slot.url.flatMap(URL.init), let ct = slot.contentType, let prefix = slot.prefix, let suffix = slot.suffix, let up = slot.uploadKey else { throw Failure(code: 502, message: "no upload slot") }
             var req = URLRequest(url: u); req.httpMethod = "POST"; req.setValue(ct, forHTTPHeaderField: "Content-Type")   // the file store, not Zotero: no key sent
-            let (_, resp) = try await URLSession.shared.upload(for: req, from: Data(prefix.utf8) + data + Data(suffix.utf8))
+            // Zotero's file store wants prefix + file + suffix as one body: it is put together on disk, in pieces, and sent from there
+            let body = FileManager.default.temporaryDirectory.appending(path: "zotero-upload-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: body) }
+            try Self.compose(prefix: Data(prefix.utf8), file: file, suffix: Data(suffix.utf8), into: body)
+            let (_, resp) = try await URLSession.shared.upload(for: req, fromFile: body)
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
             guard (200..<300).contains(code) else { throw Failure(code: code, message: "upload failed") }
             _ = try await call("POST", "/items/\(key)/file", body: Self.form([("upload", up)]), type: urlencoded, headers: ["If-None-Match": "*"])
@@ -243,7 +269,8 @@ enum Zotero {
             texts[n] = t; keyOf[n] = Vault.frontmatter(t)["zotero"]
         }
         for name in texts.keys.sorted() {
-            let text = texts[name]!, url = dir.appending(path: name)
+            guard let text = texts[name] else { continue }
+            let url = dir.appending(path: name)
             do {
                 if let key = keyOf[name] {
                     guard var e = st.items[key] else { continue }
@@ -329,7 +356,7 @@ enum Zotero {
             taken.insert(n)
             if n.hasSuffix(".md"), let t = try? String(contentsOf: dir.appending(path: n), encoding: .utf8), let k = Vault.frontmatter(t)["zotero"] { fileOf[k] = n }
         }
-        let kids = Dictionary(grouping: all.filter { $0.data.parentItem != nil }, by: { $0.data.parentItem! })
+        let kids = Dictionary(grouping: all.compactMap { it in it.data.parentItem.map { (parent: $0, item: it) } }, by: \.parent).mapValues { $0.map(\.item) }
         for it in all where it.data.parentItem == nil && !["attachment", "note", "annotation"].contains(it.data.itemType) {
             let name = fileOf[it.key] ?? fileName(it, taken: taken)
             taken.insert(name)
@@ -418,7 +445,7 @@ enum Zotero {
 
     /// Zotero notes are HTML. Paragraphs, lists, headings, bold and italic survive the trip; the rest is plain text.
     static func md(_ html: String) -> String {
-        var s = html.replacing(/<h([1-6])[^>]*>/) { String(repeating: "#", count: Int($0.1)!) + " " }
+        var s = html.replacing(/<h([1-6])[^>]*>/) { String(repeating: "#", count: Int($0.1) ?? 1) + " " }
         for (pattern, rep) in [("</(p|div|ul|ol|h[1-6]|blockquote)>", "\n\n"), ("</li>", "\n"), ("<br\\s*/?>", "\n"), ("<li[^>]*>", "- "),
                                ("</?(strong|b)>", "**"), ("</?(em|i)>", "*"), ("<[^>]+>", "")] {
             s = s.replacingOccurrences(of: pattern, with: rep, options: [.regularExpression, .caseInsensitive])

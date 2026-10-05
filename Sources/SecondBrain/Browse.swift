@@ -184,9 +184,9 @@ struct NoteBrowserPage: View {
         CourseBrowser(title: title, courses: Set(all.map { Self.course($0, known: known) }).sorted(), noun: "notes", finder: Vault.root.appending(path: Vault.dir(folders[0]))) { course, query in
             let items = all.filter { Self.course($0, known: known) == course && (query.isEmpty || $0.display.localizedCaseInsensitiveContains(query)) }
             let groups = Dictionary(grouping: items, by: Self.kind)
-            return Self.kinds.filter { groups[$0] != nil }.map { k in
-                (k, "\(groups[k]!.count)",
-                 groups[k]!.sorted { $0.title < $1.title }.map { Entry(id: $0.id, row: AnyView(NoteFileRow(note: $0))) })
+            return Self.kinds.compactMap { k -> (String, String, [Entry])? in
+                guard let group = groups[k] else { return nil }
+                return (k, "\(group.count)", group.sorted { $0.title < $1.title }.map { Entry(id: $0.id, row: AnyView(NoteFileRow(note: $0))) })
             }
         }
     }
@@ -262,7 +262,7 @@ struct ItemsPage: View {
     @State private var up = true
     static let columns = ["Title", "Course", "Date", "Status"]
     var columns: [String] { inbox ? ["Title", "Course", "Date", "Type"] : Self.columns }
-    static func width(_ c: String) -> CGFloat { ["Title": .infinity, "Course": 230, "Date": 110, "Status": 100, "Type": 100][c]! }
+    static func width(_ c: String) -> CGFloat { ["Title": .infinity, "Course": 230, "Date": 110, "Status": 100, "Type": 100][c] ?? 100 }
 
     func value(_ r: (note: Note, course: String)) -> String {
         switch key {

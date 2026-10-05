@@ -26,9 +26,21 @@ extension Store {
     private func once(_ key: String) -> Bool { if handled.contains(key) { return false }; markHandled(key); return true }
     private var dayStamp: String { Date.now.formatted(.iso8601.year().month().day()) }
 
+    /// Every note's text, read in the background.
+    private func readAllNotes() async -> [URL: String] {
+        let urls = notes.map(\.id)
+        return await Task.detached(priority: .utility) {
+            var out: [URL: String] = [:]
+            for u in urls { if let t = try? String(contentsOf: u, encoding: .utf8) { out[u] = t } }
+            return out
+        }.value
+    }
+
     func runChecks() async {
-        if jobOn("vaulthealth"), due("vaulthealth", every: 86400) { vaultHealth() }
-        if jobOn("links"), due("links", every: 86400) { brokenLinks() }
+        let health = jobOn("vaulthealth") && due("vaulthealth", every: 86400), links = jobOn("links") && due("links", every: 86400)
+        let texts = health || links ? await readAllNotes() : nil   // these two read every note, so they don't do it on the main thread
+        if health { vaultHealth(texts: texts) }
+        if links { brokenLinks(texts: texts) }
         if jobOn("calendardrift"), due("calendardrift", every: 3600) { calendarDrift() }
         if jobOn("deadlines"), due("deadlines", every: 3600) { deadlineConsistency() }
         if jobOn("atrisk"), due("atrisk", every: 6 * 3600) { atRisk() }
@@ -41,15 +53,16 @@ extension Store {
                                                  "Projects": "Projects.base", "Research": "Research.base"].merging(Study.folders.map { ($0, $0 + ".base") }) { a, _ in a }
 
     /// 15. Frontmatter against the templates, `base` links, naming, duplicates. Fixes an empty or wrong `base` (mechanical and safe); reports the rest.
-    func vaultHealth() {
+    func vaultHealth(texts: [URL: String]? = nil) {
         var fixed = 0, issues: [String] = [], titles: [String: Int] = [:], fixedRels: [String] = []
         let statuses: Set<String> = Set(TaskState.allCases.map(\.rawValue)).union(["To Find"])
         for n in notes {
             titles[n.title.lowercased(), default: 0] += 1
-            guard let base = Self.expectedBase[n.folder], let text = try? String(contentsOf: n.id, encoding: .utf8) else { continue }
+            guard let base = Self.expectedBase[n.folder], let text = texts?[n.id] ?? (try? String(contentsOf: n.id, encoding: .utf8)) else { continue }
             let fm = Vault.frontmatter(text)
             if Vault.unlink(fm["base"] ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "\" ")) != base {
-                if (try? Vault.write(Vault.setField(text, "base", to: "\"[[\(base)]]\""), to: n.id)) != nil { fixed += 1; fixedRels.append(Vault.rel(n.id)) } else { issues.append("\(n.title): `base`") }
+                let current = (try? String(contentsOf: n.id, encoding: .utf8)) ?? text   // read again just before writing, so an edit made while the check ran isn't overwritten
+                if (try? Vault.write(Vault.setField(current, "base", to: "\"[[\(base)]]\""), to: n.id)) != nil { fixed += 1; fixedRels.append(Vault.rel(n.id)) } else { issues.append("\(n.title): `base`") }
             }
             if let s = fm["status"], !statuses.contains(s.trimmingCharacters(in: CharacterSet(charactersIn: "\" "))) { issues.append("\(n.title): status “\(s)”") }
             if n.course == nil, n.folder != "Courses", n.folder != "Readings", fm["course"] != nil || fm["Course"] != nil, Vault.courses.isEmpty == false, (fm["course"] ?? fm["Course"] ?? "").isEmpty { issues.append("\(n.title): no course") }
@@ -58,9 +71,9 @@ extension Store {
         if fixed > 0 || !issues.isEmpty, once("health:\(dayStamp)") {
             let msg = "Vault health: " + (fixed > 0 ? "fixed \(fixed) `base` field\(fixed == 1 ? "" : "s"); " : "") + (issues.isEmpty ? "nothing else to report." : "\(issues.count) thing\(issues.count == 1 ? "" : "s") to look at (\(issues.prefix(3).joined(separator: "; "))).")
             if fixed > 0 {
-                let undo = InboxItem.Undo(restore: fixedRels, snapshots: Dictionary(uniqueKeysWithValues: fixedRels.compactMap { rel in
+                let undo = InboxItem.Undo(restore: fixedRels, snapshots: Dictionary(fixedRels.compactMap { rel in
                     Vault.history(Vault.root.appending(path: rel)).first.map { (rel, $0.url.lastPathComponent) }
-                }))
+                }, uniquingKeysWith: { a, _ in a }))
                 var item = InboxItem(kind: .work, agent: Agent.manager.id, title: "Vault health: fixed \(fixed) base field\(fixed == 1 ? "" : "s")", state: .done, key: "health:\(dayStamp)")
                 item.undo = undo; item.verdict = "Automated fix"
                 inbox.append(item); saveInbox()
@@ -73,12 +86,12 @@ extension Store {
     }
 
     /// 16. Wikilinks and `resources` files that point at nothing.
-    func brokenLinks() {
+    func brokenLinks(texts: [URL: String]? = nil) {
         let have = Set(notes.map { $0.title.lowercased() })
         let fileExt: Set<String> = ["pdf", "ppt", "pptx", "png", "jpg", "jpeg", "xlsx", "xls", "docx", "doc", "csv", "zip", "mp4", "mp3", "base", "txt", "json", "html"]
         var dead: [String] = [], missingFiles: [String] = []
         for n in notes {
-            guard let text = try? String(contentsOf: n.id, encoding: .utf8) else { continue }
+            guard let text = texts?[n.id] ?? (try? String(contentsOf: n.id, encoding: .utf8)) else { continue }
             for m in text.matches(of: /\[\[([^\]|#]+)/) {
                 let t = String(m.1).trimmingCharacters(in: .whitespaces)
                 if t.isEmpty || t.contains("/") || fileExt.contains((t as NSString).pathExtension.lowercased()) || have.contains(t.lowercased()) { continue }
@@ -110,9 +123,9 @@ extension Store {
             }
         }
         if changed > 0 {
-            let undo = InboxItem.Undo(restore: driftRels, snapshots: Dictionary(uniqueKeysWithValues: driftRels.compactMap { rel in
+            let undo = InboxItem.Undo(restore: driftRels, snapshots: Dictionary(driftRels.compactMap { rel in
                 Vault.history(Vault.root.appending(path: rel)).first.map { (rel, $0.url.lastPathComponent) }
-            }))
+            }, uniquingKeysWith: { a, _ in a }))
             var item = InboxItem(kind: .work, agent: Agent.manager.id, title: "Calendar drift: corrected \(changed) note\(changed == 1 ? "" : "s")", state: .done, key: "drift:\(dayStamp)")
             item.undo = undo; item.verdict = "Automated fix"
             inbox.append(item); saveInbox()
@@ -185,7 +198,7 @@ extension Store {
         let start = today, end = start.addingTimeInterval(7 * 86400)
         for (code, name) in Vault.courses.map({ ($0.value, Agent.role($0.value).name) }).sorted(by: { $0.0 < $1.0 }) {
             let mine = notes.filter { $0.course == code && !$0.done && ($0.when.map { $0 >= start && $0 < end } ?? false) }
-            func list(_ folders: Set<String>) -> String { mine.filter { folders.contains($0.folder) }.sorted { $0.when! < $1.when! }.map { "\($0.display) (\($0.when!.formatted(.dateTime.weekday(.abbreviated).hour().minute())))" }.joined(separator: ", ") }
+            func list(_ folders: Set<String>) -> String { mine.filter { folders.contains($0.folder) }.sorted { $0.whenOrFar < $1.whenOrFar }.map { "\($0.display) (\($0.whenOrFar.formatted(.dateTime.weekday(.abbreviated).hour().minute())))" }.joined(separator: ", ") }
             var parts: [String] = []
             let classes = list(["Lectures", "Tutorials"]), due = list(["Essays", "Projects", "TaskNotes/Tasks"]), reads = mine.filter { $0.folder == "Readings" }.count
             if !classes.isEmpty { parts.append("Classes: \(classes).") }

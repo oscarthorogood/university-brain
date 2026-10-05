@@ -20,6 +20,7 @@ struct ManagerMenu: View {
                 Button("Four hours") { store.pause(for: 4 * 3600) }
                 Button("Until tomorrow morning") { store.pauseUntilTomorrow() }
             }
+            if !store.activeJobs.isEmpty { Button("Stop the current job", systemImage: "stop.fill") { store.stopCurrentJob() } }
             Button("Run a scan now", systemImage: "arrow.clockwise") { store.scheduleAutopilot(after: 1) }
             Button("What it’s doing…", systemImage: "list.bullet") { showQueue = true }
             Button(store.lastUndoable.map { "Undo last job: \($0.title)" } ?? "Undo last job", systemImage: "arrow.uturn.backward") { if let j = store.lastUndoable { store.undoJob(j.id) } }

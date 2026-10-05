@@ -56,7 +56,7 @@ struct TasksAgenda: View {
             guard let w = n.when, !n.done, w >= store.today, w < end else { return false }
             return n.course != nil || n.folder == "TaskNotes/Tasks"
         }
-        let days = Dictionary(grouping: items, by: { Calendar.current.startOfDay(for: $0.when!) }).sorted { $0.key < $1.key }
+        let days = Dictionary(grouping: items, by: { Calendar.current.startOfDay(for: $0.whenOrFar) }).sorted { $0.key < $1.key }
         Card(title: "Next two weeks", trailing: "\(items.count)") {
             if items.isEmpty { Text("Nothing in the next two weeks").font(.system(size: 13)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity, maxHeight: .infinity) }
             else {
@@ -64,7 +64,7 @@ struct TasksAgenda: View {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(days, id: \.key) { day, notes in
                             Heading(Calendar.current.isDateInToday(day) ? "Today" : Calendar.current.isDateInTomorrow(day) ? "Tomorrow" : day.formatted(.dateTime.weekday(.wide).day().month(.abbreviated)), trailing: "\(notes.count)")
-                            ForEach(notes.sorted { $0.when! < $1.when! }) { NoteRow(note: $0, timeColumn: true) }
+                            ForEach(notes.sorted { $0.whenOrFar < $1.whenOrFar }) { NoteRow(note: $0, timeColumn: true) }
                         }
                     }
                 }

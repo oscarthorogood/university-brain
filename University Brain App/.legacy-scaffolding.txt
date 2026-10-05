@@ -1,0 +1,406 @@
+**Answer:** B — why, and where it comes from.
+**Mark scheme:** What earns the marks.
+**Notes section format**
+**Pulling detail from attachments**
+- **How the app shows links:** the note page's **Related** card lists every Revision, Research, Zotero, Resources or OneDrive item this note links to (through `resources`, `onedrive`, or any `[[link]]` in the text) or that links back to it. **Links to** lists the other Items notes it links to (through `related`, `readings` or any `[[link]]`). Properties (course, date, status, tags) are edited on the page. Link things once, with a wikilink; don't repeat them by hand.
+- **How the app shows this note:** the page's **Details** card shows type, course, date and status, and **Relates to** lists the notes in `related` plus the notes that link back to it. Link the Items notes this one draws on through `related`.
+- **How the app shows this note:** the page's **Details** card shows type, course, date and status, and **Relates to** lists the notes in `related` plus the notes that link back to it. Link the Items notes this one draws on through `related`; Zotero items also show their collections.
+- **Term** — Definition in one sentence. (Author, Year)
+- A. Option
+- Always link `course:: [[Course Name]]` so the lecture is grouped correctly in course-grouped Bases views and appears under the course's Linked mentions.
+- Always link `course:: [[Course Name]]` so the reading is grouped correctly in course views; set `type` to `Course Reading` (set by the course) or `Research Source` (found yourself).
+- Always link `course:: [[Course Name]]` so the tutorial is grouped correctly in course-grouped Bases views and appears under the course's Linked mentions.
+- B. Option
+- Branch
+- Build **Structure** from the table of contents or headings, then read the parts set for the course in full.
+- C. Option
+- Central idea
+- Cite a location for every extracted point (`Q3`, `p. 2`, `Sheet "Data"`). Leave blanks rather than guess.
+- Cite a location for every extracted point (`slide 12`, `p. 4`, `12:30`). If something isn't in the attachments, leave the field blank rather than guessing.
+- Cite the page for every extracted detail, and leave a row blank rather than guess.
+- Copy questions verbatim with their number and marks, and cite the paper and page.
+- Copy the questions from the tutorial sheet verbatim into **The task**, with question numbers and marks.
+- D. Option
+- Define in one sentence and cite the source; add the term once.
+- Detail
+- Every claim has a link. If it cannot be verified, it goes under Gaps, not Findings.
+- Exemplars fill **Exemplars**. Lecture slides and course schedules often hold extra detail (e.g. which weeks are set aside for the project) — check the course's L01 note.
+- Exemplars fill **Exemplars**. Lecture slides that describe the assessment count as attachments too. Check the course's L01 note.
+- Fill in `Lecture No.` so lectures sort in delivery order within a course, even if notes are created out of order. `date` is the delivery date; the time and room go in **Session details**.
+- Fill in `Tutorial No.` so tutorials sort in delivery order within a course, even if notes are created out of order.
+- Fill in `authors`, `date`, `item type`, `full citation`, and `in text citation` at the time of adding the note — doing this immediately avoids having to hunt down citation details later when writing an essay.
+- For data files (`.xlsx`, `.csv`, `.dta`), note the file, sheet and variables used next to the question they belong to.
+- For long textbooks, cover only the chapters set, and say which ones in **Source details**.
+- If a solutions file is linked, fill **Solutions check** from it — never overwrite your own answers with the model ones.
+- If the finished essay file itself lives on OneDrive (e.g. the submitted .docx/.pdf), link it via the `onedrive` field rather than duplicating the content into this note.
+- It is a working brief, not a submission: never copy its sentences into assessed work. Cite the original sources.
+- Keep `status` current (`Not started` → `In Progress` → `Done`).
+- Keep `summary` to a few lines capturing the key argument or findings, so readings are scannable without reopening the source.
+- Keep `summary` to a one-line topic description so a course's lecture list is scannable at a glance.
+- Keep `summary` to a one-line topic description so a course's tutorial list is scannable at a glance.
+- Keep `summary` to one line: assessment, weighting and question or thesis, so essays are scannable from a course's linked-mentions list.
+- Keep `summary` to one line: assessment, weighting, format.
+- Keep a card to one idea: the front is a question or term, the back the shortest correct answer.
+- Keep each node to a few words; put the explanation in the linked Items note.
+- Lead with **My work** — the exercises or problem sets you actually completed before or after the session — since that's the most valuable record for revision later. Tutorial notes are secondary, capturing what was covered/corrected in the session itself.
+- Link any sheets, solutions, datasets or handouts via `resources`, and any related readings via `readings`, rather than pasting content inline.
+- Link any slides, recordings, or handouts via `resources`, and any assigned readings via `readings`, rather than pasting content inline.
+- Link the Items notes it condenses through `related` instead of copying them.
+- Link the audio on an `Audio:` line so the app can play it.
+- Link the note to its course with `course:: [[Course Name]]`; this is what groups it under the right course in Bases views, not the folder it sits in.
+- Name it `{Course Name} - Flashcards - {Topic}`. Link `Course:: [[Course Name]]` (capital C on this type) and set `date` to when it was made or is due.
+- Name it `{Course Name} - Glossary - {Topic}`. Link `Course:: [[Course Name]]` (capital C on this type) and set `date` to when it was made or is due.
+- Name it `{Course Name} - MCQ - {Topic}`. Link `Course:: [[Course Name]]` (capital C on this type) and set `date` to when it was made or is due.
+- Name it `{Course Name} - Mind Map - {Topic}`. Link `Course:: [[Course Name]]` (capital C on this type) and set `date` to when it was made or is due.
+- Name it `{Course Name} - Past Paper - {Topic}`. Link `Course:: [[Course Name]]` (capital C on this type) and set `date` to when it was made or is due.
+- Name it `{Course Name} - Podcast - {Topic}`. Link `Course:: [[Course Name]]` (capital C on this type) and set `date` to when it was made or is due.
+- Name it `{Course Name} - Summary - {Topic}`. Link `Course:: [[Course Name]]` (capital C on this type) and set `date` to when it was made or is due.
+- One note per course or topic, filed in `Apps/Glossary`.
+- One note per deck, filed in `Apps/Flashcards`.
+- One note per episode, filed in `Apps/Podcast`; keep the audio file beside it.
+- One note per essay or individual written assignment, filed in the top-level `Essays` folder — never inside the course folder itself.
+- One note per group deliverable or coursework project, filed in the top-level `Projects` folder. Individual written reports go in `Essays` instead.
+- One note per lecture, filed in the top-level `Lectures` folder — not nested under the course note.
+- One note per map, filed in `Apps/Mind Maps`.
+- One note per paper or exam, filed in `Apps/Past Papers`.
+- One note per question set, filed in `Apps/MCQ`.
+- One note per question, filed in the top-level `Research` folder and named `{Course} - Research - {Topic}`.
+- One note per reading (article, chapter, paper), filed in the top-level `Readings` folder — not nested under the course folder.
+- One note per topic sheet, filed in `Apps/Summaries`.
+- One note per tutorial (or seminar), filed in the top-level `Tutorials` folder — not nested under the course note.
+- Put a page number on every key point, finding, definition and quote so it can be cited later without reopening the file.
+- Questions follow the format above exactly; the app turns them into a clickable quiz. Keep the explanation to one line and cite the slide or note.
+- Read every linked file in full before writing: slides give the structure, objectives, definitions, frameworks and examples; handouts and transcripts give detail the slides skip.
+- Read the brief and rubric in full before writing anything else. They fill **Brief at a glance**, **The question** (verbatim) and **Marking criteria**.
+- Read the brief and rubric in full first. They fill **Brief at a glance**, **The brief** (verbatim), **Marking criteria**, **Deliverables** and **Milestones**.
+- Set `due` as soon as it's known and copy it to the course note's Key dates. If the date isn't known yet, add a standalone TaskNote to confirm it.
+- Set `due` as soon as the essay is set so it shows up in date-based views and TaskNotes, copy the deadline to the course note's Key dates, and keep `status` current (`Not started` → `In Progress` → `Done`).
+- Set `type` to `Flashcards`.
+- Set `type` to `Glossary`.
+- Set `type` to `MCQ Test` (a full set) or `Quiz` (a short one).
+- Set `type` to `Mind Map`.
+- Set `type` to `Past Paper` (an old paper) or `Exam` (the exam itself, with its date).
+- Set `type` to `Podcast`.
+- Set `type` to `Summary`, `Handout` (a lecturer's sheet) or `Code` (a code cheat sheet).
+- The slide deck's own title slide beats the filename for the lecture topic — use it to rename a placeholder title like `Lecture 3`.
+- The 📝 Notes section follows Oscar's own note style inside a `> [!note]+ Lecture notes` callout (like every other section): plain-text headings, plain `* ` bullets, dense one-fact-per-bullet detail with (Author, Year) citations, `Note:` bullets for distinctions, indented numbered sub-lists. Cover the whole lecture, section by section.
+- Title: `{Course} - Project - {Name}`. Link `course:: [[Course Name]]`.
+- Use `related` for links to other lectures the content builds on or connects to (e.g. a follow-up or prerequisite lecture).
+- Use `related` for links to the lecture(s) this tutorial follows up on, or other tutorials it builds on.
+- Use `related` to connect readings that discuss the same theme or respond to each other.
+- Use `resources` for the brief, rubric and exemplars, `readings` for the Reading notes actually used, and `references` for the citation list or bibliography note.
+- Use `resources` for the brief, rubric, templates and exemplars, `readings` for Reading notes, `onedrive` for the live working file.
+- Use `url` to link the source (or the `Resources` PDF location if not web-based) rather than pasting the full text into the note.
+- Verify the citation against the PDF's title and imprint pages. Filenames and old Notion titles are unreliable (see `Agents/Shared Agents/open-items.md`).
+- When a document doesn't name its course, match it by content (deadlines, question style), never by filename.
+- When a document doesn't name its course, match it by content (deadlines, question style, tutorial group), never by filename.
+- `summary` is a one-line statement of the answer, so the folder's table is scannable.
+- `type` is one of: `Flashcards`.
+- `type` is one of: `Glossary`.
+- `type` is one of: `MCQ Test`, `Quiz`.
+- `type` is one of: `Mind Map`.
+- `type` is one of: `Past Paper`, `Exam`.
+- `type` is one of: `Podcast`.
+- `type` is one of: `Summary`, `Handout`, `Code`.
+1. Question text. (10 marks)
+1. Question text?
+>
+>    1. First
+>    2. Second
+>    3. Third
+>   - Did well:
+>   - Weak:
+> "..." (p. XX)
+> ### After the tutorial
+> ### Before the tutorial
+> ### Key points
+> ### My commentary
+> ### Session notes
+> ### Summary
+> #### Q1
+> #### Q2
+> * Contrast with the alternative (e.g. as happens with surveys)
+> * Defined as "quote from the slide" (Author, Year)
+> * Label — explanation
+> * Label — short explanation of that label, in plain words (e.g. Field based — conducted in the real settings where people live or work)
+> * Note: flag distinctions, warnings and common confusions on their own bullet, starting "Note:"
+> * One complete, self-contained point per bullet: what it is, who said it, why it matters
+> * Point one
+> * Point two
+> * Put the author/year cited on the slide in brackets at the end of the bullet
+> * Strengths: list, comma-separated
+> * Three approaches (Author, Year):
+> * Type one (key feature) — what it means
+> * Type two (key feature) — what it means
+> * Weaknesses: list, comma-separated
+> * When [situation one]
+> * When [situation two]
+> **Announcements** (assessments, deadlines, room changes) — copy dates to the course note's 🗓️ Key dates
+> **Examples, cases & data shown**
+> **Files read** —
+> **Ground rules / communication channel** —
+> **Guidance from the brief or lectures**
+> **Guidance from the brief or lectures** (do's and don'ts, what markers want to see)
+> **Learning outcomes assessed**
+> **Lecture structure** (section → slides)
+> **References the lecturer cites** — add as Reading notes and link in `readings`
+> -
+> - (p. )
+> - **Answer** —
+> - **Chapter(s) read & pages** —
+> - **DOI / ISBN** —
+> - **Data / sample** (who, where, when, how many) —
+> - **Date & time** — `YYYY-MM-DD HH:MM`
+> - **Edition / volume / issue** —
+> - **Example** —
+> - **Feed-forward for next essay** —
+> - **Feed-forward** —
+> - **File** — `Files/Resources/{Course}/Documents/…` or the `url`
+> - **Follows lecture(s)** — [[]]
+> - **Group** —
+> - **Key findings with numbers** — (p. )
+> - **Lecturer** —
+> - **Limitations the authors admit** —
+> - **Location** —
+> - **Mark** —
+> - **Method** (case study, survey, regression, literature review…) —
+> - **Name** (slide ) —
+> - **Prep required** —
+> - **Publisher / journal** —
+> - **Recording** —
+> - **Research question / aim** —
+> - **Set for** — which lecture/week/assessment asked for it
+> - **Strengths** —
+> - **Title & subtitle** —
+> - **To improve** —
+> - **Tutor** —
+> - **Week** —
+> - **Working / reasoning** —
+> - Concept one
+> - Concept three
+> - Concept two
+> - Questions the sources did not answer
+> - Where sources disagree, and why that might be
+> - [ ] "From the slides & attachments" filled in, with slide numbers
+> - [ ] Answers the exact question, every part
+> - [ ] Any raw Unsorted note folded in and removed
+> - [ ] Anything still to verify by hand
+> - [ ] Dates announced copied to the course note's Key dates
+> - [ ] Each rubric criterion covered
+> - [ ] Every part of the brief answered
+> - [ ] First full draft
+> - [ ] Format, cover sheet and file naming as the brief requires
+> - [ ] Formatting, cover sheet and file naming as the brief requires
+> - [ ] Groups formed / roles agreed
+> - [ ] Length / time limit met
+> - [ ] Librarian: file the good sources as Reading notes (`related` above links back here)
+> - [ ] Peer assessment completed
+> - [ ] Proofread
+> - [ ] Question one — follow up in office hours
+> - [ ] Question one — follow up in tutorial/office hours
+> - [ ] References complete
+> - [ ] References complete and in the right style
+> - [ ] Research complete
+> - [ ] Set readings linked in `readings`
+> - [ ] Slides/handouts saved to `Files/Resources/{Course}/Slides/` and linked in `resources`
+> - [ ] Submission link opens `YYYY-MM-DD`
+> - [ ] Submit by `YYYY-MM-DD HH:MM`
+> - [ ] Submitted, receipt saved, `status` set to `Done`
+> - [ ] Task
+> - [ ] Within the word limit (counted as the brief defines it)
+> - [ ] Writer: use the findings in the Evidence plan, citing the Reading notes, not this brief
+> - [ ] `summary` written, `status` set to `Done`
+> - [[]]
+> - [[]] —
+> - `YYYY-MM-DD` — attended: · decided: · actions (who, by when):
+> 1.
+> 1. `Section` — slides –
+> 2.
+> 3.
+> <!-- FORMAT (Oscar's style, do not change): everything sits inside this callout (every line starts with "> "), like the other sections. Inside it: plain-text headings and plain "* " bullets only — no # headings, no bold labels on every line, no emoji. Copy the sample below. -->
+> <!-- RULES: (1) Headings are plain text lines in the order of the lecture, question or short-topic form ("What is X?", "When to Use X"). (2) Bullets start with "* "; numbered sub-lists are indented 3 spaces. (3) 5–9 bullets per heading; every bullet carries a concrete fact, definition, example or citation. (4) Follow the slides, folding in anything said in the room. (5) Use "—" between a label and its explanation. (6) Exact quotes in "double quotes" with (Author, Year). (7) Cover the WHOLE lecture: one heading per slide section, so the notes can be revised from alone. (8) Delete comment blocks and placeholder text once written. -->
+> A nested bullet list: the first bullet is the centre, each indent is a branch. The page draws it as a tree of nodes.
+> Anything that isn't ready for the final deliverable. The working files live on OneDrive, linked via `onedrive`.
+> Anything the lecturer emphasised, repeated, said "this will come up", or linked to an assessment — plus the slide number.
+> Anything the tutor emphasised, common mistakes pointed out, or question styles that could appear in an exam.
+> Challenges / Limitations
+> Connect this lecture to readings, past lectures, tutorials, or assessments — see `related` above for the formal link, use this section for a sentence on *why* they connect.
+> Connect this tutorial to the lecture(s) it follows, related readings, or revision notes — see `related` above for the formal link, use this section for a sentence on *why* they connect.
+> Copied from the rubric. Use the top-band descriptor as the target.
+> Copied from the tutorial sheet in `resources` — question numbers, wording and any marks, verbatim. Note data files or case materials supplied with it.
+> Copy the objectives / "by the end of this lecture you should be able to…" slide (usually slide 2–3). If there isn't one, write the three or four things the lecture was really about.
+> Do you agree? What's missing? How strong is the evidence? How dated is it?
+> Each method or formula needed, with a line on when to use it. Formulas in LaTeX with every symbol defined.
+> Filled from every file in `resources` (slides, handouts, recordings, transcripts). Always cite where each point came from — `(slide 12)`, `(p. 4)`, `(12:30)` — so it can be found again. Summarise and paraphrase; don't paste the whole deck.
+> Filled from the assessment brief, rubric and course handbook in `resources`. Cite the page for each line.
+> Filled from the brief, rubric and course handbook in `resources`. Cite the page for each line.
+> Filled from the solutions file or what was worked through in the session. Record where your answer differed and why.
+> For each: what it is, when to use it, its parts or variables, and one limitation. Formulas in LaTeX (`$…$`) with every symbol defined.
+> For the written deliverable (report, plan, poster text). Writer drafts this from the brief, the marking criteria and your notes; you decide what stays.
+> Freewrite, quotes, half-formed paragraphs — anything that isn't ready for the final document yet. The polished draft itself lives on OneDrive, linked via the `onedrive` field above.
+> From any example reports in `resources`: the structure used, what earned marks, marker comments, and what to copy or avoid.
+> From any example reports/presentations in `resources`: structure, what earned marks, what to copy or avoid.
+> How does this connect to other readings or lectures on the same theme? Link them via `related` above and note the connection here.
+> Link the Reading and Resource notes drawn on — citations already live on the Reading notes.
+> Link the specific Reading and Resource notes drawn on for this essay — don't retype citations here, they already live on the Reading notes.
+> Note which essay/project this reading is likely to support, and which point it would back up.
+> Notes from the tutorial itself — what was gone over, corrections to your own work, points the tutor raised, worked examples on the board.
+> Number each question with its marks, then an `**Answer:**` or `**Mark scheme:**` line. The page hides each answer until you press Show answer.
+> Number each question, list the options as `A.` to `D.`, then an `**Answer:**` line with the letter, a one-line explanation and the slide or note it comes from. The page shows them as a quiz you can click through.
+> One card per pair of lines: `Front:` then `Back:`, with a blank line between cards. The page shows them as a deck of flip cards.
+> One or two sentences stating the argument you intend to make. Refine this as your thinking develops.
+> One or two sentences summarising the central argument or finding.
+> One or two sentences: the deliverable, who it's for, and what a strong result looks like.
+> One row per finding. Strength: **strong** (two or more independent good sources), **single** (one source), **weak** (opinion, blog or unverifiable).
+> One term per bullet, as `- **Term** — definition`. The page shows an alphabetical list you can search.
+> Paste the exact essay question or assignment brief here, verbatim. If there's a choice of questions, list all and mark the one chosen.
+> Paste the exact task, case question or scenario verbatim from the brief.
+> Prefer academic work, company filings and official statistics over news, and news over blogs. Every row needs a working link and the date it was read.
+> Put the audio on a line starting `Audio:` as a link to the file or a web address. The page shows a player with the transcript below it.
+> Record the mark and marker feedback once returned, so it can be checked against future essays.
+> Skip for textbooks. For papers and reports:
+> Strengths & Weaknesses
+> Sub-steps that only matter inside this note. Anything that needs a calendar slot becomes a TaskNote linked here.
+> Taken from the PDF's own title, imprint or first page — never from the filename, which is often wrong. Copy the verified values into `authors`, `date`, `item type`, `full citation` and `in text citation`.
+> The [Approach / Framework / Process]
+> The central idea and the lecture or reading it comes from.
+> The course or topic, and where the terms come from.
+> The course, year and sitting, the time allowed, the marks, and what is allowed in the room.
+> The main body of the note — the exercises, problem sets, or prep/follow-up work you actually did. Keep your working, answers, and any code or diagrams here so it's a real record of what you produced. One sub-heading per question.
+> The main body of the note — write your notes here as you read, section by section or argument by argument. Go as long as you need; summarise, paraphrase, and record your own commentary inline rather than saving it all for the end. Put a page number on every point.
+> The question in one or two sentences, and what it is for (which essay, project or lecture).
+> The topic and the lecture or reading it draws on.
+> The topic and the notes it condenses.
+> The topic, the lecture or reading it draws on, and the assessment it prepares for.
+> The topic, who made it, and the lecture or reading it goes with.
+> Three to five sentences. Say how sure the evidence lets you be, and where it is thin.
+> Types / Roles / Stages
+> What is [Topic]?
+> When to Use [Topic]
+> Write it from memory first, then check it against the source notes.
+> [!abstract] Big ideas from this lecture
+> [!abstract] Big ideas from this tutorial
+> [!abstract] What the author claims
+> [!abstract] What the evidence says
+> [!abstract] What this deck covers
+> [!abstract] What this episode covers
+> [!abstract] What this glossary covers
+> [!abstract] What this lecture set out to cover
+> [!abstract] What this map covers
+> [!abstract] What this project has to produce
+> [!abstract] What this set covers
+> [!abstract] What this sheet covers
+> [!abstract] Which paper
+> [!abstract] Working thesis
+> [!check] Compared with the model answers
+> [!check] Rubric → how I'll meet it
+> [!check] Rubric → how we'll meet it
+> [!example] Draft space
+> [!example] How they back it up
+> [!example] Meetings
+> [!example] Must-know
+> [!example] Research, ideas, decisions
+> [!example] Techniques to be able to reproduce
+> [!example] Tools to be able to reproduce
+> [!example] What previous answers did
+> [!example] What previous submissions did
+> [!example] Where this might get cited
+> [!example]+ Work completed before / after the tutorial
+> [!info] Assessment details
+> [!info] Checked against the source itself
+> [!info] Extracted from linked files
+> [!info] Session details
+> [!info] What was read
+> [!note] Attempts
+> [!note] Claim — source — strength
+> [!note] How the source is laid out
+> [!note] Log
+> [!note] Members & roles
+> [!note] Milestones
+> [!note] Structure & word budget
+> [!note] Terms and models introduced
+> [!note] Terms introduced
+> [!note] The short version
+> [!note] What gets handed in
+> [!note] What is said
+> [!note]+ Lecture notes
+> [!note]+ Reading notes
+> [!note]+ What happened in the session
+> [!question] Critique / reaction
+> [!question] Feedback received
+> [!question] Format the app reads
+> [!question] Things I didn't fully follow
+> [!question] What this brief is trying to find out
+> [!quote] Essay question / brief
+> [!quote] Questions / exercises set
+> [!quote] Task / case question
+> [!quote] Worth quoting
+> [!tip] Claims → evidence
+> [!tip] Links to other material
+> [!tip] Readings & resources used
+> [!tip] Related reading
+> [!tip] What to remember
+> [!todo] Final checks
+> [!todo] Task list
+> [!todo] What to do with this
+> [!todo] Wrap-up
+> [!warning] Cards I keep missing
+> [!warning] Definitions I'm not sure of
+> [!warning] Flagged as important
+> [!warning] Links I can't yet explain
+> [!warning] Still shaky
+> [!warning] What could not be found or settled
+> [Other section titles taken from the lecture]
+> |  |  |  |
+> |  |  |  |  |
+> |  |  |  |  |  |
+> |  |  | [[]] p. |
+> |  |  | p. / Fig. |
+> |  |  | slide |
+> |  | Journal / Report / Filing / News / Web |  |  |  |  |
+> |  | [Title](url) |  |
+> | **Total** |  |  |
+> | --- | --- | --- |
+> | --- | --- | --- | --- |
+> | --- | --- | --- | --- | --- |
+> | --- | --- | --- | --- | --- | --- |
+> | Assessment | e.g. Coursework 1 / Assignment 1 |  |
+> | Assessment | e.g. Coursework 2 / Assignment 2 |  |
+> | Claim | Evidence / data | Source (note + page) |
+> | Conclusion |  |  |
+> | Criterion | Weight | Top-band descriptor | How I'll meet it |
+> | Criterion | Weight | Top-band descriptor | How we'll meet it |
+> | Date | Score | What I got wrong |
+> | Date | Time taken | Score | Mistake / examiner comment |
+> | Deliverable | Format & length | Owner | Due | Status |
+> | Deliverable(s) | report / presentation / video / code, length or duration |  |
+> | Detail | Value | Source |
+> | Due | `YYYY-MM-DD HH:MM` — also in `due` |  |
+> | Extensions | eligible? |  |
+> | Feedback returned | date |  |
+> | Finding | Source | Strength |
+> | Format | cover sheet, anonymity, template to use |  |
+> | Format | font, spacing, cover sheet, anonymity (exam number only?) |  |
+> | Group or individual | group size, how groups are formed |  |
+> | Introduction |  |  |
+> | Name | Role | Responsible for | Contact |
+> | Peer assessment | e.g. WebPA — how it affects the mark |  |
+> | Point 1 |  |  |
+> | Point 2 |  |  |
+> | Point 3 |  |  |
+> | Q | My answer | Model answer | Right? | What I missed |
+> | Question released | `YYYY-MM-DD HH:MM` |  |
+> | Referencing style |  |  |
+> | Referencing style | e.g. Harvard |  |
+> | Section / chapter | Pages | What it covers |
+> | Section | Purpose / main point | Words |
+> | Source | Type | Year | Link | Read on | Used for |
+> | Submission | Learn / Turnitin link, file type, file naming |  |
+> | Submission | who submits, where, file type, file naming |  |
+> | Term / model | Meaning | Page / figure |
+> | Term | Definition (in my words) | Source |
+> | Weighting | % of course mark |  |
+> | Word limit | and what's excluded (references, appendices, tables) |  |
+Audio: [[Apps/Podcast/episode.mp3]]
+Back: Answer
+Front: Term or question

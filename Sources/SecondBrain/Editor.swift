@@ -119,6 +119,20 @@ final class MDTextView: NSTextView {
         needsDisplay = true
     }
 
+    /// Restyles only `window`, a few lines around an edit that changed the text's length by `delta`. What is drawn before the window stays, what is drawn
+    /// after it moves along with the text, and what was inside it is replaced.
+    func restyle(window: NSRange, delta: Int) {
+        guard let storage = textStorage else { return }
+        let oldEnd = NSMaxRange(window) - delta
+        let kept = decorations.compactMap { d -> MarkdownStyler.Decoration? in
+            if NSMaxRange(d.range) <= window.location { return d }
+            if d.range.location >= oldEnd { return MarkdownStyler.Decoration(kind: d.kind, range: NSRange(location: d.range.location + delta, length: d.range.length)) }
+            return nil
+        }
+        decorations = kept + MarkdownStyler.apply(to: storage, in: window)
+        needsDisplay = true
+    }
+
     override func paste(_ sender: Any?) { pasteAsPlainText(sender) }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
@@ -258,10 +272,59 @@ struct MarkdownEditor: NSViewRepresentable {
         var parent: MarkdownEditor
         init(_ parent: MarkdownEditor) { self.parent = parent }
 
+        /// Up to this many characters the whole text is styled on every keystroke, which is exact and cheap. Past it, an edit inside one line restyles only
+        /// the lines around it, and anything else waits for a pause in typing. A full pass always follows a pause, so nothing stays wrong for long.
+        private static let wholeTextLimit = 5_000
+        private var restyleTask: Task<Void, Never>?
+        private var pendingEdit: (location: Int, removed: Int, added: Int)?
+
+        /// Called before each change: remembers a change that stays inside one line (nothing with a line break going in or coming out).
+        func textView(_ tv: NSTextView, shouldChangeTextIn range: NSRange, replacementString text: String?) -> Bool {
+            let ns = tv.string as NSString, added = text ?? ""
+            let inOneLine = !added.contains("\n") && NSMaxRange(range) <= ns.length && range.length <= 500 && !ns.substring(with: range).contains("\n")
+            pendingEdit = inOneLine ? (range.location, range.length, (added as NSString).length) : nil
+            return true
+        }
+
         func textDidChange(_ n: Notification) {
             guard let tv = n.object as? MDTextView else { return }
-            if !tv.hasMarkedText() { tv.restyle() }
+            let edit = pendingEdit; pendingEdit = nil
+            restyleTask?.cancel()
+            if !tv.hasMarkedText() {
+                let length = tv.textStorage?.length ?? 0
+                if length <= Self.wholeTextLimit { tv.restyle() }
+                else if let edit, let window = Self.window(in: tv.string as NSString, around: NSRange(location: edit.location, length: edit.added)) {
+                    tv.restyle(window: window, delta: edit.added - edit.removed)
+                    after(milliseconds: 700, tv)
+                } else { after(milliseconds: 150, tv) }
+            }
             parent.text = tv.string
+        }
+
+        private func after(milliseconds: Int, _ tv: MDTextView) {
+            restyleTask = Task { [weak tv] in try? await Task.sleep(for: .milliseconds(milliseconds)); if !Task.isCancelled { tv?.restyle() } }
+        }
+
+        /// The edited line with the one before and the one after, to restyle on its own. Nil when any of them could be part of something that spans lines
+        /// (a code fence, a table, a quote or callout) or sits inside an open code fence, so the whole text has to be styled again.
+        static func window(in ns: NSString, around edit: NSRange) -> NSRange? {
+            guard ns.length > 0 else { return nil }
+            let at = min(edit.location, ns.length - 1)
+            var lines = [ns.lineRange(for: NSRange(location: at, length: 0))]
+            if lines[0].location > 0 { lines.insert(ns.lineRange(for: NSRange(location: lines[0].location - 1, length: 0)), at: 0) }
+            if let last = lines.last, NSMaxRange(last) < ns.length { lines.append(ns.lineRange(for: NSRange(location: NSMaxRange(last), length: 0))) }
+            guard let first = lines.first, let last = lines.last else { return nil }
+            for l in lines {
+                let t = ns.substring(with: l).trimmingCharacters(in: .whitespacesAndNewlines)
+                if t.hasPrefix("```") || t.hasPrefix("|") || t.hasPrefix(">") { return nil }
+            }
+            var fences = 0, from = 0
+            while from < first.location {
+                let r = ns.range(of: "```", options: [], range: NSRange(location: from, length: first.location - from))
+                if r.location == NSNotFound { break }
+                fences += 1; from = NSMaxRange(r)
+            }
+            return fences % 2 == 0 ? NSRange(location: first.location, length: NSMaxRange(last) - first.location) : nil
         }
 
         // MARK: Hidden marks take no room
@@ -462,10 +525,11 @@ struct MarkdownEditor: NSViewRepresentable {
         }
     }
 
+    /// Styles the whole text, or only `window` (whole lines, none of them inside a code fence, table or quote): the extras to draw are returned for that part only.
     @discardableResult
-    static func apply(to s: NSTextStorage) -> [Decoration] {
+    static func apply(to s: NSTextStorage, in window: NSRange? = nil) -> [Decoration] {
         let ns = s.string as NSString
-        let full = NSRange(location: 0, length: ns.length)
+        let full = window ?? NSRange(location: 0, length: ns.length)
         var lines: [NSRange] = []
         ns.enumerateSubstrings(in: full, options: [.byLines, .substringNotRequired]) { _, r, _, _ in lines.append(r) }
 

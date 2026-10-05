@@ -48,6 +48,8 @@ extension Page {
 struct Message: Identifiable, Codable { var id = UUID(); let fromAgent: Bool; let text: String; var time = Date.now }
 
 extension Note {
+    /// `when` for code that has already filtered to dated notes: a note with no date sorts last, where `when!` would have crashed.
+    var whenOrFar: Date { when ?? .distantFuture }
     /// Short, readable name: drops the course prefix the vault's naming convention adds.
     var display: String {
         var t = title
@@ -259,6 +261,11 @@ struct SecondBrainApp: App {
     /// Chats and each agent's Claude session survive a relaunch (they used to vanish, and every agent forgot the conversation).
     var chats: [String: [Message]] = Store.savedChats.chats { didSet { saveChats() } }
     var thinking: Set<String> = []
+    /// What an agent has written so far of the answer it is still working on, for its chat to show growing.
+    var streaming: [String: String] = [:]
+    @ObservationIgnored private var chatTasks: [String: Task<Void, Never>] = [:]
+    /// Stops the agent working on a chat reply: the process ends and the chat says so.
+    func stopChat(_ code: String) { chatTasks[code]?.cancel() }
     @ObservationIgnored private var sessions: [String: String] = Store.savedChats.sessions
     private struct SavedChats: Codable { var chats: [String: [Message]] = [:]; var sessions: [String: String] = [:] }
     private static var chatFile: URL { Support.dir.appending(path: "chats.json") }
@@ -283,7 +290,16 @@ struct SecondBrainApp: App {
         chats[code, default: []].append(Message(fromAgent: false, text: shown))
         thinking.insert(code)
         let team = Agent.teamLog(activity)
-        let reply = await Agent.run(team.isEmpty ? prompt : prompt + "\n\n" + team, system: Agent.systemPrompt(Agent.role(code)), session: sessions[code], canEdit: false, root: Vault.root, tier: tier, writes: Agent.writeScopes(code), web: ["librarian", "researcher"].contains(code))
+        let reply = await Agent.run(team.isEmpty ? prompt : prompt + "\n\n" + team, system: Agent.systemPrompt(Agent.role(code)), session: sessions[code], canEdit: false, root: Vault.root, tier: tier, writes: Agent.writeScopes(code), web: ["librarian", "researcher"].contains(code),
+                                    onText: { [weak self] text in
+                                        Task { @MainActor in
+                                            guard let self, self.thinking.contains(code) else { return }   // a late piece after the answer is in is ignored
+                                            self.streaming[code] = text
+                                            if let m = mirror, self.thinking.contains(m) { self.streaming[m] = "**\(Agent.role(code).name)**\n\n" + text }
+                                        }
+                                    })
+        streaming[code] = nil
+        if let m = mirror { streaming[m] = nil }
         if let s = reply.session { sessions[code] = s }
         chats[code, default: []].append(Message(fromAgent: true, text: reply.text))
         if let m = mirror { chats[m, default: []].append(Message(fromAgent: true, text: "**\(Agent.role(code).name)**\n\n" + reply.text)) }
@@ -293,14 +309,20 @@ struct SecondBrainApp: App {
     }
     private func send(_ code: String, _ text: String, tier: Manager.Tier) {
         thinking.insert(code)
-        Task { _ = await converse(code, shown: text, prompt: text, tier: tier, mirror: nil) }
+        chatTasks[code] = Task { [weak self] in
+            guard let self else { return }
+            _ = await converse(code, shown: text, prompt: text, tier: tier, mirror: nil)
+            chatTasks[code] = nil
+        }
     }
     /// The Manager's chat: one agent, or a team working one after another. Each stage gets what the earlier ones handed over, and a course agent advises first.
     private func dispatch(_ text: String, tier: Manager.Tier? = nil) {
         let m = Agent.manager.id
         chats[m, default: []].append(Message(fromAgent: false, text: text))
         thinking.insert(m)
-        Task {
+        chatTasks[m] = Task { [weak self] in
+            guard let self else { return }
+            defer { chatTasks[m] = nil }
             let earlier = recentManagerChat()
             let previous = chats[m]?.last { $0.fromAgent && $0.text.hasPrefix("**") }.flatMap { msg in Agent.all.first { msg.text.hasPrefix("**\($0.name)**") }?.id }
             var steps = Manager.chain(text) ?? []
@@ -336,7 +358,7 @@ struct SecondBrainApp: App {
                         : "\nYou are the last stage: produce the finished result the request asks for from the handed-over material. If something it needed is missing, say so plainly instead of inventing it."
                 }
                 let reply = await converse(r.agent, shown: team ? "\(text) (stage \(i + 1) of \(steps.count), from the Manager)" : text, prompt: prompt, tier: tier ?? r.tier, mirror: m)
-                if reply.session == nil { chats[m, default: []].append(Message(fromAgent: true, text: "\(names[i]) couldn’t finish, so I stopped there.")); break }
+                if reply.session == nil { chats[m, default: []].append(Message(fromAgent: true, text: reply.stopped ? "Stopped." : "\(names[i]) couldn’t finish, so I stopped there.")); break }
                 if team, i == steps.count - 1, !done.isEmpty {   // a different agent checks the finished result against what was handed over
                     chats[m, default: []].append(Message(fromAgent: true, text: "→ **Checking** the result against what was handed over"))
                     let problems = await Agent.verify(result: reply.text, handoff: done.map(\.text).joined(separator: "\n\n"), root: Vault.root)
@@ -350,9 +372,13 @@ struct SecondBrainApp: App {
     @ObservationIgnored private var watcher: VaultWatcher?
     var needs: [String: [Need]] = [:]
     var activity: [Activity] = Activity.load()
-    init() { rewatch(); computeNeeds(); scheduleAutopilot(after: 8) }
+    init() {
+        // a new app version brings its Templates and Agents files into the vault (see AppFiles.swift)
+        if let n = AppFiles.installIfNeeded()?.count, n > 0 { log("manager", "Updated \(n) Templates and Agents file\(n == 1 ? "" : "s") in the vault to version \(AppFiles.version.split(separator: "+")[0]).") }
+        rewatch(); computeNeeds(); scheduleAutopilot(after: 8)
+    }
     func rewatch() {
-        watcher = VaultWatcher(path: Vault.root.path) { [weak self] in MainActor.assumeIsolated { self?.reload() } }
+        watcher = VaultWatcher(path: Vault.root.path) { [weak self] in MainActor.assumeIsolated { self?.reloadInBackground() } }
     }
     func addLink() {
         let alert = NSAlert()
@@ -372,11 +398,28 @@ struct SecondBrainApp: App {
         reload()
     }
     var revision = 0
+    @ObservationIgnored private var reloadTask: Task<Void, Never>?
+    /// What the file watcher calls. Reading every note used to happen on the main thread, so each autosave (or Obsidian touching a file) stalled typing;
+    /// now the vault is read in the background and applied here, and a newer change cancels an older read that hasn't been applied yet.
+    func reloadInBackground() {
+        reloadTask?.cancel()
+        reloadTask = Task { [weak self] in
+            // the search index goes with it: opening a note asks for it, and building it there re-read every note on the main thread after each save
+            let loaded = await Task.detached(priority: .utility) { () -> (notes: [Note], unsorted: [URL], index: (bodies: [URL: String], backlinks: [String: [Note]])) in
+                let notes = Vault.load()
+                return (notes, Vault.unsorted(), Store.buildIndex(notes))
+            }.value
+            guard !Task.isCancelled, let self else { return }
+            releaseStaleClaims(); notes = loaded.notes; unsorted = loaded.unsorted; revision += 1
+            bodyCache = (revision, loaded.index.bodies, loaded.index.backlinks)
+            computeNeeds(); scheduleAutopilot()
+        }
+    }
     func reload() { releaseStaleClaims(); notes = Vault.load(); unsorted = Vault.unsorted(); computeNeeds(); revision += 1; scheduleAutopilot() }
-    var semesterStart: Date { Vault.parseDate("2026-09-21")! }   // Semester 1, which the week numbers count from
+    var semesterStart: Date { Vault.parseDate("2026-09-21") ?? today }   // Semester 1, which the week numbers count from
     /// The semesters the Semester page can switch between. ponytail: Semester 2's start is a guess (mid-January); correct it here.
     static let semesters = [(name: "Semester 1", start: "2026-09-21"), (name: "Semester 2", start: "2027-01-18")]
-    var currentSemester: Int { Self.semesters.lastIndex { Vault.parseDate($0.start)! <= today } ?? 0 }
+    var currentSemester: Int { Self.semesters.lastIndex { (Vault.parseDate($0.start) ?? .distantFuture) <= today } ?? 0 }
     var semesterWeek: Int { (Calendar.current.dateComponents([.day], from: semesterStart, to: today).day ?? 0) / 7 + 1 }
     /// The next things on: classes still to come and open deadlines, soonest first.
     func upcoming(_ n: Int) -> [Note] {
@@ -384,10 +427,10 @@ struct SecondBrainApp: App {
             guard !x.done, let w = x.when else { return false }
             if ["Lectures", "Tutorials"].contains(x.folder) { return w > .now }
             return ["Essays", "Projects", "TaskNotes/Tasks"].contains(x.folder) && w >= today
-        }.sorted { $0.when! < $1.when! }.prefix(n).map { $0 }
+        }.sorted { $0.whenOrFar < $1.whenOrFar }.prefix(n).map { $0 }
     }
     func nextDeliverable(_ c: String) -> Note? {
-        notes.filter { $0.course == c && ["Essays", "Projects"].contains($0.folder) && !$0.done && ($0.when ?? .distantPast) >= today }.min { $0.when! < $1.when! }
+        notes.filter { $0.course == c && ["Essays", "Projects"].contains($0.folder) && !$0.done && ($0.when ?? .distantPast) >= today }.min { $0.whenOrFar < $1.whenOrFar }
     }
     func newNote() {
         let dir = Vault.root.appending(path: "Unsorted")
@@ -416,7 +459,7 @@ struct SecondBrainApp: App {
         notes.filter { n in
             guard let w = n.when, ["Lectures", "Tutorials", "Essays", "Projects", "TaskNotes/Tasks"].contains(n.folder) else { return false }
             return Calendar.current.isDate(w, inSameDayAs: .now) && matches(n)
-        }.sorted { $0.when! < $1.when! }
+        }.sorted { $0.whenOrFar < $1.whenOrFar }
     }
     func list(_ tab: Tab) -> [Note] {
         let folders: Set<String> = switch tab {
@@ -427,7 +470,7 @@ struct SecondBrainApp: App {
         return notes.filter { n in
             guard folders.contains(n.folder), !n.done, matches(n), let w = n.when else { return false }
             return tab == .readings ? isCurrentSemester(n) : w >= today
-        }.sorted { $0.when! < $1.when! }
+        }.sorted { $0.whenOrFar < $1.whenOrFar }
     }
     func course(_ c: String, _ folders: Set<String>) -> [Note] {
         notes.filter { $0.course == c && folders.contains($0.folder) && isCurrentSemester($0) }.sorted { ($0.when ?? .distantFuture) < ($1.when ?? .distantFuture) }
@@ -1157,13 +1200,14 @@ enum Check {
         precondition((try? Vault.perform(.init(from: "Unsorted/x.pdf", to: "Resources/TEM/Slides/lecture-02.pdf"), in: box)) == nil, "never overwrites")
         precondition((try? Vault.perform(.init(from: "Unsorted/x.pdf", to: "../escape.pdf"), in: box)) == nil, "never leaves the vault")
         print("filing ok: copy verified, original in .trash, no overwrite, no escape")
+        AppFiles.check()
         CalendarSync.check()
         Zotero.check()
         CalendarSync.checkNotes()
         Vault.checkEditing()
         Manager.check()
         let tags = TagsPage.build(notes); precondition(!tags.isEmpty, "tags are indexed from frontmatter")
-        let week: (Date?) -> Int = { d in d.map { Int((Double(Calendar.current.dateComponents([.day], from: Vault.parseDate("2026-09-21")!, to: $0).day ?? 0) / 7).rounded(.down)) + 1 } ?? 0 }
+        let week: (Date?) -> Int = { d in d.map { Int((Double(Calendar.current.dateComponents([.day], from: Vault.semesterOneStart, to: $0).day ?? 0) / 7).rounded(.down)) + 1 } ?? 0 }
         let mapped = CourseGraph.build(notes.filter { $0.course == "SM" && CourseGraph.row($0) != nil }, week: week)
         precondition(mapped.nodes.count > 5 && mapped.edges.contains(where: \.explicit), "the course map finds notes and the links written between them")
         let essay = notes.first { $0.folder == "Essays" && $0.course == "SM" }

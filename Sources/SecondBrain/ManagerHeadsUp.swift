@@ -45,7 +45,7 @@ extension Store {
         // a lecture was written up in the last few days: offer MCQs
         // (only the latest one, so these don't crowd out everything else)
         let fresh = current.filter { $0.folder == "Lectures" && $0.done && !$0.unfilled && ($0.when.map { $0 < .now && $0 > .now.addingTimeInterval(-3 * 86400) } ?? false) }
-        for n in fresh.sorted(by: { $0.when! > $1.when! }).prefix(1) {
+        for n in fresh.sorted(by: { $0.whenOrFar > $1.whenOrFar }).prefix(1) {
             add("mcq:\(n.path)", "\(n.display) is written up. Want 5 MCQs on it?", role: "tutor", prompt: "Make 5 MCQs with answers from \(n.title), quoting the slides.")
         }
         return out
@@ -64,10 +64,10 @@ extension Store {
     func composeBrief() -> String {
         let cal = Calendar.current, end = cal.date(byAdding: .day, value: 7, to: self.today)!
         func at(_ d: Date) -> String { cal.component(.hour, from: d) == 0 ? d.formatted(.dateTime.weekday(.abbreviated)) : d.formatted(.dateTime.weekday(.abbreviated).hour().minute()) }
-        let classes = notes.filter { $0.course != nil && ["Lectures", "Tutorials"].contains($0.folder) && !$0.done && ($0.when.map { cal.isDateInToday($0) } ?? false) }.sorted { $0.when! < $1.when! }
-        let due = notes.filter { ["Essays", "Projects", "TaskNotes/Tasks"].contains($0.folder) && !$0.done && ($0.when.map { $0 >= self.today && $0 < end } ?? false) }.sorted { $0.when! < $1.when! }
-        var out = ["**Today:** " + (classes.isEmpty ? "no classes." : classes.map { "\($0.when!.formatted(.dateTime.hour().minute())) \($0.display)" }.joined(separator: ", ") + ".")]
-        out.append("**Due this week:** " + (due.isEmpty ? "nothing." : due.prefix(5).map { "\($0.display) (\(at($0.when!)))" }.joined(separator: ", ") + (due.count > 5 ? " and \(due.count - 5) more." : ".")))
+        let classes = notes.filter { $0.course != nil && ["Lectures", "Tutorials"].contains($0.folder) && !$0.done && ($0.when.map { cal.isDateInToday($0) } ?? false) }.sorted { $0.whenOrFar < $1.whenOrFar }
+        let due = notes.filter { ["Essays", "Projects", "TaskNotes/Tasks"].contains($0.folder) && !$0.done && ($0.when.map { $0 >= self.today && $0 < end } ?? false) }.sorted { $0.whenOrFar < $1.whenOrFar }
+        var out = ["**Today:** " + (classes.isEmpty ? "no classes." : classes.map { "\($0.whenOrFar.formatted(.dateTime.hour().minute())) \($0.display)" }.joined(separator: ", ") + ".")]
+        out.append("**Due this week:** " + (due.isEmpty ? "nothing." : due.prefix(5).map { "\($0.display) (\(at($0.whenOrFar)))" }.joined(separator: ", ") + (due.count > 5 ? " and \(due.count - 5) more." : ".")))
         if let first = due.first(where: { $0.state == .notStarted }), let w = first.when { out.append("**Start with:** \(first.display), due in \(days(w)) day\(days(w) == 1 ? "" : "s") and not started.") }
         else if let w = due.first?.when, let n = due.first { out.append("**Next up:** \(n.display), \(at(w)).") }
         return out.joined(separator: "\n\n")
