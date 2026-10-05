@@ -35,11 +35,17 @@ enum Sections {
         t = t.replacingOccurrences(of: #"^\d+\.\s*"#, with: "", options: .regularExpression).trimmingCharacters(in: .whitespaces)
         return t.hasPrefix("|") && t.replacingOccurrences(of: "|", with: " ").trimmingCharacters(in: .whitespaces).isEmpty ? "" : t
     }
+    /// Every line of the longer templates earlier versions of the app shipped (`.legacy-scaffolding.txt` in the bundled folder). A note made from one still carries
+    /// those instructions and placeholders, which are template text and not Oscar's own, though the current template is now much shorter.
+    static let legacy: [String] = {
+        guard let u = AppFiles.bundled?.appending(path: ".legacy-scaffolding.txt"), let t = try? String(contentsOf: u, encoding: .utf8) else { return [] }
+        return t.components(separatedBy: "\n").filter { !$0.isEmpty }
+    }()
     /// Whether Oscar or an agent has written anything in this section beyond the template's own scaffolding (callout titles, sub-headings, empty bullets,
     /// and a table's header and empty rows).
-    static func hasContent(_ heading: String, in text: String, template: String) -> Bool {
+    static func hasContent(_ heading: String, in text: String, template: String, legacy: [String] = Sections.legacy) -> Bool {
         guard let mine = body(heading, in: text) else { return false }
-        let known = Set(template.components(separatedBy: "\n").map(bare))
+        let known = Set((template.components(separatedBy: "\n") + legacy).map(bare))
         var headerSeen = false
         for raw in mine.components(separatedBy: "\n") {
             let l = bare(raw)
@@ -55,7 +61,7 @@ enum Sections {
         return false
     }
     /// Still the template.
-    static func isTemplate(_ heading: String, in text: String, template: String) -> Bool { !hasContent(heading, in: text, template: template) }
+    static func isTemplate(_ heading: String, in text: String, template: String, legacy: [String] = Sections.legacy) -> Bool { !hasContent(heading, in: text, template: template, legacy: legacy) }
     static func template(forFolder folder: String, root: URL = Vault.root) -> String {
         let name = ["Lectures": "Lecture", "Tutorials": "Tutorial", "Essays": "Essay", "Projects": "Projects", "Readings": "Readings", "Research": "Research"][folder] ?? Study.kind(folder)?.noun ?? folder
         return (try? String(contentsOf: Vault.template("\(name) Template", root: root), encoding: .utf8)) ?? ""
@@ -86,7 +92,7 @@ enum Review {
     }
 
     /// Structural checks on one edited note: nothing the helper wasn't given has changed.
-    static func checkEdit(rel: String, before: String, after: String, sections allowed: [String]?, template: String) -> Verdict {
+    static func checkEdit(rel: String, before: String, after: String, sections allowed: [String]?, template: String, legacy: [String] = Sections.legacy) -> Verdict {
         var v = Verdict()
         let b = Sections.parse(before), a = Sections.parse(after)
         let free: Set<String> = ["status", "summary", "readings", "references", "related", "tags"]   // the Agent In Progress mark flips status; the rest are fields a job may fill
@@ -106,8 +112,8 @@ enum Review {
         // Oscar's own lines (anything that isn't in the template) must still be there
         let beforeLines = before.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
         let afterLines = after.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
-        let templateLines = Set(template.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) })
-        
+        let templateLines = Set((template.components(separatedBy: "\n") + legacy).map { $0.trimmingCharacters(in: .whitespaces) })
+
         var lost = [String]()
         for change in afterLines.difference(from: beforeLines) {
             if case let .remove(_, line, _) = change, !line.isEmpty, !templateLines.contains(line), !line.hasPrefix("status:") {

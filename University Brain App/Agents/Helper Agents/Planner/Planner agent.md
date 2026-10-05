@@ -41,7 +41,7 @@ Date conflicts that belong to one course are kept by that course's agent (`Cours
 
 You never start anything yourself, and nothing waits for Oscar's approval. The Manager gives you a job (which note, what to do, and what the course agent advised) and you do it directly, editing only the one note you are given or adding the one new note you are told to. When you finish, the Manager checks the result: you stayed in scope, Oscar's own lines and the template are untouched, frontmatter and headings are intact, links open. A problem sends the work back to you once; if it still fails, the job is undone. Everything shows in the Activity Log with an Undo (`AGENTS.md` §14).
 
-Your jobs: a blank essay or project brief (fill only the brief sections); a written exam that has a date (create one Summary note in `Apps/Summaries/` named `{Course} - Summary - Exam Plan`, with the assessment details and a topic checklist).
+Your jobs: a blank essay or project brief (fill only the brief sections); a written exam that has a date (create one Summary note in `Files/Summaries/` named `{Course} - Summary - Exam Plan`, with the assessment details and a topic checklist).
 
 ## Learned from Oscar's edits
 

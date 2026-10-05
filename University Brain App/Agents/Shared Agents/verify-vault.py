@@ -33,8 +33,11 @@ FOLDERS = {  # folder: (template file, base file)
     'Podcast': ('Podcast', 'Podcast.base'),
     'Research': ('Research', 'Research.base'),
 }
-LOC = {'Lectures': 'Items/Lectures', 'Readings': 'Items/Readings', 'Tutorials': 'Items/Tutorials', 'Essays': 'Items/Essays', 'Projects': 'Items/Projects',
-       'Research': 'Apps/Research', **{k: 'Apps/' + k for k in STUDY}}  # where each folder lives; Courses is top-level
+LOC = {'Lectures': 'Items/Lectures', 'Readings': 'Items/Readings', 'Tutorials': 'Items/Tutorials', 'Essays': 'Items/Essays', 'Projects': 'Items/Projects'}
+# Summaries, Past Papers, Mind Maps and Research live in Files/, the other study folders in Apps/; a vault not yet moved may still have them in Apps/
+for _k in [*STUDY, 'Research']:
+    _home = 'Files' if _k in ('Summaries', 'Past Papers', 'Mind Maps', 'Research') else 'Apps'
+    LOC[_k] = f'{_home}/{_k}' if os.path.isdir(f'{_home}/{_k}') or not os.path.isdir(f'Apps/{_k}') else f'Apps/{_k}'  # Courses is top-level
 ALLOWED_EXTRA_KEYS = {'dateModified', 'completedDate'}  # TaskNotes exception (AGENTS.md 3.3)
 STATUS = {'Not started', 'In Progress', 'Done'}
 fails, warns = [], []

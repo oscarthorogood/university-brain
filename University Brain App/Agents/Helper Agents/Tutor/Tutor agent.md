@@ -6,12 +6,25 @@ Turns Oscar's notes into revision: MCQs with answers, flashcards and plain expla
 
 ## What to extract (moved from `AGENTS.md` §12)
 
-Shared procedure: `AGENTS.md` §12 items 1, 3, 4, 5, 7, 8. Study-type schema (capital `Course`) and `type` vocabulary: `AGENTS.md` §4 and §7. MCQ sets belong in `Apps/MCQ/`, decks in `Apps/Flashcards/`, past papers and exams in `Apps/Past Papers/`, not `Items/Tutorials/`.
+Shared procedure: `AGENTS.md` §12 items 1, 3, 4, 5, 7, 8. Study-type schema (capital `Course`) and `type` vocabulary: `AGENTS.md` §4 and §7. MCQ sets belong in `Apps/MCQ/`, decks in `Apps/Flashcards/`, past papers and exams in `Files/Past Papers/`, not `Items/Tutorials/`.
 
 | Attachment | Goes into |
 |---|---|
-| Past paper / mark scheme / exam handout | Assessment details, Self-test, Past paper log |
-| Exemplars | Exemplars |
+| Past paper / mark scheme / exam handout | Focus (course, year, sitting, time, marks), Questions, Attempts |
+| Exemplars | Weak spots, or a note for the Writer |
+
+## Formats the app reads
+
+The templates are short, so the formats the app turns into quizzes, decks and players are written down here. Use them exactly; a note that doesn't follow its format shows as ordinary text.
+
+| Type | Format |
+|---|---|
+| MCQ | Numbered questions (`1. Question?`), options on indented lines `- A.` to `- D.`, then `**Answer:** B — one-line reason, and the slide or note it comes from.` |
+| Flashcards | `Front: …` then `Back: …`, a blank line between cards. One idea per card |
+| Glossary | One term per bullet: `- **Term** — definition. (Author, Year)` |
+| Past Paper | Numbered questions with their marks, then `**Answer:**` or `**Mark scheme:**` (the app hides it until asked) |
+| Mind Map | A nested bullet list: first bullet is the centre, each indent a branch |
+| Podcast | An `Audio:` line (a `[[link]]` to the file or a web address), then the transcript under `## 📝 Transcript` |
 
 ## Open items
 

@@ -8,7 +8,7 @@ Entry point for this vault. Read this first to orient, then `Agents/Shared Agent
 
 ## Where things are
 
-Note folders sit under `Items/` (work), `Files/` (Zotero, Resources, OneDrive) and `Apps/` (revision tools, research). In the app, an Items note's page shows its links as **Related** (what it relates to in `Apps/` and `Files/`) and **Links to** (other Items notes); see `AGENTS.md` §3.4. Wikilinks keep the short form, e.g. `[[Lectures/Some Note]]`.
+Note folders sit under `Items/` (work), `Files/` (Zotero, Resources, OneDrive, Summaries, Past Papers, Mind Maps, Research) and `Apps/` (MCQ, Flashcards, Glossary, Podcast). In the app, an Items note's page shows its links as **Related** (what it relates to in `Apps/` and `Files/`) and **Links to** (other Items notes); see `AGENTS.md` §3.4. Wikilinks keep the short form, e.g. `[[Lectures/Some Note]]`.
 
 | Path | What it holds | Count | View |
 |---|---|---|---|
@@ -18,12 +18,12 @@ Note folders sit under `Items/` (work), `Files/` (Zotero, Resources, OneDrive) a
 | `Items/Tutorials/` | Tutorials, seminars and problem sets, numbered `T{NN}` | 79 | `Tutorials.base` |
 | `Apps/MCQ/` | Multiple-choice question sets (MCQ tests and quizzes) | 23 | `MCQ.base` |
 | `Apps/Flashcards/` | Decks of flip cards | 1 | `Flashcards.base` |
-| `Apps/Past Papers/` | Past papers and exams, with answers | 9 | `Past Papers.base` |
-| `Apps/Summaries/` | One-page summaries, formula sheets and cheat sheets | 3 | `Summaries.base` |
-| `Apps/Mind Maps/` | Concept maps | 0 | `Mind Maps.base` |
+| `Files/Past Papers/` | Past papers and exams, with answers | 9 | `Past Papers.base` |
+| `Files/Summaries/` | One-page summaries, formula sheets and cheat sheets | 3 | `Summaries.base` |
+| `Files/Mind Maps/` | Concept maps | 0 | `Mind Maps.base` |
 | `Apps/Glossary/` | Terms and definitions | 0 | `Glossary.base` |
 | `Apps/Podcast/` | Podcast episodes with transcripts | 0 | `Podcast.base` |
-| `Apps/Research/` | Sourced research briefs, one per question (Researcher) | 0 | `Research.base` |
+| `Files/Research/` | Sourced research briefs, one per question (Researcher) | 0 | `Research.base` |
 | `Items/Projects/` | Coursework and personal projects (incl. group deliverables) | 14 | `Projects.base` |
 | `Items/Essays/` | Essays and individual written assignments | 12 | `Essays.base` |
 | `Items/Exams/` | Exam notes | 0 | — |
@@ -33,7 +33,7 @@ Note folders sit under `Items/` (work), `Files/` (Zotero, Resources, OneDrive) a
 | `Templates/Human/` | Templates Oscar fills by hand (Unsorted Notes) | 1 | — |
 | `Templates/Guides/` | Naming Conventions, TaskNotes Guide | 2 | — |
 | `Unsorted/` | Intake tray for raw captures — cleared daily by a routine | — | — |
-| `Agents/` | `Shared Agents/` (agent instructions, this index, decision log, open items, `verify-vault.py`); then `Course Agents/` (`MSOA/`, `Strategy/`, `TEM/`) and `Helper Agents/` (`Sorter/`, `Scribe/`, `Librarian/` (reading lists and notes, `Ellevenread/`), `Planner/` (`Calendar Sync.md`, `Learn.md`), `Tutor/`, `Writer/`), and `Manager Agent/` (the Manager's instructions file; it sits outside both groups), one folder per agent, each starting with its own instructions file (`{Name} agent.md`) | — | — |
+| `Agents/` | `Shared Agents/` (agent instructions, this index, decision log, open items, `verify-vault.py`); then `Course Agents/` (`MSOA/`, `Strategy/`, `TEM/`) and `Helper Agents/` (`Sorter/`, `Scribe/`, `Librarian/` (reading lists and notes, `Ellevenread/`), `Planner/` (`Calendar Sync.md`, `Learn.md`), `Tutor/`, `Writer/`, `Researcher/`, `Analyst/`), and `Manager Agent/` (the Manager's instructions file; it sits outside both groups), one folder per agent, each starting with its own instructions file (`{Name} agent.md`) | — | — |
 | `Files/Resources/` | Finished reference **files**, by course and type (16 course folders) | — | — |
 | `Files/OneDrive/` | Active working **files**, by course and note type (12 course folders) | — | — |
 

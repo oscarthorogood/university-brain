@@ -115,6 +115,11 @@ enum AppFiles {
         try! "x".write(to: src.appending(path: "Agents/Shared Agents/new.md"), atomically: true, encoding: .utf8)
         precondition(installIfNeeded(source: src, version: "1.0.3+4", into: vault) == ["Agents/Shared Agents/memory.md", "Agents/Shared Agents/new.md"] && read("Agents/Shared Agents/memory.md") == "starter", "a missing seed file is installed")
         precondition(installIfNeeded(source: src, version: "9.9.9+9", into: box.appending(path: "no-such-vault")) == nil, "a missing vault is not created")
+        // notes made from the older, longer templates still hold their instructions: those count as template text, not as the user's own lines
+        let old = "---\n---\n\n## My work\n\n> [!example]+ Work completed before / after\n> The main body of the note.\n"
+        let slim = "---\n---\n\n## My work\n\n> [!example]+ My work\n> ### Before\n"
+        precondition(Sections.hasContent("My work", in: old, template: slim, legacy: []) && !Sections.hasContent("My work", in: old, template: slim, legacy: ["> The main body of the note."]), "old template text isn't content")
+        precondition(Review.checkEdit(rel: "n.md", before: old, after: old.replacingOccurrences(of: "> The main body of the note.\n", with: "> My answer\n"), sections: nil, template: slim, legacy: ["> The main body of the note."]).ok, "an agent may replace old template text")
         print("app files ok: shipped Templates and Agents overwrite once per version, old text kept, other files untouched")
     }
 }

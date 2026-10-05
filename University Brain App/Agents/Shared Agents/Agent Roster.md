@@ -6,16 +6,16 @@ Every agent in University Brain: who they are, what they own, which model they r
 
 ## Who they are
 
-| Agent | Role | Gets jobs from | What it does | Reads | May write | Web | Model and effort | Library home |
-|---|---|---|---|---|---|---|---|---|
+| Agent | Role | Gets jobs from | What it does | Reads | May write | Web | Model and effort |
+|---|---|---|---|---|---|---|---|
 | **Manager** | Finds work, assigns, consults, reviews | Itself | Scans for the 22 jobs and checks, picks helper and course agent, reviews and undoes failures, budget, morning brief, week ahead | The whole vault | Its own folder | No | **On the Mac only**: rules, plain code, Apple's on-device model. No Claude | Its own glass-walled office in the south-east corner |
 | **Sorter** | Intake and filing | Manager | Files Unsorted into Resources, folds raw notes into lectures | Whole vault, Unsorted | One note at a time; the app does the file moves | No | Sonnet, medium | Desk; Unsorted bin and shelves |
 | **Scribe** | Lecture and tutorial write-ups | Manager | Writes up from slides and Oscar's own lines | The note, its slides, the template | The one note it is given | No | Sonnet, medium | Desk; Lectures and Tutorials shelves |
 | **Librarian** | Readings and citations | Manager | Confirms citations, finds sources, creates missing Reading notes | Readings, linked files | The one Reading note, or the new Reading notes it is told to create | **Yes** | Sonnet, medium | Desk; Readings and Resources shelves |
-| **Planner** | Deadlines, briefs, exam plans | Manager | Fills briefs, builds exam revision plans, keeps the deadline picture | Calendar Sync, Learn snapshot, course notes, brief files | The one note, or the one new Revision note | No | Sonnet, medium | Desk; Tasks, Essays and Projects shelves |
-| **Tutor** | Revision and explanations | Manager | MCQ sets, flashcards and explanations | Lecture notes, slides, Revision | One new note in `Apps/MCQ/` | No | Sonnet, medium; Haiku for quick explanations | Desk; Revision and Exams shelves |
+| **Planner** | Deadlines, briefs, exam plans | Manager | Fills briefs, builds exam revision plans, keeps the deadline picture | Calendar Sync, Learn snapshot, course notes, brief files | The one note, or the one new Summary note (an exam plan, in `Files/Summaries/`) | No | Sonnet, medium | Desk; Tasks, Essays and Projects shelves |
+| **Tutor** | Revision and explanations | Manager | MCQ sets, flashcards and explanations | Lecture notes, slides, existing study notes | One new note in `Apps/MCQ/` | No | Sonnet, medium; Haiku for quick explanations | Desk; Revision and Exams shelves |
 | **Writer** | Essay and project coach | Manager | Thesis suggestion, outline, evidence plan | Brief, rubric, Oscar's notes, readings, Research briefs | Only the plan sections of the one note | No | **Opus, high** | Desk; Essays and Projects shelves |
-| **Researcher** | Evidence and sources | Manager | Sourced briefs in `Apps/Research/` | Whole vault and the web | One new note in `Apps/Research/` | **Yes** | Sonnet, medium | Desk; Readings, Research, Resources and Essays shelves |
+| **Researcher** | Evidence and sources | Manager | Sourced briefs in `Files/Research/` | Whole vault and the web | One new note in `Files/Research/` | **Yes** | Sonnet, medium | Desk; Readings, Research, Resources and Essays shelves |
 | **Analyst** | Maths and data | Manager | Worked solutions for formative tutorials and workshops, checks of Oscar's own answers; never assessed work | The note, the sheet, Resources | Only the "Solutions check" section of one tutorial note | No | **Sonnet, high, run twice and compared** | Desk; Tutorials, Exams and Resources shelves |
 | **MSOA, Strategy, TEM** | Course consultants | Manager | Advise on jobs in their own course; keep a short course briefing; answer questions in chat | That course's notes | Their own folder (the briefing, notes to self) | No | **Haiku, low** when consulted; Haiku or Sonnet in chat | Their own course shelf on the left wall |
 
