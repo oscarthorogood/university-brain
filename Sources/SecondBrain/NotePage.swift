@@ -278,9 +278,10 @@ struct NotePage: View {
         let title = note?.display ?? url.deletingPathExtension().lastPathComponent
         let sub = (isRelation ? [fm["type"] ?? fm["Type"], fm["year"], fm["publication"], note?.course] : [note?.course, note?.kind, note?.when.map(NoteRow.format), fm["location"]]).compactMap { $0 }.joined(separator: " · ")
         let subtitle = sub.isEmpty ? url.deletingLastPathComponent().lastPathComponent : sub
-        VStack(spacing: 0) {
-            noteToolbar
-            HStack(spacing: 12) {
+        HStack(spacing: 12) {
+            VStack(spacing: 0) {
+                TabBar().padding(.horizontal, 14).padding(.top, 10)
+                noteToolbar
                 Card {
                     if editing {
                         HStack(spacing: 0) {
@@ -305,15 +306,20 @@ struct NotePage: View {
                     }
                     if let saveError { Text(saveError).font(.caption).foregroundStyle(Color.redFG).padding(10) }
                 }
-                if showInspector {
-                    NoteInspector(title: title, subtitle: subtitle, tint: note?.course == nil ? nil : Color.course(note?.course), text: saved,
-                                  jump: { jump = $0 }, edit: { change in edit(change) }) {
-                        propertiesTab(fm, lists)
-                    } agent: {
-                        agentTab
-                    }.frame(width: 300)
+                .padding([.horizontal, .bottom], 12)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .modifier(GlassPane())
+            if showInspector {
+                NoteInspector(title: title, subtitle: subtitle, tint: note?.course == nil ? nil : Color.course(note?.course), text: saved,
+                              jump: { jump = $0 }, edit: { change in edit(change) }) {
+                    propertiesTab(fm, lists)
+                } agent: {
+                    agentTab
                 }
-            }.padding([.horizontal, .bottom], 12)
+                .padding(14).frame(width: 300).frame(maxHeight: .infinity)
+                .modifier(GlassPane())
+            }
         }
         .sheet(item: $work) { AgentWorkSheet(work: $0, note: url).environment(store) }
         .task(id: url) { load() }

@@ -89,9 +89,11 @@ struct PageToolbar<More: View>: View {
 /// The floating shortcut to the agents and messages, bottom right of the main panel.
 struct AssistantButton: View {
     @Environment(Store.self) private var store
+    @AppStorage("noteInspector") private var inspector = true
     var body: some View {
         switch store.page {
         case .messages, .agent: EmptyView()
+        case _ where store.page.isNote && inspector: EmptyView()   // the inspector's Agent tab is there instead
         default:
             Button { store.page = .messages } label: { Label("Assistant", systemImage: "sparkles") }
                 .buttonStyle(.glassAction(.control)).help("Messages and agents")

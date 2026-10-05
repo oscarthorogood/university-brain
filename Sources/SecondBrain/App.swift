@@ -34,6 +34,17 @@ extension Color {
 
 enum Page: Hashable { case messages, inbox, overview, week, month, semester, sortNow, course(String), folder(String), unsorted(URL), search, agent(String), note(URL), file(URL), tags }
 
+extension Page {
+    /// Pages that show a note (and so draw their own document pane and inspector pane).
+    var isNote: Bool {
+        switch self {
+        case .note: true
+        case .unsorted(let u): u.pathExtension == "md"
+        default: false
+        }
+    }
+}
+
 struct Message: Identifiable, Codable { var id = UUID(); let fromAgent: Bool; let text: String; var time = Date.now }
 
 extension Note {
@@ -448,14 +459,21 @@ struct ContentView: View {
             .modifier(GlassPane())
             .background(TrafficLights())
             .padding(.top, 12).ignoresSafeArea(.container, edges: .top)
-            VStack(spacing: 0) {
-                TabBar().padding(.horizontal, 14).padding(.top, 10)
-                MainPanel().frame(maxWidth: .infinity, maxHeight: .infinity)
+            Group {
+                if store.page.isNote {
+                    // A note draws its own two panes: the document, and the inspector as a sidebar of its own.
+                    MainPanel().frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    VStack(spacing: 0) {
+                        TabBar().padding(.horizontal, 14).padding(.top, 10)
+                        MainPanel().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .modifier(GlassPane())
+                }
             }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .modifier(GlassPane())
-                .overlay(alignment: .bottomTrailing) { AssistantButton().padding(18) }
-                .padding(.top, 12).ignoresSafeArea(.container, edges: .top)
+            .overlay(alignment: .bottomTrailing) { AssistantButton().padding(18) }
+            .padding(.top, 12).ignoresSafeArea(.container, edges: .top)
         }
         .padding(12)
         .ignoresSafeArea(.container, edges: .top)
