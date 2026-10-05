@@ -437,6 +437,7 @@ struct ContentView: View {
             .padding(.top, 12).ignoresSafeArea(.container, edges: .top)
             MainPanel().frame(maxWidth: .infinity, maxHeight: .infinity)
                 .modifier(GlassPane())
+                .overlay(alignment: .bottomTrailing) { AssistantButton().padding(18) }
                 .padding(.top, 12).ignoresSafeArea(.container, edges: .top)
         }
         .padding(12)
@@ -825,6 +826,7 @@ struct MainPanel: View {
 struct PageHeader<Trailing: View>: View {
     @Environment(Store.self) private var store
     let title: String; let subtitle: String
+    var compact = false   // a one-line title, as in a Craft toolbar
     @ViewBuilder var trailing: Trailing
     /// A round + for a new note, then the title in a serif, as in Craft's page headers.
     var titleBlock: some View {
@@ -832,8 +834,11 @@ struct PageHeader<Trailing: View>: View {
             Button { store.newNote() } label: { Image(systemName: "plus").font(.system(size: 15, weight: .medium)) }
                 .buttonStyle(.glassIcon()).help("New Note (⌘N)").accessibilityLabel("New note")
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.system(size: 28, weight: .semibold, design: .serif)).lineLimit(1)
-                Text(subtitle).font(.system(size: 13)).foregroundStyle(Color.ink2).lineLimit(1)
+                if compact { Text(title).font(.system(size: 18, weight: .semibold)).lineLimit(1) }
+                else {
+                    Text(title).font(.system(size: 28, weight: .semibold, design: .serif)).lineLimit(1)
+                    Text(subtitle).font(.system(size: 13)).foregroundStyle(Color.ink2).lineLimit(1)
+                }
             }
         }
     }

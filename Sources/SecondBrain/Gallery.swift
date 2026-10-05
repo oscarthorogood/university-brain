@@ -32,6 +32,73 @@ struct ViewModePicker: View {
     }
 }
 
+/// The notification bell in a page header: the same notices as the sidebar's Notifications button.
+struct NoticeBell: View {
+    @Environment(Store.self) private var store
+    @State private var open = false
+    var body: some View {
+        let n = store.notices().count
+        Button { open.toggle() } label: { Image(systemName: n > 0 ? "bell.badge" : "bell").font(.system(size: 15)) }
+            .buttonStyle(.glassIcon())
+            .popover(isPresented: $open, arrowEdge: .bottom) { NoticeBox().padding(10).frame(width: 300, height: 380) }
+            .help("Notifications").accessibilityLabel(n > 0 ? "Notifications, \(n)" : "Notifications")
+    }
+}
+
+/// The right-hand side of a list page's header: view switcher, sort, more (filters and page settings), search, notifications.
+/// `more` adds page-specific items to the top of the More menu.
+struct PageToolbar<More: View>: View {
+    let title: String
+    var finder: URL? = nil
+    var seasonal = false
+    @Binding var mode: ViewMode
+    @Binding var query: String
+    let sortKeys: [String]
+    @Binding var sortKey: String
+    @Binding var ascending: Bool
+    @ViewBuilder var more: More
+    @State private var searching = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ViewModePicker(mode: $mode)
+            Menu {
+                Picker("Sort by", selection: $sortKey) { ForEach(sortKeys, id: \.self) { Text($0).tag($0) } }.pickerStyle(.inline)
+                Picker("Order", selection: $ascending) { Text("Ascending").tag(true); Text("Descending").tag(false) }.pickerStyle(.inline)
+            } label: { Image(systemName: "arrow.up.arrow.down").font(.system(size: 15)) }
+                .menuStyle(.button).buttonStyle(.glassIcon()).menuIndicator(.hidden).help("Sort")
+            Menu {
+                more
+                Divider()
+                if seasonal { AllDefaultToggle(title: title) }
+                if SideNav.folders.contains(where: { $0.name == title }) { NavToggle(name: title, label: "Show in sidebar") }
+                if let finder { Button("Show in Finder") { NSWorkspace.shared.open(finder) } }
+            } label: { Image(systemName: "ellipsis").font(.system(size: 15)) }
+                .menuStyle(.button).buttonStyle(.glassIcon()).menuIndicator(.hidden).help("More")
+            Button { searching.toggle() } label: { Image(systemName: "magnifyingglass").font(.system(size: 15)) }
+                .buttonStyle(.glassIcon(DS.Height.header, prominent: !query.isEmpty))
+                .popover(isPresented: $searching, arrowEdge: .bottom) {
+                    TextField("Filter", text: $query).textFieldStyle(.roundedBorder).frame(width: 220).padding(12)
+                }
+                .help("Filter").accessibilityLabel("Filter")
+            NoticeBell()
+        }
+    }
+}
+
+/// The floating shortcut to the agents and messages, bottom right of the main panel.
+struct AssistantButton: View {
+    @Environment(Store.self) private var store
+    var body: some View {
+        switch store.page {
+        case .messages, .agent: EmptyView()
+        default:
+            Button { store.page = .messages } label: { Label("Assistant", systemImage: "sparkles") }
+                .buttonStyle(.glassAction(.control)).help("Messages and agents")
+        }
+    }
+}
+
 /// One card in a gallery. The page decides what opening it and its right-click menu do.
 struct GalleryItem: Identifiable {
     let id: URL
@@ -43,64 +110,118 @@ struct GalleryItem: Identifiable {
     let menu: AnyView
 }
 
-/// Notes as cards: a serif title, a faded preview of the text, a soft tint for the course.
+/// The start of each note's text, cached by file and modified date, so the gallery can size its cards without re-reading files.
+@MainActor enum GalleryPreview {
+    private static var cache: [URL: (modified: Date?, text: String)] = [:]
+    static func text(_ url: URL) -> String {
+        guard url.pathExtension == "md" else { return "" }
+        let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        if let hit = cache[url], hit.modified == modified { return hit.text }
+        let raw = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        let text = String(Vault.body(raw).trimmingCharacters(in: .whitespacesAndNewlines).prefix(1200))
+        cache[url] = (modified, text)
+        return text
+    }
+    /// Longer notes get taller cards, so the columns are uneven like a pinboard.
+    static func height(_ text: String, compact: Bool) -> CGFloat {
+        let lines = min(text.split(separator: "\n", omittingEmptySubsequences: true).count, 18)
+        let lo: CGFloat = compact ? 130 : 190, hi: CGFloat = compact ? 210 : 330
+        return lo + (hi - lo) * CGFloat(lines) / 18
+    }
+}
+
+/// Notes as cards in masonry columns: a serif title and a tiny rendered thumbnail of the note.
 struct NoteGallery: View {
     let items: [GalleryItem]
     let compact: Bool
+
+    private struct Placed: Identifiable { let item: GalleryItem; let text: String; let height: CGFloat; var id: URL { item.id } }
+
+    /// Deals the cards, in order, into whichever column is currently shortest.
+    private func columns(_ n: Int) -> [[Placed]] {
+        var cols = Array(repeating: [Placed](), count: n)
+        var heights = Array(repeating: CGFloat(0), count: n)
+        for item in items {
+            let text = GalleryPreview.text(item.id)
+            let h = GalleryPreview.height(text, compact: compact)
+            let i = heights.indices.min { heights[$0] < heights[$1] } ?? 0
+            cols[i].append(Placed(item: item, text: text, height: h))
+            heights[i] += h + 16
+        }
+        return cols
+    }
+
     var body: some View {
-        ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: compact ? 150 : 230), spacing: 14)], spacing: 14) {
-                ForEach(items) { GalleryCard(item: $0, compact: compact) }
-            }.padding(14)
+        GeometryReader { g in
+            let inner = max(g.size.width - 40, 100)
+            let minWidth: CGFloat = compact ? 150 : 240
+            let n = max(1, Int((inner + 16) / (minWidth + 16)))
+            let w = (inner - CGFloat(n - 1) * 16) / CGFloat(n)
+            ScrollView {
+                HStack(alignment: .top, spacing: 16) {
+                    ForEach(Array(columns(n).enumerated()), id: \.offset) { _, col in
+                        LazyVStack(spacing: 16) {
+                            ForEach(col) { GalleryCard(item: $0.item, text: $0.text, width: w, height: $0.height, compact: compact) }
+                        }
+                    }
+                }.padding(20)
+            }
         }
     }
 }
 
 private struct GalleryCard: View {
     let item: GalleryItem
+    let text: String
+    let width: CGFloat
+    let height: CGFloat
     let compact: Bool
-    @State private var preview = ""
     @State private var hover = false
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+        let pad: CGFloat = compact ? 12 : 16
         Button(action: item.open) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(item.title).font(.system(size: compact ? 14 : 18, weight: .semibold, design: .serif))
-                    .foregroundStyle(item.done ? Color.ink2 : Color.ink).lineLimit(compact ? 2 : 3).multilineTextAlignment(.leading)
-                if !item.subtitle.isEmpty { Text(item.subtitle).font(.system(size: 11)).foregroundStyle(Color.ink2).lineLimit(1) }
-                if preview.isEmpty && item.id.pathExtension != "md" {
-                    Image(nsImage: NSWorkspace.shared.icon(forFile: item.id.path)).resizable().frame(width: 40, height: 40).padding(.top, 6)
-                } else {
-                    Text(preview).font(.system(size: compact ? 9 : 11)).foregroundStyle(Color.ink2)
-                        .lineLimit(compact ? 5 : 9).multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .mask(LinearGradient(colors: [.black, .black, .clear], startPoint: .top, endPoint: .bottom))
-                }
-                Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.title).font(.system(size: compact ? 14 : 19, weight: .semibold, design: .serif))
+                    .foregroundStyle(item.done ? Color.ink2 : Color.ink).lineLimit(2).multilineTextAlignment(.leading)
+                if !item.subtitle.isEmpty { Text(item.subtitle).font(.system(size: 10)).foregroundStyle(Color.ink2).lineLimit(1) }
+                thumbnail(inner: width - 2 * pad).padding(.top, 8)
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-            .frame(height: compact ? 150 : 230)
+            .padding(pad)
+            .frame(width: width, height: height, alignment: .topLeading)
             .background {
                 shape.fill(Color.card)
-                    .overlay { if item.code != nil { shape.fill(Color.course(item.code).opacity(0.14)) } }
-                    .shadow(color: .black.opacity(hover ? 0.14 : 0.07), radius: hover ? 12 : 8, y: 3)
+                    .overlay { if item.code != nil { shape.fill(Color.course(item.code).opacity(0.3)) } }
+                    .shadow(color: .black.opacity(hover ? 0.18 : 0.1), radius: hover ? 14 : 9, y: 3)
             }
-            .overlay(shape.strokeBorder(Color.line.opacity(0.6)))
+            .overlay(shape.strokeBorder(Color.line.opacity(0.9)))
             .contentShape(shape)
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
         .animation(.easeOut(duration: 0.15), value: hover)
         .contextMenu { item.menu }
-        .task(id: item.id) { preview = Self.text(item.id) }
     }
 
-    /// The start of the note's text, without the frontmatter or Markdown marks.
-    static func text(_ url: URL) -> String {
-        guard url.pathExtension == "md", let t = try? String(contentsOf: url, encoding: .utf8) else { return "" }
-        let body = Vault.body(t).replacingOccurrences(of: "#", with: "").replacingOccurrences(of: "*", with: "")
-        return String(body.trimmingCharacters(in: .whitespacesAndNewlines).prefix(700))
+    /// The note rendered at full size, then shrunk, like the page thumbnails in Craft. Fades out at the bottom.
+    @ViewBuilder func thumbnail(inner: CGFloat) -> some View {
+        let scale: CGFloat = compact ? 0.3 : 0.38
+        Color.clear.frame(maxHeight: .infinity)
+            .overlay(alignment: .topLeading) {
+                if text.isEmpty {
+                    if item.id.pathExtension != "md" {
+                        Image(nsImage: NSWorkspace.shared.icon(forFile: item.id.path)).resizable().frame(width: 40, height: 40)
+                    }
+                } else {
+                    MarkdownBlocks(blocks: MD.parse(text.components(separatedBy: "\n")))
+                        .frame(width: inner / scale, alignment: .topLeading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .scaleEffect(scale, anchor: .topLeading)
+                }
+            }
+            .clipped()
+            .mask(LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.7), .init(color: .clear, location: 1)], startPoint: .top, endPoint: .bottom))
+            .allowsHitTesting(false)
     }
 }

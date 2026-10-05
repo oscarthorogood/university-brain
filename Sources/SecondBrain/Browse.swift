@@ -203,7 +203,7 @@ struct FileRow: View {
     }
 }
 
-/// Everything waiting in Unsorted, laid out like an Items page: one sortable table. A note opens in the note page, any other file in a preview.
+/// Everything waiting in Unsorted, laid out like an Items page: gallery, grid or a sortable table. A note opens in the note page, any other file in a preview.
 struct InboxPage: View {
     @Environment(Store.self) private var store
     @AppStorage("viewMode") private var viewMode = ViewMode.gallery
@@ -236,45 +236,39 @@ struct InboxPage: View {
             .filter { query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) || $0.course.localizedCaseInsensitiveContains(query) || $0.type.localizedCaseInsensitiveContains(query) }
             .sorted { up ? value($0) < value($1) : value($0) > value($1) }
         VStack(spacing: 0) {
-            PageHeader(title: "Unsorted", subtitle: every.isEmpty ? "All sorted" : "\(every.count) waiting · \(every.filter { $0.type == "Note" }.count) notes") {
+            PageHeader(title: "Unsorted", subtitle: every.isEmpty ? "All sorted" : "\(every.count) waiting · \(every.filter { $0.type == "Note" }.count) notes", compact: true) {
                 HStack(spacing: 10) {
                     if !every.isEmpty { Button { store.page = .sortNow } label: { Label("Sort Now", systemImage: "sparkles") }.buttonStyle(.glassAction(.header)) }
-                    RoundButton(icon: "square.and.pencil", label: "New note") { store.newNote() }
-                    RoundButton(icon: "arrow.up.doc", label: "Add file") { store.addFile() }
-                    RoundButton(icon: "link", label: "Add link") { store.addLink() }
-                    RoundButton(icon: "mic", label: "Voice memo") { store.voiceMemo = true }
-                    ViewModePicker(mode: $viewMode)
-                    PageTools(title: "Unsorted", finder: Vault.root.appending(path: "Unsorted"))
-                }
-            }
-            Card {
-                if every.isEmpty { Label("All sorted", systemImage: "checkmark.circle").font(.system(size: 13)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity, maxHeight: .infinity) }
-                else {
-                    HStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass").foregroundStyle(Color.ink2)
-                        TextField("Filter", text: $query).textFieldStyle(.plain)
-                    }.font(.system(size: 13)).glassField().padding(.horizontal, 12).padding(.vertical, 10)
-                    if rows.isEmpty { Text("No matches").font(.system(size: 13)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity, maxHeight: .infinity) }
-                    else if viewMode != .list {
-                        NoteGallery(items: rows.map { r in
-                            GalleryItem(id: r.url, title: r.title, subtitle: [r.type, r.course.isEmpty ? nil : r.course].compactMap { $0 }.joined(separator: " · "),
-                                        code: r.code, open: { store.page = .unsorted(r.url) }, menu: AnyView(UnsortedMenu(url: r.url)))
-                        }, compact: viewMode == .grid)
-                    } else {
-                        HStack(spacing: 8) {
-                            Color.clear.frame(width: 22, height: 1)
-                            ForEach(Self.columns, id: \.self) { c in
-                                Button { if key == c { up.toggle() } else { key = c; up = true } } label: {
-                                    HStack(spacing: 3) { Text(c); if key == c { Image(systemName: up ? "chevron.up" : "chevron.down").font(.system(size: 8, weight: .bold)) } }
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }.buttonStyle(.plain).frame(maxWidth: Self.width(c), alignment: .leading)
-                            }
-                        }.font(.caption.weight(.semibold)).foregroundStyle(Color.ink2).padding(.horizontal, 14).padding(.vertical, 8)
-                        Rectangle().fill(Color.line.opacity(0.6)).frame(height: 1)
-                        ScrollView { LazyVStack(spacing: 0) { ForEach(rows, id: \.url) { UnsortedRow(row: $0) } } }
+                    PageToolbar(title: "Unsorted", finder: Vault.root.appending(path: "Unsorted"), mode: $viewMode, query: $query,
+                                sortKeys: Self.columns, sortKey: $key, ascending: $up) {
+                        Button("Add File…") { store.addFile() }
+                        Button("Add Link…") { store.addLink() }
+                        Button("Voice Memo…") { store.voiceMemo = true }
                     }
                 }
-            }.padding([.horizontal, .bottom], 12)
+            }
+            if every.isEmpty { Label("All sorted", systemImage: "checkmark.circle").font(.system(size: 13)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity, maxHeight: .infinity) }
+            else if rows.isEmpty { Text("No matches").font(.system(size: 13)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity, maxHeight: .infinity) }
+            else if viewMode != .list {
+                NoteGallery(items: rows.map { r in
+                    GalleryItem(id: r.url, title: r.title, subtitle: [r.type, r.course.isEmpty ? nil : r.course].compactMap { $0 }.joined(separator: " · "),
+                                code: r.code, open: { store.page = .unsorted(r.url) }, menu: AnyView(UnsortedMenu(url: r.url)))
+                }, compact: viewMode == .grid)
+            } else {
+                Card {
+                    HStack(spacing: 8) {
+                        Color.clear.frame(width: 22, height: 1)
+                        ForEach(Self.columns, id: \.self) { c in
+                            Button { if key == c { up.toggle() } else { key = c; up = true } } label: {
+                                HStack(spacing: 3) { Text(c); if key == c { Image(systemName: up ? "chevron.up" : "chevron.down").font(.system(size: 8, weight: .bold)) } }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }.buttonStyle(.plain).frame(maxWidth: Self.width(c), alignment: .leading)
+                        }
+                    }.font(.caption.weight(.semibold)).foregroundStyle(Color.ink2).padding(.horizontal, 14).padding(.vertical, 8)
+                    Rectangle().fill(Color.line.opacity(0.6)).frame(height: 1)
+                    ScrollView { LazyVStack(spacing: 0) { ForEach(rows, id: \.url) { UnsortedRow(row: $0) } } }
+                }.padding([.horizontal, .bottom], 12)
+            }
         }
     }
 }
@@ -301,7 +295,7 @@ private struct UnsortedRow: View {
     }
 }
 
-/// Items pages (Lectures, Readings, Essays…): every note in one sortable table.
+/// Items pages (Lectures, Readings, Essays…): every note as a card (gallery or grid) or one sortable table.
 struct ItemsPage: View {
     @Environment(Store.self) private var store
     let title: String; let folders: [String]
@@ -329,38 +323,33 @@ struct ItemsPage: View {
         let rows = every
             .filter { (showAll || current.contains($0.course)) && (course == nil || $0.course == course) && (query.isEmpty || $0.note.display.localizedCaseInsensitiveContains(query) || $0.course.localizedCaseInsensitiveContains(query)) }
             .sorted { up ? value($0) < value($1) : value($0) > value($1) }
+        // The course filter: every course the notes belong to, or this semester's three (as on Home).
+        let courseOptions: [(String, String)] = showAll
+            ? Set(every.map(\.course)).sorted().map { ($0, $0) }
+            : ["MSOA", "SM", "TEM"].compactMap { code in Vault.courses.first { $0.value == code }.map { ($0.key, code) } }
         VStack(spacing: 0) {
-            PageHeader(title: SideNav.label(title), subtitle: "\(rows.count) notes · \(rows.filter { !$0.note.done && !$0.note.status.isEmpty }.count) not done") {
-                HStack(spacing: 10) {
-                    Pills(options: [(false, "This semester"), (true, "All courses")], selection: Binding(get: { showAll }, set: { showAll = $0; course = nil }))
-                    if showAll {   // every course the notes belong to, as a menu with All as the default
-                        Menu {
-                            Picker("Course", selection: $course) {
-                                Text("All").tag(String?.none)
-                                ForEach(Set(every.map(\.course)).sorted(), id: \.self) { Text($0).tag(String?.some($0)) }
-                            }.pickerStyle(.inline)
-                        } label: { Text(course ?? "All") }.menuStyle(.button).buttonStyle(.glassAction(.header)).fixedSize().help("Filter by course")
-                    } else {   // this semester's three courses, as on Home
-                        Pills(options: [(nil, "All")] + ["MSOA", "SM", "TEM"].compactMap { code in Vault.courses.first { $0.value == code }.map { (String?.some($0.key), code) } } as [(String?, String)], selection: $course)
-                    }
-                    ViewModePicker(mode: $viewMode)
-                    PageTools(title: title, finder: Vault.root.appending(path: Vault.dir(folders[0])), seasonal: true)
+            PageHeader(title: SideNav.label(title), subtitle: "\(rows.count) notes · \(rows.filter { !$0.note.done && !$0.note.status.isEmpty }.count) not done", compact: true) {
+                PageToolbar(title: title, finder: Vault.root.appending(path: Vault.dir(folders[0])), seasonal: true, mode: $viewMode, query: $query,
+                            sortKeys: Self.columns, sortKey: $key, ascending: $up) {
+                    Picker("Courses", selection: Binding(get: { showAll }, set: { showAll = $0; course = nil })) {
+                        Text("This semester").tag(false); Text("All courses").tag(true)
+                    }.pickerStyle(.inline)
+                    Picker("Course", selection: $course) {
+                        Text("All").tag(String?.none)
+                        ForEach(courseOptions, id: \.0) { Text($0.1).tag(String?.some($0.0)) }
+                    }.pickerStyle(.inline)
                 }
             }
-            Card {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(Color.ink2)
-                    TextField("Filter notes", text: $query).textFieldStyle(.plain)
-                }.font(.system(size: 13)).glassField().padding(.horizontal, 12).padding(.vertical, 10)
-                if rows.isEmpty { Text("No notes").font(.system(size: 13)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity, maxHeight: .infinity) }
-                else if viewMode != .list {
-                    NoteGallery(items: rows.map { r in
-                        GalleryItem(id: r.note.id, title: r.note.display,
-                                    subtitle: [r.course, r.note.when.map { $0.formatted(.dateTime.day().month(.abbreviated)) }].compactMap { $0 }.joined(separator: " · "),
-                                    code: r.note.course, done: r.note.done,
-                                    open: { store.page = .note(r.note.id) }, menu: AnyView(NoteMenu(note: r.note)))
-                    }, compact: viewMode == .grid)
-                } else {
+            if rows.isEmpty { Text("No notes").font(.system(size: 13)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity, maxHeight: .infinity) }
+            else if viewMode != .list {
+                NoteGallery(items: rows.map { r in
+                    GalleryItem(id: r.note.id, title: r.note.display,
+                                subtitle: r.note.when.map { $0.formatted(.dateTime.day().month(.abbreviated)) } ?? "",
+                                code: r.note.course, done: r.note.done,
+                                open: { store.page = .note(r.note.id) }, menu: AnyView(NoteMenu(note: r.note)))
+                }, compact: viewMode == .grid)
+            } else {
+                Card {
                     HStack(spacing: 8) {
                         Color.clear.frame(width: 22, height: 1)
                         ForEach(Self.columns, id: \.self) { c in
@@ -372,8 +361,8 @@ struct ItemsPage: View {
                     }.font(.caption.weight(.semibold)).foregroundStyle(Color.ink2).padding(.horizontal, 14).padding(.vertical, 8)
                     Rectangle().fill(Color.line.opacity(0.6)).frame(height: 1)
                     ScrollView { LazyVStack(spacing: 0) { ForEach(rows, id: \.note.id) { ItemRow(note: $0.note, course: $0.course) } } }
-                }
-            }.padding([.horizontal, .bottom], 12)
+                }.padding([.horizontal, .bottom], 12)
+            }
         }
         .onAppear { showAll = UserDefaults.standard.bool(forKey: "allDefault.\(title)") }
     }
