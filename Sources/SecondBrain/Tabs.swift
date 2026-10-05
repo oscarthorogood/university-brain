@@ -62,35 +62,71 @@ extension Store {
     }
 }
 
-/// The whole top strip of the window: window buttons, sidebar and settings buttons, Home, the open tabs, a + for a new one, and notifications.
+/// The top strip of the window, laid out like Safari's toolbar. Over the sidebar: the window buttons and one glass group with the
+/// sidebar, settings, notifications and Home. Then a divider, and over the pages the open tabs in a glass group of their own.
 struct WindowTabBar: View {
     @Environment(Store.self) private var store
+    @Environment(\.openSettings) private var openSettings
+    @AppStorage("sidebarCollapsed") private var collapsed = false
+    @State private var showNotices = false
+
     var body: some View {
-        HStack(spacing: 8) {
-            Color.clear.frame(width: 82, height: 1)   // room for the window buttons
-            CollapseButton()
-            SettingsButton()
-            Button { store.openHome() } label: {
-                Image(systemName: "house.fill").font(.system(size: 13)).foregroundStyle(store.page == .overview ? Color.ink : Color.ink2).frame(width: 28, height: 28).contentShape(.circle)
-            }.buttonStyle(.plain).help("Home").accessibilityLabel("Home")
-            TabBar()
-            Spacer(minLength: 0)
-            NoticeBell(size: DS.Height.icon)
+        let count = store.notices().count
+        HStack(spacing: 0) {
+            HStack(spacing: 0) {
+                Color.clear.frame(width: 88, height: 1)   // the window buttons
+                GlassEffectContainer(spacing: 0) {
+                    HStack(spacing: 2) {
+                        ChromeButton(icon: "sidebar.left", help: collapsed ? "Show Sidebar" : "Hide Sidebar") { withAnimation(.spring(duration: 0.45, bounce: 0.15)) { collapsed.toggle() } }
+                        ChromeButton(icon: "gearshape", help: "Settings (⌘,)") { openSettings() }
+                        ChromeButton(icon: count > 0 ? "bell.badge" : "bell", help: count > 0 ? "Notifications, \(count)" : "Notifications") { showNotices.toggle() }
+                            .popover(isPresented: $showNotices, arrowEdge: .bottom) { NoticeBox().padding(10).frame(width: 300, height: 380) }
+                        ChromeButton(icon: "house", help: "Home", on: store.page == .overview) { store.openHome() }
+                    }
+                    .padding(3).glassEffect(.regular, in: .capsule)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(width: 258)
+            Rectangle().fill(Color.line.opacity(0.8)).frame(width: 1, height: 28)
+            HStack(spacing: 0) { TabBar(); Spacer(minLength: 0) }.padding(.leading, 5).padding(.trailing, 12)
         }
-        .frame(height: 44).padding(.horizontal, 12)
+        .frame(height: 44)
         .background(TrafficLights())
     }
 }
 
-/// The open tabs and the + after them.
+/// One round icon inside a glass group in the top strip.
+private struct ChromeButton: View {
+    let icon: String
+    let help: String
+    var on = false
+    let action: () -> Void
+    @State private var hover = false
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon).font(.system(size: 13)).foregroundStyle(on ? Color.ink : Color.ink2)
+                .frame(width: 32, height: 30).contentShape(.capsule)
+                .background(Capsule().fill(Color.ink.opacity(on ? 0.1 : hover ? 0.06 : 0)))
+        }
+        .buttonStyle(.plain).onHover { hover = $0 }
+        .animation(.easeOut(duration: 0.12), value: hover)
+        .help(help).accessibilityLabel(help)
+    }
+}
+
+/// The open tabs and the + after them, in one glass capsule.
 struct TabBar: View {
     @Environment(Store.self) private var store
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(Array(store.tabs.enumerated()), id: \.element.id) { i, tab in TabPill(tab: tab, index: i) }
-            Button { store.newTab() } label: {
-                Image(systemName: "plus").font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ink2).frame(width: 28, height: 28).contentShape(.circle)
-            }.buttonStyle(.plain).help("New Tab (⌘T)").accessibilityLabel("New tab")
+        GlassEffectContainer(spacing: 0) {
+            HStack(spacing: 2) {
+                ForEach(Array(store.tabs.enumerated()), id: \.element.id) { i, tab in TabPill(tab: tab, index: i) }
+                Button { store.newTab() } label: {
+                    Image(systemName: "plus").font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ink2).frame(width: 30, height: 30).contentShape(.circle)
+                }.buttonStyle(.plain).help("New Tab (⌘T)").accessibilityLabel("New tab")
+            }
+            .padding(3).glassEffect(.regular, in: .capsule)
         }
     }
 }

@@ -1309,7 +1309,7 @@ struct TrafficLights: NSViewRepresentable {
                 for (i, type) in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].enumerated() {
                     guard let b = w.standardWindowButton(type), let bar = b.superview else { continue }
                     let size = b.frame.size
-                    let y = bar.isFlipped ? 22 - size.height / 2 : bar.bounds.height - 22 - size.height / 2
+                    let y = bar.isFlipped ? 18 - size.height / 2 : bar.bounds.height - 18 - size.height / 2
                     b.setFrameOrigin(NSPoint(x: 34 - size.width / 2 + CGFloat(i) * 20, y: y))
                 }
             }
