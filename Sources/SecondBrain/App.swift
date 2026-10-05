@@ -261,6 +261,11 @@ struct SecondBrainApp: App {
     /// Chats and each agent's Claude session survive a relaunch (they used to vanish, and every agent forgot the conversation).
     var chats: [String: [Message]] = Store.savedChats.chats { didSet { saveChats() } }
     var thinking: Set<String> = []
+    /// What an agent has written so far of the answer it is still working on, for its chat to show growing.
+    var streaming: [String: String] = [:]
+    @ObservationIgnored private var chatTasks: [String: Task<Void, Never>] = [:]
+    /// Stops the agent working on a chat reply: the process ends and the chat says so.
+    func stopChat(_ code: String) { chatTasks[code]?.cancel() }
     @ObservationIgnored private var sessions: [String: String] = Store.savedChats.sessions
     private struct SavedChats: Codable { var chats: [String: [Message]] = [:]; var sessions: [String: String] = [:] }
     private static var chatFile: URL { Support.dir.appending(path: "chats.json") }
@@ -285,7 +290,16 @@ struct SecondBrainApp: App {
         chats[code, default: []].append(Message(fromAgent: false, text: shown))
         thinking.insert(code)
         let team = Agent.teamLog(activity)
-        let reply = await Agent.run(team.isEmpty ? prompt : prompt + "\n\n" + team, system: Agent.systemPrompt(Agent.role(code)), session: sessions[code], canEdit: false, root: Vault.root, tier: tier, writes: Agent.writeScopes(code), web: ["librarian", "researcher"].contains(code))
+        let reply = await Agent.run(team.isEmpty ? prompt : prompt + "\n\n" + team, system: Agent.systemPrompt(Agent.role(code)), session: sessions[code], canEdit: false, root: Vault.root, tier: tier, writes: Agent.writeScopes(code), web: ["librarian", "researcher"].contains(code),
+                                    onText: { [weak self] text in
+                                        Task { @MainActor in
+                                            guard let self, self.thinking.contains(code) else { return }   // a late piece after the answer is in is ignored
+                                            self.streaming[code] = text
+                                            if let m = mirror, self.thinking.contains(m) { self.streaming[m] = "**\(Agent.role(code).name)**\n\n" + text }
+                                        }
+                                    })
+        streaming[code] = nil
+        if let m = mirror { streaming[m] = nil }
         if let s = reply.session { sessions[code] = s }
         chats[code, default: []].append(Message(fromAgent: true, text: reply.text))
         if let m = mirror { chats[m, default: []].append(Message(fromAgent: true, text: "**\(Agent.role(code).name)**\n\n" + reply.text)) }
@@ -295,14 +309,20 @@ struct SecondBrainApp: App {
     }
     private func send(_ code: String, _ text: String, tier: Manager.Tier) {
         thinking.insert(code)
-        Task { _ = await converse(code, shown: text, prompt: text, tier: tier, mirror: nil) }
+        chatTasks[code] = Task { [weak self] in
+            guard let self else { return }
+            _ = await converse(code, shown: text, prompt: text, tier: tier, mirror: nil)
+            chatTasks[code] = nil
+        }
     }
     /// The Manager's chat: one agent, or a team working one after another. Each stage gets what the earlier ones handed over, and a course agent advises first.
     private func dispatch(_ text: String, tier: Manager.Tier? = nil) {
         let m = Agent.manager.id
         chats[m, default: []].append(Message(fromAgent: false, text: text))
         thinking.insert(m)
-        Task {
+        chatTasks[m] = Task { [weak self] in
+            guard let self else { return }
+            defer { chatTasks[m] = nil }
             let earlier = recentManagerChat()
             let previous = chats[m]?.last { $0.fromAgent && $0.text.hasPrefix("**") }.flatMap { msg in Agent.all.first { msg.text.hasPrefix("**\($0.name)**") }?.id }
             var steps = Manager.chain(text) ?? []
@@ -338,7 +358,7 @@ struct SecondBrainApp: App {
                         : "\nYou are the last stage: produce the finished result the request asks for from the handed-over material. If something it needed is missing, say so plainly instead of inventing it."
                 }
                 let reply = await converse(r.agent, shown: team ? "\(text) (stage \(i + 1) of \(steps.count), from the Manager)" : text, prompt: prompt, tier: tier ?? r.tier, mirror: m)
-                if reply.session == nil { chats[m, default: []].append(Message(fromAgent: true, text: "\(names[i]) couldn’t finish, so I stopped there.")); break }
+                if reply.session == nil { chats[m, default: []].append(Message(fromAgent: true, text: reply.stopped ? "Stopped." : "\(names[i]) couldn’t finish, so I stopped there.")); break }
                 if team, i == steps.count - 1, !done.isEmpty {   // a different agent checks the finished result against what was handed over
                     chats[m, default: []].append(Message(fromAgent: true, text: "→ **Checking** the result against what was handed over"))
                     let problems = await Agent.verify(result: reply.text, handoff: done.map(\.text).joined(separator: "\n\n"), root: Vault.root)

@@ -41,19 +41,32 @@ struct AgentChatCard: View {
                                        receipt: lastMine ? (replied ? "Read" : (busy ? "Delivered" : nil)) : nil)
                                 .id(m.id).appearIn().padding(.top, prev?.fromAgent == m.fromAgent ? -12 : 0)
                         }
-                        if busy { HStack { IMTyping(); Spacer() }.id("busy") }
+                        if busy {
+                            // what the agent has written so far, growing; the dots until its first words arrive
+                            if let live = store.streaming[code], !live.senderAndBody.body.isEmpty {
+                                HStack { IMBubble(text: live.senderAndBody.body, mine: false); Spacer(minLength: 56) }.id("busy")
+                            } else { HStack { IMTyping(); Spacer() }.id("busy") }
+                        }
                     }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .onChange(of: messages.count) { withAnimation { proxy.scrollTo(busy ? AnyHashable("busy") : AnyHashable(messages.last?.id), anchor: .bottom) } }
                 .onChange(of: busy) { if busy { withAnimation { proxy.scrollTo("busy", anchor: .bottom) } } }
+                .onChange(of: store.streaming[code]) { if busy { proxy.scrollTo("busy", anchor: .bottom) } }
             }
             HStack(spacing: 8) {
                 TextField(code == Agent.manager.id ? "What do you need?" : "Message \(role.name)", text: $draft, axis: .vertical).textFieldStyle(.plain).lineLimit(1...4).onSubmit { send() }
                 let ready = !busy && !draft.trimmingCharacters(in: .whitespaces).isEmpty
-                Button(action: send) {
-                    Image(systemName: "arrow.up").font(.system(size: 13, weight: .bold)).foregroundStyle(ready ? Color.white : Color.ink2)
-                        .frame(width: 28, height: 28).glassEffect(ready ? .regular.tint(IM.blue).interactive() : .regular, in: .circle)
-                }.buttonStyle(.plain).disabled(!ready).accessibilityLabel("Send")
+                if busy {
+                    Button { store.stopChat(code) } label: {
+                        Image(systemName: "stop.fill").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.ink)
+                            .frame(width: 28, height: 28).glassEffect(.regular.interactive(), in: .circle)
+                    }.buttonStyle(.plain).help("Stop \(role.name)").accessibilityLabel("Stop")
+                } else {
+                    Button(action: send) {
+                        Image(systemName: "arrow.up").font(.system(size: 13, weight: .bold)).foregroundStyle(ready ? Color.white : Color.ink2)
+                            .frame(width: 28, height: 28).glassEffect(ready ? .regular.tint(IM.blue).interactive() : .regular, in: .circle)
+                    }.buttonStyle(.plain).disabled(!ready).accessibilityLabel("Send")
+                }
             }
             .font(.system(size: 14)).padding(.leading, 14).padding(.trailing, 4).padding(.vertical, 4)
             .glassEffect(.regular, in: .capsule)

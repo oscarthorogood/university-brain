@@ -20,6 +20,8 @@ enum Agent {
     /// `session` is nil when the run failed (including when Claude Code answered with an error such as a usage limit).
     struct Reply: Sendable {
         let text: String; let session: String?
+        /// You stopped it (Stop in a chat, or pausing the Manager), so it isn't a failure and shouldn't count against the agent.
+        var stopped = false
         /// Out of usage: the CLI says so in its reply, so background work should wait instead of retrying.
         var limited: Bool { session == nil && ["usage limit", "session limit", "rate limit", "limit reached", "hit your"].contains { text.localizedCaseInsensitiveContains($0) } }
     }
@@ -187,11 +189,17 @@ enum Agent {
         """, system: filingPrompt, session: nil, canEdit: false, root: root)
     }
 
+    /// Where the Sorter may write while it carries out a plan: the note folders and the synced calendar note it ticks. Never `Agents/` or `Templates/`
+    /// (it used to have write access to the whole vault, with only the review to catch a stray edit there).
+    static func filingScopes(root: URL) -> [String] {
+        Array(Set(Vault.folders.map { scope(folder: Vault.dir($0, root: root)) } + [scope(file: CalendarSync.file)])).sorted()
+    }
+
     /// Stage 2: carry out that plan in the same session, once the app has done the moves.
     static func approveFiling(session: String, moved: [String], root: URL) async -> Reply {
         let done = moved.isEmpty ? "No files needed moving." : "The app has already moved: " + moved.joined(separator: "; ") + "."
         return await run("\(done) Now do the note changes from your plan (don't move files), then reply with one short line per step saying what you did.",
-                  system: filingPrompt, session: session, canEdit: true, root: root)
+                  system: filingPrompt, session: session, canEdit: false, root: root, writes: filingScopes(root: root))
     }
 
 
@@ -245,53 +253,150 @@ enum Agent {
         """, system: workPrompt("analyst"), session: nil, canEdit: false, root: root, tier: .careful)
     }
 
+    /// The reply a stopped run gives.
+    static let stoppedText = "Stopped by you."
+    /// Set for everything the Manager starts on its own, so pausing can stop exactly that (not a chat, not a job you started with a button).
+    @TaskLocal static var background = false
+    /// Set for a job started from a button (Sort Now, a note's page): Stop ends these too, pausing does not.
+    @TaskLocal static var button = false
+    private static let live = LiveRuns()
+    /// Ends the Manager's own runs that are going now, and refuses new ones for a few seconds, so the rest of a job in progress stops as well.
+    static func stopBackgroundRuns() { live.stop(buttonsToo: false) }
+    /// The same, and the jobs you started yourself as well. Chats are left alone (each has its own Stop).
+    static func stopJobs() { live.stop(buttonsToo: true) }
+
     /// `canEdit` allows edits anywhere; `writes` allows edits only to those files or folders (`Folder/**`); `web` adds web search for finding sources.
-    static func run(_ prompt: String, system: String, session: String?, canEdit: Bool, root: URL, tier: Manager.Tier = .standard, writes: [String] = [], web: Bool = false) async -> Reply {
+    /// `onText` hears the answer as it is written (about ten times a second at most), for a chat to show it growing.
+    static func run(_ prompt: String, system: String, session: String?, canEdit: Bool, root: URL, tier: Manager.Tier = .standard, writes: [String] = [], web: Bool = false,
+                    onText: (@Sendable (String) -> Void)? = nil) async -> Reply {
         let prompt = clip(prompt)
         if let stub { return await stub(prompt, system, session, writes, tier) }
+        let background = Agent.background, button = Agent.button
+        if live.blocked(background: background, button: button) { return Reply(text: stoppedText, session: nil, stopped: true) }
         await Task.detached { cachePDFs(root: root) }.value
         let tools = (["Read", "Glob", "Grep"] + (canEdit ? ["Edit", "Write"] : writes.flatMap { ["Edit(\($0))", "Write(\($0))"] }) + (web ? ["WebSearch", "WebFetch"] : [])).joined(separator: ",")
         var args = ["-p", prompt, "--output-format", "stream-json", "--verbose"] + Manager.args(tier) + [
                     "--append-system-prompt", system,
                     "--allowedTools", tools]
         if let session { args += ["--resume", session] }
-        return await withCheckedContinuation { cont in
-            let p = Process()
-            p.executableURL = URL(fileURLWithPath: cli)
-            p.arguments = args
-            p.currentDirectoryURL = root
-            var env = ProcessInfo.processInfo.environment
-            env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:" + (env["PATH"] ?? "")
-            p.environment = env
-            let out = Pipe(); p.standardOutput = out; p.standardError = FileHandle.nullDevice
-            p.standardInput = FileHandle.nullDevice   // nothing can make it wait for input
-            do { try p.run() } catch {
-                cont.resume(returning: Reply(text: "Couldn’t start Claude Code at \(cli): \(error.localizedDescription)", session: nil)); return
-            }
-            // a call that hangs would freeze the Manager, so each one has a time limit
-            let limit: Double = tier == .quick ? 240 : tier == .standard ? 900 : 1500
-            let timedOut = TimeoutFlag()
-            DispatchQueue.global().asyncAfter(deadline: .now() + limit) {
-                guard p.isRunning else { return }
-                timedOut.hit = true; p.terminate()
-                DispatchQueue.global().asyncAfter(deadline: .now() + 5) { if p.isRunning { kill(p.processIdentifier, SIGKILL) } }
-            }
-            // Read before waiting so a large reply can't fill the pipe and stall the process.
-            DispatchQueue.global().async {
-                let data = out.fileHandleForReading.readDataToEndOfFile()
-                p.waitUntilExit()
-                // stream-json: one event per line; the last "result" is the answer, and rate-limit events say how much of the plan is used
-                var json: [String: Any]?
-                for line in data.split(separator: UInt8(ascii: "\n")) {
-                    guard let e = (try? JSONSerialization.jsonObject(with: Data(line))) as? [String: Any] else { continue }
-                    if e["type"] as? String == "rate_limit_event" { PlanUsage.record(e) } else if e["type"] as? String == "result" { json = e }
-                }
-                let raw = json == nil ? (String(data: data, encoding: .utf8) ?? "") : ""
-                let text = (json?["result"] as? String) ?? (raw.isEmpty ? "The agent didn’t reply. Is Claude Code signed in? Run `claude` once in Terminal." : raw)
-                let failed = (json?["is_error"] as? Bool) == true
-                if timedOut.hit { cont.resume(returning: Reply(text: "The agent took longer than \(Int(limit / 60)) minutes and was stopped.", session: nil)); return }
-                cont.resume(returning: Reply(text: text.trimmingCharacters(in: .whitespacesAndNewlines), session: failed ? nil : json?["session_id"] as? String))
-            }
+        // a call that hangs would freeze the Manager, so each one has a time limit
+        let limit: Double = tier == .quick ? 240 : tier == .standard ? 900 : 1500
+        var done = await launch(args + (onText == nil ? [] : ["--include-partial-messages"]), root: root, limit: limit, background: background, button: button, onText: onText)
+        // a CLI that doesn't know the partial-messages flag fails at once with nothing to show: ask again without it
+        if onText != nil, done.reply.session == nil, done.failedFast, !done.reply.stopped {
+            done = await launch(args, root: root, limit: limit, background: background, button: button, onText: onText)
         }
+        return done.reply
+    }
+
+    private struct Launch: Sendable { let reply: Reply; let failedFast: Bool }
+
+    /// One Claude Code process, from start to its last line of output. Output is read as it arrives, so a chat can show the answer growing;
+    /// cancelling the calling task (or `stopBackgroundRuns`) ends the process.
+    private static func launch(_ args: [String], root: URL, limit: Double, background: Bool, button: Bool, onText: (@Sendable (String) -> Void)?) async -> Launch {
+        let handle = ProcessHandle(), id = live.add(handle, background: background, button: button)
+        defer { live.remove(id) }
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { (cont: CheckedContinuation<Launch, Never>) in
+                let p = Process()
+                p.executableURL = URL(fileURLWithPath: cli)
+                p.arguments = args
+                p.currentDirectoryURL = root
+                var env = ProcessInfo.processInfo.environment
+                env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:" + (env["PATH"] ?? "")
+                p.environment = env
+                let out = Pipe(); p.standardOutput = out; p.standardError = FileHandle.nullDevice
+                p.standardInput = FileHandle.nullDevice   // nothing can make it wait for input
+                do { try p.run() } catch {
+                    cont.resume(returning: Launch(reply: Reply(text: "Couldn’t start Claude Code at \(cli): \(error.localizedDescription)", session: nil), failedFast: false)); return
+                }
+                handle.set(p)   // a stop that came before this point ends it now
+                let began = Date(), timedOut = TimeoutFlag()
+                DispatchQueue.global().asyncAfter(deadline: .now() + limit) {
+                    guard p.isRunning else { return }
+                    timedOut.hit = true; p.terminate()
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 5) { if p.isRunning { kill(p.processIdentifier, SIGKILL) } }
+                }
+                // Read as it comes, so a large reply can't fill the pipe and stall the process, and so the answer can be shown while it is written.
+                // stream-json: one event per line; the last "result" is the answer, and rate-limit events say how much of the plan is used.
+                DispatchQueue.global().async {
+                    var raw = Data(), pending = Data(), current = "", lastEmit = Date.distantPast
+                    var json: [String: Any]?
+                    func emit(_ text: String, force: Bool) {
+                        guard let onText, !text.isEmpty, force || Date().timeIntervalSince(lastEmit) > 0.08 else { return }
+                        lastEmit = Date(); onText(text)
+                    }
+                    func take(_ line: Data) {
+                        guard !line.isEmpty else { return }
+                        guard let e = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any] else { raw.append(line); raw.append(10); return }
+                        switch e["type"] as? String {
+                        case "rate_limit_event": PlanUsage.record(e)
+                        case "result": json = e
+                        case "stream_event":   // with partial messages on: the text arrives a few words at a time
+                            guard let ev = e["event"] as? [String: Any] else { break }
+                            if ev["type"] as? String == "message_start" { current = "" }
+                            else if ev["type"] as? String == "content_block_delta", let d = ev["delta"] as? [String: Any], d["type"] as? String == "text_delta", let t = d["text"] as? String {
+                                current += t; emit(current, force: false)
+                            }
+                        case "assistant":      // a whole message; its text replaces what was built up from pieces
+                            if let m = e["message"] as? [String: Any], let parts = m["content"] as? [[String: Any]] {
+                                let text = parts.compactMap { $0["type"] as? String == "text" ? $0["text"] as? String : nil }.joined()
+                                if !text.isEmpty { current = text; emit(text, force: true) }
+                            }
+                        default: break
+                        }
+                    }
+                    while true {
+                        let chunk = out.fileHandleForReading.availableData
+                        if chunk.isEmpty { break }
+                        pending.append(chunk)
+                        while let nl = pending.firstIndex(of: 10) {
+                            take(pending.subdata(in: pending.startIndex..<nl))
+                            pending.removeSubrange(pending.startIndex...nl)
+                        }
+                    }
+                    take(pending)
+                    p.waitUntilExit()
+                    if timedOut.hit { cont.resume(returning: Launch(reply: Reply(text: "The agent took longer than \(Int(limit / 60)) minutes and was stopped.", session: nil), failedFast: false)); return }
+                    if handle.isCancelled { cont.resume(returning: Launch(reply: Reply(text: stoppedText, session: nil, stopped: true), failedFast: false)); return }
+                    let text = (json?["result"] as? String) ?? (raw.isEmpty ? "The agent didn’t reply. Is Claude Code signed in? Run `claude` once in Terminal." : String(decoding: raw, as: UTF8.self))
+                    let failed = (json?["is_error"] as? Bool) == true
+                    let session = failed ? nil : json?["session_id"] as? String
+                    cont.resume(returning: Launch(reply: Reply(text: text.trimmingCharacters(in: .whitespacesAndNewlines), session: session),
+                                                  failedFast: session == nil && json == nil && p.terminationStatus != 0 && Date().timeIntervalSince(began) < 10))
+                }
+            }
+        } onCancel: { handle.cancel() }
+    }
+}
+
+/// One running Claude process, so it can be ended from another thread (the user stopping it, or the task that started it being cancelled).
+final class ProcessHandle: @unchecked Sendable {
+    private let lock = NSLock()
+    private var process: Process?, cancelled = false
+    var isCancelled: Bool { lock.withLock { cancelled } }
+    /// Called once the process has started; if a stop already came, it ends at once.
+    func set(_ p: Process) { lock.withLock { process = p; if cancelled { p.terminate() } } }
+    func cancel() { lock.withLock { cancelled = true; process?.terminate() } }
+}
+
+/// The processes that are running now, and whether new ones from the Manager (or from a button) are being refused for a moment after a stop.
+final class LiveRuns: @unchecked Sendable {
+    private let lock = NSLock()
+    private var handles: [UUID: (handle: ProcessHandle, background: Bool, button: Bool)] = [:]
+    private var refuseBackground = Date.distantPast, refuseButton = Date.distantPast
+    func add(_ h: ProcessHandle, background: Bool, button: Bool) -> UUID { let id = UUID(); lock.withLock { handles[id] = (h, background, button) }; return id }
+    func remove(_ id: UUID) { lock.withLock { handles[id] = nil } }
+    func stop(buttonsToo: Bool) {
+        let victims = lock.withLock { () -> [ProcessHandle] in
+            let until = Date().addingTimeInterval(4)   // the rest of a job that was mid-way must not start fresh runs
+            refuseBackground = until
+            if buttonsToo { refuseButton = until }
+            return handles.values.filter { $0.background || (buttonsToo && $0.button) }.map { $0.handle }
+        }
+        for v in victims { v.cancel() }
+    }
+    func blocked(background: Bool, button: Bool) -> Bool {
+        lock.withLock { let now = Date(); return (background && now < refuseBackground) || (button && now < refuseButton) }
     }
 }

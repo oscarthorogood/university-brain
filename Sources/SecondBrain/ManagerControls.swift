@@ -24,8 +24,11 @@ extension Store {
 
     // MARK: Pausing
     var pausedUntil: Date? { (d.object(forKey: "pausedUntil") as? Date).flatMap { $0 > .now ? $0 : nil } }
-    func pause(for seconds: TimeInterval?) { d.set(seconds.map { Date.now.addingTimeInterval($0) } ?? Date.distantFuture, forKey: "pausedUntil"); revision += 1 }
+    /// Pausing also ends what the Manager has running now: a job under way is stopped and put back, not left to finish.
+    func pause(for seconds: TimeInterval?) { d.set(seconds.map { Date.now.addingTimeInterval($0) } ?? Date.distantFuture, forKey: "pausedUntil"); revision += 1; Agent.stopBackgroundRuns() }
     func pauseUntilTomorrow() { pause(for: Calendar.current.date(byAdding: .day, value: 1, to: today)!.addingTimeInterval(6 * 3600).timeIntervalSinceNow) }
+    /// Ends the job that is running now, whoever started it, and puts back what it had changed.
+    func stopCurrentJob() { Agent.stopJobs() }
     func resume() { d.removeObject(forKey: "pausedUntil"); revision += 1; scheduleAutopilot(after: 2) }
 
     var quietOn: Bool { d.bool(forKey: "quietOn") }

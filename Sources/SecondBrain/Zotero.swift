@@ -157,6 +157,24 @@ enum Zotero {
             }
         }
 
+        /// MD5 and byte count of a file, reading 1 MB at a time.
+        static func md5AndSize(_ url: URL) throws -> (md5: String, size: Int) {
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+            var hash = Insecure.MD5(), size = 0
+            while let piece = try handle.read(upToCount: 1 << 20), !piece.isEmpty { hash.update(data: piece); size += piece.count }
+            return (hash.finalize().map { String(format: "%02x", $0) }.joined(), size)
+        }
+        /// Writes `prefix`, then the file, then `suffix` to `out`, copying the file 1 MB at a time.
+        static func compose(prefix: Data, file: URL, suffix: Data, into out: URL) throws {
+            guard FileManager.default.createFile(atPath: out.path, contents: nil) else { throw CocoaError(.fileWriteUnknown) }
+            let dst = try FileHandle(forWritingTo: out), src = try FileHandle(forReadingFrom: file)
+            defer { try? dst.close(); try? src.close() }
+            try dst.write(contentsOf: prefix)
+            while let piece = try src.read(upToCount: 1 << 20), !piece.isEmpty { try dst.write(contentsOf: piece) }
+            try dst.write(contentsOf: suffix)
+        }
+
         static func json(_ x: Any) -> Data { (try? JSONSerialization.data(withJSONObject: x)) ?? Data() }
         static func form(_ kv: [(String, String)]) -> Data {
             Data(kv.map { "\($0)=\($1.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "")" }.joined(separator: "&").utf8)
@@ -173,18 +191,21 @@ enum Zotero {
 
         /// Uploads a file to an existing attachment item (Zotero's authorise, upload, register steps).
         func upload(_ key: String, file: URL) async throws {
-            let data = try Data(contentsOf: file)
-            let md5 = Insecure.MD5.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            let (md5, size) = try Self.md5AndSize(file)   // read in pieces: a 200 MB PDF is never held in memory
             let mtime = Int(((try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .now).timeIntervalSince1970 * 1000)
             let urlencoded = "application/x-www-form-urlencoded"
             struct Slot: Decodable { var url: String?, contentType: String?, prefix: String?, suffix: String?, uploadKey: String?, exists: Int? }
-            let (d, _) = try await call("POST", "/items/\(key)/file", body: Self.form([("md5", md5), ("filename", file.lastPathComponent), ("filesize", "\(data.count)"), ("mtime", "\(mtime)")]),
+            let (d, _) = try await call("POST", "/items/\(key)/file", body: Self.form([("md5", md5), ("filename", file.lastPathComponent), ("filesize", "\(size)"), ("mtime", "\(mtime)")]),
                                         type: urlencoded, headers: ["If-None-Match": "*"])
             let slot = try JSONDecoder().decode(Slot.self, from: d)
             if slot.exists == 1 { return }
             guard let u = slot.url.flatMap(URL.init), let ct = slot.contentType, let prefix = slot.prefix, let suffix = slot.suffix, let up = slot.uploadKey else { throw Failure(code: 502, message: "no upload slot") }
             var req = URLRequest(url: u); req.httpMethod = "POST"; req.setValue(ct, forHTTPHeaderField: "Content-Type")   // the file store, not Zotero: no key sent
-            let (_, resp) = try await URLSession.shared.upload(for: req, from: Data(prefix.utf8) + data + Data(suffix.utf8))
+            // Zotero's file store wants prefix + file + suffix as one body: it is put together on disk, in pieces, and sent from there
+            let body = FileManager.default.temporaryDirectory.appending(path: "zotero-upload-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: body) }
+            try Self.compose(prefix: Data(prefix.utf8), file: file, suffix: Data(suffix.utf8), into: body)
+            let (_, resp) = try await URLSession.shared.upload(for: req, fromFile: body)
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
             guard (200..<300).contains(code) else { throw Failure(code: code, message: "upload failed") }
             _ = try await call("POST", "/items/\(key)/file", body: Self.form([("upload", up)]), type: urlencoded, headers: ["If-None-Match": "*"])
