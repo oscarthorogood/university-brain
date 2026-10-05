@@ -23,6 +23,8 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
+Or, without a terminal: **Actions → Release → Run workflow**, and type the version (`1.0.0`).
+
 The **Release** workflow (`.github/workflows/release.yml`) builds the app on a macOS 26 runner, packs the DMG with `make-dmg.sh` and publishes the release. Versions come from the tag, so keep them increasing (`1.0.0`, `1.0.1`, `1.1.0`…).
 
 ## Build locally

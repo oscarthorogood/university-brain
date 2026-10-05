@@ -1,18 +1,32 @@
-# Push a tag like v1.2.0 and this builds the app, packs a DMG and publishes it as a GitHub Release.
+# Builds the app, packs a DMG and publishes it as a GitHub Release. Two ways to start it:
+#   - push a tag like v1.2.0, or
+#   - Actions → Release → Run workflow, with a version like 1.2.0 (the tag is created on the commit it runs on).
 # The app's updater reads the latest release, so publishing is all an update needs.
 name: Release
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 1.2.0"
+        required: true
 
 permissions:
-  contents: write   # to create the release
+  contents: write   # to create the tag and the release
 
 jobs:
   dmg:
     runs-on: macos-26   # the app needs the macOS 26 SDK (Xcode 26, Swift 6.2)
+    env:
+      # passed through env, not pasted into the scripts, so the typed version can't run as shell code
+      TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
     steps:
+      - name: Check the version
+        run: |
+          echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || { echo "Version must look like 1.2.0 (got $TAG)"; exit 1; }
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # bundle.sh counts commits for the build number
@@ -21,7 +35,7 @@ jobs:
         run: xcodebuild -version && swift --version
 
       - name: Build the app
-        run: VERSION="${GITHUB_REF_NAME#v}" ./bundle.sh
+        run: VERSION="${TAG#v}" ./bundle.sh
 
       - name: Make the disk image
         run: ./make-dmg.sh
@@ -30,5 +44,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" build/UniversityBrain-*.dmg build/UniversityBrain-*.dmg.sha256 \
-            --title "University Brain ${GITHUB_REF_NAME#v}" --generate-notes
+          gh release create "$TAG" build/UniversityBrain-*.dmg build/UniversityBrain-*.dmg.sha256 \
+            --target "$GITHUB_SHA" --title "University Brain ${TAG#v}" --generate-notes
