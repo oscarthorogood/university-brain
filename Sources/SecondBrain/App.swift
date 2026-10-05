@@ -280,7 +280,7 @@ struct SecondBrainApp: App {
     func ask(_ code: String, _ text: String, tier: Manager.Tier? = nil) {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !thinking.contains(code) else { return }
-        // "apply the MCQ template to the existing MCQ files": agents never edit existing notes from chat, so the app does it itself
+        // "apply the MCQ template to the existing MCQ files": an agent does it a few notes at a time, and the app checks and tidies each one
         if let folder = Self.templateRequest(text) { applyTemplates(folder, asked: text, in: code); return }
         if code == Agent.manager.id { dispatch(text, tier: tier) } else { send(code, text, tier: tier ?? Manager.tier(text, role: code)) }
     }
@@ -289,12 +289,21 @@ struct SecondBrainApp: App {
         (chats[Agent.manager.id] ?? []).filter { !$0.text.hasPrefix("→") }.dropLast().suffix(8)
             .map { ($0.fromAgent ? "" : "Oscar: ") + String($0.text.prefix(600)) }.joined(separator: "\n\n")
     }
-    /// One agent answers in its own chat (and in the Manager's chat when the Manager sent it).
-    private func converse(_ code: String, shown: String, prompt: String, tier: Manager.Tier, mirror: String?) async -> Agent.Reply {
-        chats[code, default: []].append(Message(fromAgent: false, text: shown))
+    /// One agent answers in its own chat (and in the Manager's chat when the Manager sent it). When the request is to change notes it may edit them (the edits are
+    /// checked and logged with an Undo); when it can't do the request it says `DELEGATE:` and nothing is shown, for `passOn` to give it to another agent.
+    /// The Manager itself (`code == Agent.manager.id`) is the general agent, the last resort. `echo`: show the request in this agent's chat too.
+    func converse(_ code: String, shown: String, prompt: String, tier: Manager.Tier, mirror: String?, echo: Bool = true) async -> Agent.Reply {
+        if echo { chats[code, default: []].append(Message(fromAgent: false, text: shown)) }
         thinking.insert(code)
         let team = Agent.teamLog(activity)
-        let reply = await Agent.run(team.isEmpty ? prompt : prompt + "\n\n" + team, system: Agent.systemPrompt(Agent.role(code)), session: sessions[code], canEdit: false, root: Vault.root, tier: tier, writes: Agent.writeScopes(code), web: ["librarian", "researcher"].contains(code),
+        let general = code == Agent.manager.id
+        let editing = general || Manager.isEdit(shown)
+        let root = Vault.root
+        let started = Date.now
+        var existing = Set<String>()
+        if editing { await snapshotNotes(root); existing = Set(notes.map { Vault.rel($0.id) }) }
+        let writes = Agent.writeScopes(code) + (editing ? Agent.noteScopes(root: root) : [])
+        let reply = await Agent.run(team.isEmpty ? prompt : prompt + "\n\n" + team, system: general ? Agent.generalPrompt : Agent.systemPrompt(Agent.role(code)), session: sessions[code], canEdit: false, root: root, tier: tier, writes: writes, web: ["librarian", "researcher"].contains(code),
                                     onText: { [weak self] text in
                                         Task { @MainActor in
                                             guard let self, self.thinking.contains(code) else { return }   // a late piece after the answer is in is ignored
@@ -305,8 +314,18 @@ struct SecondBrainApp: App {
         streaming[code] = nil
         if let m = mirror { streaming[m] = nil }
         if let s = reply.session { sessions[code] = s }
-        chats[code, default: []].append(Message(fromAgent: true, text: reply.text))
-        if let m = mirror { chats[m, default: []].append(Message(fromAgent: true, text: "**\(Agent.role(code).name)**\n\n" + reply.text)) }
+        if let why = reply.delegation {   // not an answer: the Manager passes it on
+            thinking.remove(code)
+            log(code, "Couldn’t do “\(shown.prefix(50))”: \(why.prefix(80))")
+            return reply
+        }
+        var text = reply.text
+        if reply.session != nil {
+            if editing, let line = await recordEdits(since: started, existing: existing, by: code, root: root) { text += "\n\n" + line }
+            if general { text += performMoves(in: reply.text, root: root) }
+        }
+        chats[code, default: []].append(Message(fromAgent: true, text: text))
+        if let m = mirror { chats[m, default: []].append(Message(fromAgent: true, text: "**\(Agent.role(code).name)**\n\n" + text)) }
         thinking.remove(code)
         log(code, reply.session == nil ? "Couldn’t answer “\(shown.prefix(60))”" : "Answered “\(shown.prefix(60))”")
         return reply
@@ -315,7 +334,8 @@ struct SecondBrainApp: App {
         thinking.insert(code)
         chatTasks[code] = Task { [weak self] in
             guard let self else { return }
-            _ = await converse(code, shown: text, prompt: text, tier: tier, mirror: nil)
+            let reply = await converse(code, shown: text, prompt: text, tier: tier, mirror: nil)
+            if let why = reply.delegation { await passOn(text, tried: [code], why: why, in: code, tier: nil) }
             chatTasks[code] = nil
         }
     }
@@ -362,6 +382,7 @@ struct SecondBrainApp: App {
                         : "\nYou are the last stage: produce the finished result the request asks for from the handed-over material. If something it needed is missing, say so plainly instead of inventing it."
                 }
                 let reply = await converse(r.agent, shown: team ? "\(text) (stage \(i + 1) of \(steps.count), from the Manager)" : text, prompt: prompt, tier: tier ?? r.tier, mirror: m)
+                if let why = reply.delegation { await passOn(text, tried: [r.agent], why: why, in: m, tier: tier); break }
                 if reply.session == nil { chats[m, default: []].append(Message(fromAgent: true, text: reply.stopped ? "Stopped." : "\(names[i]) couldn’t finish, so I stopped there.")); break }
                 if team, i == steps.count - 1, !done.isEmpty {   // a different agent checks the finished result against what was handed over
                     chats[m, default: []].append(Message(fromAgent: true, text: "→ **Checking** the result against what was handed over"))

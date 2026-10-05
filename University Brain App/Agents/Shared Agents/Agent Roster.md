@@ -2,13 +2,13 @@
 
 Every agent in University Brain: who they are, what they own, which model they run on, and how they work. Written 2026-10-02. Keep it in step with `AGENTS.md` §14 and each agent's own file.
 
-**The model.** The **Manager** is the only agent that looks for work. For each job it picks a **helper** to do it and the **course agent(s)** to consult first, the helper does the job with no approval, and the Manager checks the result (and undoes it if it fails). Helpers never start anything themselves. Course agents only advise. Oscar can still chat with any agent; anything that does work goes through the Manager.
+**The model.** The **Manager** is the only agent that looks for work. For each job it picks a **helper** to do it and the **course agent(s)** to consult first, the helper does the job with no approval, and the Manager checks the result (and undoes it if it fails). Helpers never start anything themselves. Course agents only advise. Oscar can still chat with any agent, and any agent edits his notes when he asks. An agent that can't do a request says so and the Manager hands it to another; when none can, the Manager does it itself, so every task has an agent.
 
 ## Who they are
 
 | Agent | Role | Gets jobs from | What it does | Reads | May write | Web | Model and effort |
 |---|---|---|---|---|---|---|---|
-| **Manager** | Finds work, assigns, consults, reviews | Itself | Scans for the 22 jobs and checks, picks helper and course agent, reviews and undoes failures, budget, morning brief, week ahead | The whole vault | Its own folder | No | **On the Mac only**: rules, plain code, Apple's on-device model. No Claude | Its own glass-walled office in the south-east corner |
+| **Manager** | Finds work, assigns, consults, reviews | Itself | Scans for the 22 jobs and checks, picks helper and course agent, reviews and undoes failures, budget, morning brief, week ahead. **Last resort: the general agent**, which does any Markdown request no other agent could | The whole vault | Its own folder; note folders when acting as the general agent | No | **On the Mac**: rules, plain code, Apple's on-device model. Claude only when acting as the general agent | Its own glass-walled office in the south-east corner |
 | **Sorter** | Intake and filing | Manager | Files Unsorted into Resources, folds raw notes into lectures | Whole vault, Unsorted | One note at a time; the app does the file moves | No | Sonnet, medium | Desk; Unsorted bin and shelves |
 | **Scribe** | Lecture and tutorial write-ups | Manager | Writes up from slides and Oscar's own lines | The note, its slides, the template | The one note it is given | No | Sonnet, medium | Desk; Lectures and Tutorials shelves |
 | **Librarian** | Readings and citations | Manager | Confirms citations, finds sources, creates missing Reading notes | Readings, linked files | The one Reading note, or the new Reading notes it is told to create | **Yes** | Sonnet, medium | Desk; Readings and Resources shelves |

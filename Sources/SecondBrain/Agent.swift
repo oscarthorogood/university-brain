@@ -22,6 +22,12 @@ enum Agent {
         let text: String; let session: String?
         /// You stopped it (Stop in a chat, or pausing the Manager), so it isn't a failure and shouldn't count against the agent.
         var stopped = false
+        /// The agent couldn't do the request and said so with a `DELEGATE:` line: why, for the Manager to pass it to another agent.
+        var delegation: String? {
+            let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard session != nil, t.uppercased().hasPrefix("DELEGATE") else { return nil }
+            return String(t.drop { $0 != ":" }.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: "\n")[0]
+        }
         /// Out of usage: the CLI says so in its reply, so background work should wait instead of retrying.
         var limited: Bool { session == nil && ["usage limit", "session limit", "rate limit", "limit reached", "hit your"].contains { text.localizedCaseInsensitiveContains($0) } }
     }
@@ -191,9 +197,9 @@ enum Agent {
 
     /// Where the Sorter may write while it carries out a plan: the note folders and the synced calendar note it ticks. Never `Agents/` or `Templates/`
     /// (it used to have write access to the whole vault, with only the review to catch a stray edit there).
-    static func filingScopes(root: URL) -> [String] {
-        Array(Set(Vault.folders.map { scope(folder: Vault.dir($0, root: root)) } + [scope(file: CalendarSync.file)])).sorted()
-    }
+    static func filingScopes(root: URL) -> [String] { Array(Set(noteScopes(root: root) + [scope(file: CalendarSync.file)])).sorted() }
+    /// Every note folder (Lectures, Readings, MCQ… and Courses), where an agent may edit notes when Oscar asks it to. Never `Agents/` or `Templates/`.
+    static func noteScopes(root: URL) -> [String] { Array(Set(Vault.folders.map { scope(folder: Vault.dir($0, root: root)) })).sorted() }
 
     /// Stage 2: carry out that plan in the same session, once the app has done the moves.
     static func approveFiling(session: String, moved: [String], root: URL) async -> Reply {
