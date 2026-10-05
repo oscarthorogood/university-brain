@@ -1,0 +1,11 @@
+{
+  "/Users/oscarthorogood/Developer/SecondBrain/Sources/SecondBrain/Agent.swift" : {
+    "abi-baseline-json" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Release/SecondBrain-p.build/Objects-normal/arm64/SecondBrain.abi.json",
+    "const-values" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Release/SecondBrain-p.build/Objects-normal/arm64/SecondBrain-primary.swiftconstvalues",
+    "dependencies" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Release/SecondBrain-p.build/Objects-normal/arm64/SecondBrain-primary.d",
+    "diagnostics" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Release/SecondBrain-p.build/Objects-normal/arm64/SecondBrain-primary.dia",
+    "swiftdoc" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Release/SecondBrain-p.build/Objects-normal/arm64/SecondBrain.swiftdoc",
+    "swiftmodule" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Release/SecondBrain-p.build/Objects-normal/arm64/SecondBrain.swiftmodule",
+    "swiftsourceinfo" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Release/SecondBrain-p.build/Objects-normal/arm64/SecondBrain.swiftsourceinfo"
+  }
+}

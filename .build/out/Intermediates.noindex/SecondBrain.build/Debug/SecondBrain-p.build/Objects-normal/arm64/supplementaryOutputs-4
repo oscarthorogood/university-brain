@@ -1,0 +1,44 @@
+{
+  "/Users/oscarthorogood/Developer/SecondBrain/Sources/SecondBrain/ManagerScan.swift" : {
+    "const-values" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/ManagerScan.swiftconstvalues",
+    "dependencies" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/ManagerScan.d",
+    "diagnostics" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/ManagerScan.dia",
+    "object" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/ManagerScan.o",
+    "swift-dependencies" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/ManagerScan.swiftdeps"
+  },
+  "/Users/oscarthorogood/Developer/SecondBrain/Sources/SecondBrain/ManagerSettings.swift" : {
+    "const-values" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/ManagerSettings.swiftconstvalues",
+    "dependencies" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/ManagerSettings.d",
+    "diagnostics" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/ManagerSettings.dia",
+    "object" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/ManagerSettings.o",
+    "swift-dependencies" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/ManagerSettings.swiftdeps"
+  },
+  "/Users/oscarthorogood/Developer/SecondBrain/Sources/SecondBrain/Messages.swift" : {
+    "const-values" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/Messages.swiftconstvalues",
+    "dependencies" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/Messages.d",
+    "diagnostics" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/Messages.dia",
+    "object" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/Messages.o",
+    "swift-dependencies" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/Messages.swiftdeps"
+  },
+  "/Users/oscarthorogood/Developer/SecondBrain/Sources/SecondBrain/MonthPage.swift" : {
+    "const-values" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/MonthPage.swiftconstvalues",
+    "dependencies" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/MonthPage.d",
+    "diagnostics" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/MonthPage.dia",
+    "object" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/MonthPage.o",
+    "swift-dependencies" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/MonthPage.swiftdeps"
+  },
+  "/Users/oscarthorogood/Developer/SecondBrain/Sources/SecondBrain/Needs.swift" : {
+    "const-values" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/Needs.swiftconstvalues",
+    "dependencies" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/Needs.d",
+    "diagnostics" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/Needs.dia",
+    "object" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/Needs.o",
+    "swift-dependencies" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/Needs.swiftdeps"
+  },
+  "/Users/oscarthorogood/Developer/SecondBrain/Sources/SecondBrain/NewNote.swift" : {
+    "const-values" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/NewNote.swiftconstvalues",
+    "dependencies" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/NewNote.d",
+    "diagnostics" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/NewNote.dia",
+    "object" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/NewNote.o",
+    "swift-dependencies" : "/Users/oscarthorogood/Developer/SecondBrain/.build/out/Intermediates.noindex/SecondBrain.build/Debug/SecondBrain-p.build/Objects-normal/arm64/NewNote.swiftdeps"
+  }
+}

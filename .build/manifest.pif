@@ -1,0 +1,2477 @@
+[
+  {
+    "contents" : {
+      "guid" : "Workspace:/Users/oscarthorogood/Developer/SecondBrain",
+      "name" : "SecondBrain",
+      "path" : "/Users/oscarthorogood/Developer/SecondBrain",
+      "projects" : [
+        "f79a7649ddcbd0a335d2311841b20cfcb09225573c530965998b3534e0c103a5",
+        "3ebbe01362ec1f84584480cca4ec16546a3603bf959010a6d5acd477a13fff5d"
+      ]
+    },
+    "signature" : "b667996d86ae3c257b2f6e2128ca9f776a548bbe6ddc77f4b843d6b052551edd",
+    "type" : "workspace"
+  },
+  {
+    "contents" : {
+      "buildConfigurations" : [
+        {
+          "buildSettings" : {
+            "CLANG_ENABLE_MODULES[__platform_filter=driverkit]" : "YES",
+            "CLANG_ENABLE_MODULES[__platform_filter=ios-maccatalyst]" : "YES",
+            "CLANG_ENABLE_MODULES[__platform_filter=ios;ios-simulator]" : "YES",
+            "CLANG_ENABLE_MODULES[__platform_filter=macos]" : "YES",
+            "CLANG_ENABLE_MODULES[__platform_filter=tvos;tvos-simulator]" : "YES",
+            "CLANG_ENABLE_MODULES[__platform_filter=watchos;watchos-simulator]" : "YES",
+            "CLANG_ENABLE_MODULES[__platform_filter=xros;xros-simulator]" : "YES",
+            "CODE_SIGNING_REQUIRED" : "NO",
+            "CODE_SIGN_IDENTITY" : "",
+            "COMPILER_WORKING_DIRECTORY" : "$(WORKSPACE_DIR)",
+            "COPY_PHASE_STRIP" : "NO",
+            "DEBUG_INFORMATION_FORMAT" : "dwarf",
+            "DRIVERKIT_DEPLOYMENT_TARGET" : "21.0",
+            "DYLIB_INSTALL_NAME_BASE[__platform_filter=driverkit]" : "@rpath",
+            "DYLIB_INSTALL_NAME_BASE[__platform_filter=ios-maccatalyst]" : "@rpath",
+            "DYLIB_INSTALL_NAME_BASE[__platform_filter=ios;ios-simulator]" : "@rpath",
+            "DYLIB_INSTALL_NAME_BASE[__platform_filter=macos]" : "@rpath",
+            "DYLIB_INSTALL_NAME_BASE[__platform_filter=tvos;tvos-simulator]" : "@rpath",
+            "DYLIB_INSTALL_NAME_BASE[__platform_filter=watchos;watchos-simulator]" : "@rpath",
+            "DYLIB_INSTALL_NAME_BASE[__platform_filter=xros;xros-simulator]" : "@rpath",
+            "ENABLE_NS_ASSERTIONS" : "YES",
+            "ENABLE_TESTABILITY" : "YES",
+            "ENABLE_TESTING_SEARCH_PATHS" : "YES",
+            "ENTITLEMENTS_REQUIRED" : "NO",
+            "GCC_OPTIMIZATION_LEVEL" : "0",
+            "GCC_PREPROCESSOR_DEFINITIONS" : [
+              "$(inherited)",
+              "SWIFT_PACKAGE",
+              "DEBUG=1"
+            ],
+            "INDEX_ENABLE_DATA_STORE" : "YES",
+            "IPHONEOS_DEPLOYMENT_TARGET" : "15.0",
+            "IPHONEOS_DEPLOYMENT_TARGET[__platform_filter=ios-maccatalyst]" : "15.0",
+            "KEEP_PRIVATE_EXTERNS" : "NO",
+            "LIBTOOL_NO_WARNING_FOR_NO_SYMBOLS" : "YES",
+            "LINKER_DRIVER" : "auto",
+            "MACOSX_DEPLOYMENT_TARGET" : "26.0",
+            "ONLY_ACTIVE_ARCH" : "YES",
+            "OTHER_CFLAGS" : [
+              "$(inherited)",
+              "-DXcode"
+            ],
+            "OTHER_LDRFLAGS" : [
+
+            ],
+            "OTHER_SWIFT_FLAGS" : [
+              "$(inherited)",
+              "-DXcode"
+            ],
+            "PRODUCT_NAME" : "$(TARGET_NAME)",
+            "SKIP_INSTALL" : "YES",
+            "SPECIALIZATION_SDK_OPTIONS[__platform_filter=macos]" : [
+
+            ],
+            "SUPPORTED_PLATFORMS" : [
+              "$(AVAILABLE_PLATFORMS)"
+            ],
+            "SWIFT_ACTIVE_COMPILATION_CONDITIONS" : [
+              "$(inherited)",
+              "SWIFT_PACKAGE",
+              "DEBUG"
+            ],
+            "SWIFT_INSTALL_OBJC_HEADER" : "NO",
+            "SWIFT_OBJC_INTERFACE_HEADER_NAME" : "",
+            "SWIFT_OPTIMIZATION_LEVEL" : "-Onone",
+            "TARGETED_DEVICE_FAMILY" : "",
+            "TVOS_DEPLOYMENT_TARGET" : "15.0",
+            "USE_HEADERMAP" : "NO",
+            "WATCHOS_DEPLOYMENT_TARGET" : "9.0",
+            "XROS_DEPLOYMENT_TARGET" : "1.0"
+          },
+          "guid" : "PACKAGE:secondbrain::BUILDCONFIG_0",
+          "impartedBuildProperties" : {
+            "buildSettings" : {
+
+            }
+          },
+          "name" : "Debug"
+        },
+        {
+          "buildSettings" : {
+            "CLANG_ENABLE_MODULES[__platform_filter=driverkit]" : "YES",
+            "CLANG_ENABLE_MODULES[__platform_filter=ios-maccatalyst]" : "YES",
+            "CLANG_ENABLE_MODULES[__platform_filter=ios;ios-simulator]" : "YES",
+            "CLANG_ENABLE_MODULES[__platform_filter=macos]" : "YES",
+            "CLANG_ENABLE_MODULES[__platform_filter=tvos;tvos-simulator]" : "YES",
+            "CLANG_ENABLE_MODULES[__platform_filter=watchos;watchos-simulator]" : "YES",
+            "CLANG_ENABLE_MODULES[__platform_filter=xros;xros-simulator]" : "YES",
+            "CODE_SIGNING_REQUIRED" : "NO",
+            "CODE_SIGN_IDENTITY" : "",
+            "COMPILER_WORKING_DIRECTORY" : "$(WORKSPACE_DIR)",
+            "COPY_PHASE_STRIP" : "YES",
+            "DEBUG_INFORMATION_FORMAT" : "dwarf-with-dsym",
+            "DEPLOYMENT_POSTPROCESSING" : "YES",
+            "DRIVERKIT_DEPLOYMENT_TARGET" : "21.0",
+            "DYLIB_INSTALL_NAME_BASE[__platform_filter=driverkit]" : "@rpath",
+            "DYLIB_INSTALL_NAME_BASE[__platform_filter=ios-maccatalyst]" : "@rpath",
+            "DYLIB_INSTALL_NAME_BASE[__platform_filter=ios;ios-simulator]" : "@rpath",
+            "DYLIB_INSTALL_NAME_BASE[__platform_filter=macos]" : "@rpath",
+            "DYLIB_INSTALL_NAME_BASE[__platform_filter=tvos;tvos-simulator]" : "@rpath",
+            "DYLIB_INSTALL_NAME_BASE[__platform_filter=watchos;watchos-simulator]" : "@rpath",
+            "DYLIB_INSTALL_NAME_BASE[__platform_filter=xros;xros-simulator]" : "@rpath",
+            "ENABLE_TESTING_SEARCH_PATHS" : "YES",
+            "ENTITLEMENTS_REQUIRED" : "NO",
+            "GCC_OPTIMIZATION_LEVEL" : "s",
+            "GCC_PREPROCESSOR_DEFINITIONS" : [
+              "$(inherited)",
+              "SWIFT_PACKAGE"
+            ],
+            "IPHONEOS_DEPLOYMENT_TARGET" : "15.0",
+            "IPHONEOS_DEPLOYMENT_TARGET[__platform_filter=ios-maccatalyst]" : "15.0",
+            "KEEP_PRIVATE_EXTERNS" : "NO",
+            "LIBTOOL_NO_WARNING_FOR_NO_SYMBOLS" : "YES",
+            "LINKER_DRIVER" : "auto",
+            "MACOSX_DEPLOYMENT_TARGET" : "26.0",
+            "OTHER_CFLAGS" : [
+              "$(inherited)",
+              "-DXcode"
+            ],
+            "OTHER_LDRFLAGS" : [
+
+            ],
+            "OTHER_SWIFT_FLAGS" : [
+              "$(inherited)",
+              "-DXcode"
+            ],
+            "PRODUCT_NAME" : "$(TARGET_NAME)",
+            "SKIP_INSTALL" : "YES",
+            "SPECIALIZATION_SDK_OPTIONS[__platform_filter=macos]" : [
+
+            ],
+            "SUPPORTED_PLATFORMS" : [
+              "$(AVAILABLE_PLATFORMS)"
+            ],
+            "SWIFT_ACTIVE_COMPILATION_CONDITIONS" : [
+              "$(inherited)",
+              "SWIFT_PACKAGE"
+            ],
+            "SWIFT_INSTALL_OBJC_HEADER" : "NO",
+            "SWIFT_OBJC_INTERFACE_HEADER_NAME" : "",
+            "SWIFT_OPTIMIZATION_LEVEL" : "-Owholemodule",
+            "TARGETED_DEVICE_FAMILY" : "",
+            "TVOS_DEPLOYMENT_TARGET" : "15.0",
+            "USE_HEADERMAP" : "NO",
+            "WATCHOS_DEPLOYMENT_TARGET" : "9.0",
+            "XROS_DEPLOYMENT_TARGET" : "1.0"
+          },
+          "guid" : "PACKAGE:secondbrain::BUILDCONFIG_1",
+          "impartedBuildProperties" : {
+            "buildSettings" : {
+
+            }
+          },
+          "name" : "Release"
+        }
+      ],
+      "defaultConfigurationName" : "Release",
+      "groupTree" : {
+        "children" : [
+          {
+            "children" : [
+
+            ],
+            "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_0",
+            "name" : "AdditionalFiles",
+            "path" : "/",
+            "sourceTree" : "<absolute>",
+            "type" : "group"
+          },
+          {
+            "children" : [
+
+            ],
+            "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_1",
+            "name" : "Binaries",
+            "path" : "/",
+            "sourceTree" : "<absolute>",
+            "type" : "group"
+          },
+          {
+            "children" : [
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_0",
+                "name" : "Agent.swift",
+                "path" : "Agent.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_1",
+                "name" : "AgentChat.swift",
+                "path" : "AgentChat.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_2",
+                "name" : "AgentStage.swift",
+                "path" : "AgentStage.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_3",
+                "name" : "App.swift",
+                "path" : "App.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_4",
+                "name" : "Browse.swift",
+                "path" : "Browse.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_5",
+                "name" : "Calendar.swift",
+                "path" : "Calendar.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_6",
+                "name" : "CalendarNotes.swift",
+                "path" : "CalendarNotes.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_7",
+                "name" : "Character.swift",
+                "path" : "Character.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_8",
+                "name" : "ContextMenus.swift",
+                "path" : "ContextMenus.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_9",
+                "name" : "CoursePage.swift",
+                "path" : "CoursePage.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_10",
+                "name" : "Detect.swift",
+                "path" : "Detect.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_11",
+                "name" : "Editing.swift",
+                "path" : "Editing.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_12",
+                "name" : "Files.swift",
+                "path" : "Files.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_13",
+                "name" : "JobProgress.swift",
+                "path" : "JobProgress.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_14",
+                "name" : "Manager.swift",
+                "path" : "Manager.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_15",
+                "name" : "ManagerChecks.swift",
+                "path" : "ManagerChecks.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_16",
+                "name" : "ManagerControls.swift",
+                "path" : "ManagerControls.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_17",
+                "name" : "ManagerHeadsUp.swift",
+                "path" : "ManagerHeadsUp.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_18",
+                "name" : "ManagerJobs.swift",
+                "path" : "ManagerJobs.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_19",
+                "name" : "ManagerMenu.swift",
+                "path" : "ManagerMenu.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_20",
+                "name" : "ManagerReview.swift",
+                "path" : "ManagerReview.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_21",
+                "name" : "ManagerScan.swift",
+                "path" : "ManagerScan.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_22",
+                "name" : "ManagerSettings.swift",
+                "path" : "ManagerSettings.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_23",
+                "name" : "Messages.swift",
+                "path" : "Messages.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_24",
+                "name" : "MonthPage.swift",
+                "path" : "MonthPage.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_25",
+                "name" : "Needs.swift",
+                "path" : "Needs.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_26",
+                "name" : "NewNote.swift",
+                "path" : "NewNote.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_27",
+                "name" : "NotePage.swift",
+                "path" : "NotePage.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_28",
+                "name" : "NoteSide.swift",
+                "path" : "NoteSide.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_29",
+                "name" : "Notices.swift",
+                "path" : "Notices.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_30",
+                "name" : "Notify.swift",
+                "path" : "Notify.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_31",
+                "name" : "PipelineCheck.swift",
+                "path" : "PipelineCheck.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_32",
+                "name" : "PlanUsage.swift",
+                "path" : "PlanUsage.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_33",
+                "name" : "ScheduleViews.swift",
+                "path" : "ScheduleViews.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_34",
+                "name" : "Search.swift",
+                "path" : "Search.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_35",
+                "name" : "SemesterPage.swift",
+                "path" : "SemesterPage.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_36",
+                "name" : "Settings.swift",
+                "path" : "Settings.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_37",
+                "name" : "Status.swift",
+                "path" : "Status.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_38",
+                "name" : "Study.swift",
+                "path" : "Study.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_39",
+                "name" : "StudyPreview.swift",
+                "path" : "StudyPreview.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_40",
+                "name" : "Style.swift",
+                "path" : "Style.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_41",
+                "name" : "SyncSettings.swift",
+                "path" : "SyncSettings.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_42",
+                "name" : "Tags.swift",
+                "path" : "Tags.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_43",
+                "name" : "TasksViews.swift",
+                "path" : "TasksViews.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_44",
+                "name" : "Vault.swift",
+                "path" : "Vault.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_45",
+                "name" : "Visibility.swift",
+                "path" : "Visibility.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_46",
+                "name" : "VoiceMemo.swift",
+                "path" : "VoiceMemo.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_47",
+                "name" : "Watcher.swift",
+                "path" : "Watcher.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_48",
+                "name" : "WeekPage.swift",
+                "path" : "WeekPage.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_49",
+                "name" : "Zotero.swift",
+                "path" : "Zotero.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_50",
+                "name" : "ZoteroPage.swift",
+                "path" : "ZoteroPage.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              }
+            ],
+            "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_2",
+            "name" : "/Users/oscarthorogood/Developer/SecondBrain/Sources/SecondBrain",
+            "path" : "/Users/oscarthorogood/Developer/SecondBrain/Sources/SecondBrain",
+            "sourceTree" : "<absolute>",
+            "type" : "group"
+          },
+          {
+            "children" : [
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_0",
+                "name" : "Agent.swift",
+                "path" : "Agent.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_1",
+                "name" : "AgentChat.swift",
+                "path" : "AgentChat.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_2",
+                "name" : "AgentStage.swift",
+                "path" : "AgentStage.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_3",
+                "name" : "App.swift",
+                "path" : "App.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_4",
+                "name" : "Browse.swift",
+                "path" : "Browse.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_5",
+                "name" : "Calendar.swift",
+                "path" : "Calendar.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_6",
+                "name" : "CalendarNotes.swift",
+                "path" : "CalendarNotes.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_7",
+                "name" : "Character.swift",
+                "path" : "Character.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_8",
+                "name" : "ContextMenus.swift",
+                "path" : "ContextMenus.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_9",
+                "name" : "CoursePage.swift",
+                "path" : "CoursePage.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_10",
+                "name" : "Detect.swift",
+                "path" : "Detect.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_11",
+                "name" : "Editing.swift",
+                "path" : "Editing.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_12",
+                "name" : "Files.swift",
+                "path" : "Files.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_13",
+                "name" : "JobProgress.swift",
+                "path" : "JobProgress.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_14",
+                "name" : "Manager.swift",
+                "path" : "Manager.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_15",
+                "name" : "ManagerChecks.swift",
+                "path" : "ManagerChecks.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_16",
+                "name" : "ManagerControls.swift",
+                "path" : "ManagerControls.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_17",
+                "name" : "ManagerHeadsUp.swift",
+                "path" : "ManagerHeadsUp.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_18",
+                "name" : "ManagerJobs.swift",
+                "path" : "ManagerJobs.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_19",
+                "name" : "ManagerMenu.swift",
+                "path" : "ManagerMenu.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_20",
+                "name" : "ManagerReview.swift",
+                "path" : "ManagerReview.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_21",
+                "name" : "ManagerScan.swift",
+                "path" : "ManagerScan.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_22",
+                "name" : "ManagerSettings.swift",
+                "path" : "ManagerSettings.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_23",
+                "name" : "Messages.swift",
+                "path" : "Messages.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_24",
+                "name" : "MonthPage.swift",
+                "path" : "MonthPage.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_25",
+                "name" : "Needs.swift",
+                "path" : "Needs.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_26",
+                "name" : "NewNote.swift",
+                "path" : "NewNote.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_27",
+                "name" : "NotePage.swift",
+                "path" : "NotePage.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_28",
+                "name" : "NoteSide.swift",
+                "path" : "NoteSide.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_29",
+                "name" : "Notices.swift",
+                "path" : "Notices.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_30",
+                "name" : "Notify.swift",
+                "path" : "Notify.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_31",
+                "name" : "PipelineCheck.swift",
+                "path" : "PipelineCheck.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_32",
+                "name" : "PlanUsage.swift",
+                "path" : "PlanUsage.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_33",
+                "name" : "ScheduleViews.swift",
+                "path" : "ScheduleViews.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_34",
+                "name" : "Search.swift",
+                "path" : "Search.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_35",
+                "name" : "SemesterPage.swift",
+                "path" : "SemesterPage.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_36",
+                "name" : "Settings.swift",
+                "path" : "Settings.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_37",
+                "name" : "Status.swift",
+                "path" : "Status.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_38",
+                "name" : "Study.swift",
+                "path" : "Study.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_39",
+                "name" : "StudyPreview.swift",
+                "path" : "StudyPreview.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_40",
+                "name" : "Style.swift",
+                "path" : "Style.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_41",
+                "name" : "SyncSettings.swift",
+                "path" : "SyncSettings.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_42",
+                "name" : "Tags.swift",
+                "path" : "Tags.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_43",
+                "name" : "TasksViews.swift",
+                "path" : "TasksViews.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_44",
+                "name" : "Vault.swift",
+                "path" : "Vault.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_45",
+                "name" : "Visibility.swift",
+                "path" : "Visibility.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_46",
+                "name" : "VoiceMemo.swift",
+                "path" : "VoiceMemo.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_47",
+                "name" : "Watcher.swift",
+                "path" : "Watcher.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_48",
+                "name" : "WeekPage.swift",
+                "path" : "WeekPage.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_49",
+                "name" : "Zotero.swift",
+                "path" : "Zotero.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_50",
+                "name" : "ZoteroPage.swift",
+                "path" : "ZoteroPage.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              }
+            ],
+            "guid" : "PACKAGE:secondbrain::MAINGROUP::REF_3",
+            "name" : "/Users/oscarthorogood/Developer/SecondBrain/Sources/SecondBrain",
+            "path" : "/Users/oscarthorogood/Developer/SecondBrain/Sources/SecondBrain",
+            "sourceTree" : "<absolute>",
+            "type" : "group"
+          }
+        ],
+        "guid" : "PACKAGE:secondbrain::MAINGROUP",
+        "name" : "",
+        "path" : "",
+        "sourceTree" : "<group>",
+        "type" : "group"
+      },
+      "guid" : "PACKAGE:secondbrain",
+      "path" : "/Users/oscarthorogood/Developer/SecondBrain/Package.swift",
+      "projectDirectory" : "/Users/oscarthorogood/Developer/SecondBrain",
+      "projectIsPackage" : "true",
+      "projectName" : "SecondBrain",
+      "targets" : [
+        "6708f54dd7098557b72f29b05ccc5c674f943d4f1fa7a77d7539c4efe03d832b",
+        "bee68b2c5418ddb191b3f761557d01a21df93cef87fa448b918b472f7805be4d",
+        "37adf614f81b0729aaec13b8a44f2028862ac870638aca124834b301d8968754"
+      ]
+    },
+    "signature" : "f79a7649ddcbd0a335d2311841b20cfcb09225573c530965998b3534e0c103a5",
+    "type" : "project"
+  },
+  {
+    "contents" : {
+      "approvedByUser" : "true",
+      "buildConfigurations" : [
+        {
+          "buildSettings" : {
+            "DOCC_EXTRACT_PROJECT_HEADERS_DOCUMENTATION" : "YES",
+            "DRIVERKIT_DEPLOYMENT_TARGET" : "21.0",
+            "GENERATE_EMBED_IN_CODE_ACCESSORS" : "NO",
+            "GENERATE_RESOURCE_ACCESSORS" : "YES",
+            "IPHONEOS_DEPLOYMENT_TARGET" : "15.0",
+            "IPHONEOS_DEPLOYMENT_TARGET[__platform_filter=ios-maccatalyst]" : "15.0",
+            "MACOSX_DEPLOYMENT_TARGET" : "26.0",
+            "OTHER_SWIFT_FLAGS" : [
+              "$(inherited)",
+              "$(OTHER_SWIFT_FLAGS_ENABLE_LIBFUZZER_$(ENABLE_LIBFUZZER))"
+            ],
+            "OTHER_SWIFT_FLAGS_ENABLE_LIBFUZZER_YES" : [
+              "-Xfrontend",
+              "-entry-point-function-name",
+              "-Xfrontend",
+              "SecondBrain_main"
+            ],
+            "PACKAGE_RESOURCE_TARGET_KIND" : "regular",
+            "PRODUCT_BUNDLE_IDENTIFIER" : "secondbrain.SecondBrain",
+            "PRODUCT_MODULE_NAME" : "SecondBrain",
+            "PRODUCT_NAME" : "$(TARGET_NAME)",
+            "SDKROOT" : "auto",
+            "SDK_VARIANT" : "auto",
+            "SWIFT_DISABLE_PARSE_AS_LIBRARY" : "NO",
+            "SWIFT_ENABLE_BARE_SLASH_REGEX" : "NO",
+            "SWIFT_INSTALL_MODULE" : "NO",
+            "SWIFT_LIBRARIES_ONLY" : "YES",
+            "SWIFT_PACKAGE_NAME" : "secondbrain",
+            "SWIFT_VERSION" : "6",
+            "SYMBOL_GRAPH_EXTRACTOR_OUTPUT_DIR" : "$(TARGET_BUILD_DIR)/$(CURRENT_ARCH)/SecondBrain.symbolgraphs",
+            "TAPI_EXTRACT_API_OUTPUT_DIR" : "$(TARGET_BUILD_DIR)/$(CURRENT_ARCH)/SecondBrain.symbolgraphs",
+            "TARGET_NAME" : "SecondBrain",
+            "TARGET_TEMP_DIR_SUFFIX" : "-p",
+            "TVOS_DEPLOYMENT_TARGET" : "15.0",
+            "WATCHOS_DEPLOYMENT_TARGET" : "9.0",
+            "XROS_DEPLOYMENT_TARGET" : "1.0"
+          },
+          "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDCONFIG_0",
+          "impartedBuildProperties" : {
+            "buildSettings" : {
+
+            }
+          },
+          "name" : "Debug"
+        },
+        {
+          "buildSettings" : {
+            "DOCC_EXTRACT_PROJECT_HEADERS_DOCUMENTATION" : "YES",
+            "DRIVERKIT_DEPLOYMENT_TARGET" : "21.0",
+            "GENERATE_EMBED_IN_CODE_ACCESSORS" : "NO",
+            "GENERATE_RESOURCE_ACCESSORS" : "YES",
+            "IPHONEOS_DEPLOYMENT_TARGET" : "15.0",
+            "IPHONEOS_DEPLOYMENT_TARGET[__platform_filter=ios-maccatalyst]" : "15.0",
+            "MACOSX_DEPLOYMENT_TARGET" : "26.0",
+            "OTHER_SWIFT_FLAGS" : [
+              "$(inherited)",
+              "$(OTHER_SWIFT_FLAGS_ENABLE_LIBFUZZER_$(ENABLE_LIBFUZZER))"
+            ],
+            "OTHER_SWIFT_FLAGS_ENABLE_LIBFUZZER_YES" : [
+              "-Xfrontend",
+              "-entry-point-function-name",
+              "-Xfrontend",
+              "SecondBrain_main"
+            ],
+            "PACKAGE_RESOURCE_TARGET_KIND" : "regular",
+            "PRODUCT_BUNDLE_IDENTIFIER" : "secondbrain.SecondBrain",
+            "PRODUCT_MODULE_NAME" : "SecondBrain",
+            "PRODUCT_NAME" : "$(TARGET_NAME)",
+            "SDKROOT" : "auto",
+            "SDK_VARIANT" : "auto",
+            "SWIFT_DISABLE_PARSE_AS_LIBRARY" : "NO",
+            "SWIFT_ENABLE_BARE_SLASH_REGEX" : "NO",
+            "SWIFT_INSTALL_MODULE" : "NO",
+            "SWIFT_LIBRARIES_ONLY" : "YES",
+            "SWIFT_PACKAGE_NAME" : "secondbrain",
+            "SWIFT_VERSION" : "6",
+            "SYMBOL_GRAPH_EXTRACTOR_OUTPUT_DIR" : "$(TARGET_BUILD_DIR)/$(CURRENT_ARCH)/SecondBrain.symbolgraphs",
+            "TAPI_EXTRACT_API_OUTPUT_DIR" : "$(TARGET_BUILD_DIR)/$(CURRENT_ARCH)/SecondBrain.symbolgraphs",
+            "TARGET_NAME" : "SecondBrain",
+            "TARGET_TEMP_DIR_SUFFIX" : "-p",
+            "TVOS_DEPLOYMENT_TARGET" : "15.0",
+            "WATCHOS_DEPLOYMENT_TARGET" : "9.0",
+            "XROS_DEPLOYMENT_TARGET" : "1.0"
+          },
+          "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDCONFIG_1",
+          "impartedBuildProperties" : {
+            "buildSettings" : {
+
+            }
+          },
+          "name" : "Release"
+        }
+      ],
+      "buildPhases" : [
+        {
+          "buildFiles" : [
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_0",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::0",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_1",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::1",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_2",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::2",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_3",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::3",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_4",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::4",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_5",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::5",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_6",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::6",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_7",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::7",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_8",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::8",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_9",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::9",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_10",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::10",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_11",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::11",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_12",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::12",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_13",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::13",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_14",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::14",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_15",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::15",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_16",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::16",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_17",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::17",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_18",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::18",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_19",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::19",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_20",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::20",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_21",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::21",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_22",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::22",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_23",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::23",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_24",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::24",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_25",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::25",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_26",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::26",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_27",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::27",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_28",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::28",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_29",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::29",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_30",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::30",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_31",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::31",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_32",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::32",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_33",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::33",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_34",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::34",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_35",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::35",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_36",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::36",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_37",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::37",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_38",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::38",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_39",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::39",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_40",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::40",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_41",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::41",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_42",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::42",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_43",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::43",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_44",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::44",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_45",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::45",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_46",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::46",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_47",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::47",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_48",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::48",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_49",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::49",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_2::REF_50",
+              "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0::50",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            }
+          ],
+          "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain::BUILDPHASE_0",
+          "type" : "com.apple.buildphase.sources"
+        }
+      ],
+      "buildRules" : [
+
+      ],
+      "customTasks" : [
+
+      ],
+      "dependencies" : [
+
+      ],
+      "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain",
+      "name" : "SecondBrain-product",
+      "productReference" : {
+        "guid" : "PRODUCTREF-PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain",
+        "name" : "$(EXECUTABLE_NAME)",
+        "type" : "file"
+      },
+      "productTypeIdentifier" : "com.apple.product-type.tool",
+      "type" : "standard"
+    },
+    "signature" : "6708f54dd7098557b72f29b05ccc5c674f943d4f1fa7a77d7539c4efe03d832b",
+    "type" : "target"
+  },
+  {
+    "contents" : {
+      "approvedByUser" : "true",
+      "buildConfigurations" : [
+        {
+          "buildSettings" : {
+            "DEFINES_MODULE" : "YES",
+            "DOCC_EXTRACT_PROJECT_HEADERS_DOCUMENTATION" : "YES",
+            "GENERATE_EMBED_IN_CODE_ACCESSORS" : "YES",
+            "GENERATE_PRELINK_OBJECT_FILE" : "NO",
+            "GENERATE_RESOURCE_ACCESSORS" : "YES",
+            "MODULEMAP_FILE_CONTENTS" : "module SecondBrain {\nheader \"SecondBrain-Swift.h\"\nexport *\n}",
+            "MODULEMAP_PATH" : "$(GENERATED_MODULEMAP_DIR)/SecondBrain.modulemap",
+            "OTHER_SWIFT_FLAGS" : [
+              "$(inherited)",
+              "-Xfrontend",
+              "-entry-point-function-name",
+              "-Xfrontend",
+              "SecondBrain_main"
+            ],
+            "PACKAGE_RESOURCE_TARGET_KIND" : "regular",
+            "PRODUCT_BUNDLE_IDENTIFIER" : "secondbrain.SecondBrain",
+            "PRODUCT_MODULE_NAME" : "SecondBrain",
+            "PRODUCT_NAME" : "$(TARGET_NAME)",
+            "SDKROOT" : "auto",
+            "SDK_VARIANT" : "auto",
+            "STRIP_INSTALLED_PRODUCT" : "NO",
+            "SUPPORTS_TEXT_BASED_API" : "NO",
+            "SWIFT_DISABLE_PARSE_AS_LIBRARY" : "NO",
+            "SWIFT_ENABLE_BARE_SLASH_REGEX" : "NO",
+            "SWIFT_LIBRARIES_ONLY" : "YES",
+            "SWIFT_OBJC_INTERFACE_HEADER_DIR" : "$(GENERATED_MODULEMAP_DIR)",
+            "SWIFT_OBJC_INTERFACE_HEADER_NAME" : "SecondBrain-Swift.h",
+            "SWIFT_PACKAGE_NAME" : "secondbrain",
+            "SWIFT_VERSION" : "6",
+            "SYMBOL_GRAPH_EXTRACTOR_OUTPUT_DIR" : "$(TARGET_BUILD_DIR)/$(CURRENT_ARCH)/SecondBrain.symbolgraphs",
+            "TAPI_DYLIB_INSTALL_NAME" : "SecondBrain",
+            "TAPI_EXTRACT_API_OUTPUT_DIR" : "$(TARGET_BUILD_DIR)/$(CURRENT_ARCH)/SecondBrain.symbolgraphs",
+            "TARGET_BUILD_DIR" : "$(TARGET_BUILD_DIR)/ExecutableModules",
+            "TARGET_NAME" : "SecondBrain--75748FA68163EDAD-testable",
+            "TARGET_TEMP_DIR_SUFFIX" : "-t"
+          },
+          "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDCONFIG_0",
+          "impartedBuildProperties" : {
+            "buildSettings" : {
+              "FRAMEWORK_SEARCH_PATHS" : [
+                "$(BUILT_PRODUCTS_DIR)/PackageFrameworks",
+                "$(inherited)"
+              ],
+              "LD_RUNPATH_SEARCH_PATHS" : [
+                "$(RPATH_ORIGIN)",
+                "$(BUILT_PRODUCTS_DIR)/PackageFrameworks",
+                "$(inherited)"
+              ],
+              "LD_WARN_DUPLICATE_LIBRARIES" : "NO",
+              "LIBRARY_SEARCH_PATHS[__platform_filter=windows-msvc]" : [
+                "$(inherited)",
+                "$(TARGET_BUILD_DIR)/ExecutableModules"
+              ],
+              "OTHER_CFLAGS" : [
+                "-fmodule-map-file=$(GENERATED_MODULEMAP_DIR)/SecondBrain.modulemap",
+                "$(inherited)"
+              ]
+            }
+          },
+          "name" : "Debug"
+        },
+        {
+          "buildSettings" : {
+            "DEFINES_MODULE" : "YES",
+            "DOCC_EXTRACT_PROJECT_HEADERS_DOCUMENTATION" : "YES",
+            "GENERATE_EMBED_IN_CODE_ACCESSORS" : "YES",
+            "GENERATE_PRELINK_OBJECT_FILE" : "NO",
+            "GENERATE_RESOURCE_ACCESSORS" : "YES",
+            "MODULEMAP_FILE_CONTENTS" : "module SecondBrain {\nheader \"SecondBrain-Swift.h\"\nexport *\n}",
+            "MODULEMAP_PATH" : "$(GENERATED_MODULEMAP_DIR)/SecondBrain.modulemap",
+            "OTHER_SWIFT_FLAGS" : [
+              "$(inherited)",
+              "-Xfrontend",
+              "-entry-point-function-name",
+              "-Xfrontend",
+              "SecondBrain_main"
+            ],
+            "PACKAGE_RESOURCE_TARGET_KIND" : "regular",
+            "PRODUCT_BUNDLE_IDENTIFIER" : "secondbrain.SecondBrain",
+            "PRODUCT_MODULE_NAME" : "SecondBrain",
+            "PRODUCT_NAME" : "$(TARGET_NAME)",
+            "SDKROOT" : "auto",
+            "SDK_VARIANT" : "auto",
+            "STRIP_INSTALLED_PRODUCT" : "NO",
+            "SUPPORTS_TEXT_BASED_API" : "NO",
+            "SWIFT_DISABLE_PARSE_AS_LIBRARY" : "NO",
+            "SWIFT_ENABLE_BARE_SLASH_REGEX" : "NO",
+            "SWIFT_LIBRARIES_ONLY" : "YES",
+            "SWIFT_OBJC_INTERFACE_HEADER_DIR" : "$(GENERATED_MODULEMAP_DIR)",
+            "SWIFT_OBJC_INTERFACE_HEADER_NAME" : "SecondBrain-Swift.h",
+            "SWIFT_PACKAGE_NAME" : "secondbrain",
+            "SWIFT_VERSION" : "6",
+            "SYMBOL_GRAPH_EXTRACTOR_OUTPUT_DIR" : "$(TARGET_BUILD_DIR)/$(CURRENT_ARCH)/SecondBrain.symbolgraphs",
+            "TAPI_DYLIB_INSTALL_NAME" : "SecondBrain",
+            "TAPI_EXTRACT_API_OUTPUT_DIR" : "$(TARGET_BUILD_DIR)/$(CURRENT_ARCH)/SecondBrain.symbolgraphs",
+            "TARGET_BUILD_DIR" : "$(TARGET_BUILD_DIR)/ExecutableModules",
+            "TARGET_NAME" : "SecondBrain--75748FA68163EDAD-testable",
+            "TARGET_TEMP_DIR_SUFFIX" : "-t"
+          },
+          "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDCONFIG_1",
+          "impartedBuildProperties" : {
+            "buildSettings" : {
+              "FRAMEWORK_SEARCH_PATHS" : [
+                "$(BUILT_PRODUCTS_DIR)/PackageFrameworks",
+                "$(inherited)"
+              ],
+              "LD_RUNPATH_SEARCH_PATHS" : [
+                "$(RPATH_ORIGIN)",
+                "$(inherited)"
+              ],
+              "LD_WARN_DUPLICATE_LIBRARIES" : "NO",
+              "LIBRARY_SEARCH_PATHS[__platform_filter=windows-msvc]" : [
+                "$(inherited)",
+                "$(TARGET_BUILD_DIR)/ExecutableModules"
+              ],
+              "OTHER_CFLAGS" : [
+                "-fmodule-map-file=$(GENERATED_MODULEMAP_DIR)/SecondBrain.modulemap",
+                "$(inherited)"
+              ]
+            }
+          },
+          "name" : "Release"
+        }
+      ],
+      "buildPhases" : [
+        {
+          "buildFiles" : [
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_0",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::0",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_1",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::1",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_2",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::2",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_3",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::3",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_4",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::4",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_5",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::5",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_6",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::6",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_7",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::7",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_8",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::8",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_9",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::9",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_10",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::10",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_11",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::11",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_12",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::12",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_13",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::13",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_14",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::14",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_15",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::15",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_16",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::16",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_17",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::17",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_18",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::18",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_19",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::19",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_20",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::20",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_21",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::21",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_22",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::22",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_23",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::23",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_24",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::24",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_25",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::25",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_26",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::26",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_27",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::27",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_28",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::28",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_29",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::29",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_30",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::30",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_31",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::31",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_32",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::32",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_33",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::33",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_34",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::34",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_35",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::35",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_36",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::36",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_37",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::37",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_38",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::38",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_39",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::39",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_40",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::40",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_41",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::41",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_42",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::42",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_43",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::43",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_44",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::44",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_45",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::45",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_46",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::46",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_47",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::47",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_48",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::48",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_49",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::49",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:secondbrain::MAINGROUP::REF_3::REF_50",
+              "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0::50",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
+            }
+          ],
+          "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable::BUILDPHASE_0",
+          "type" : "com.apple.buildphase.sources"
+        }
+      ],
+      "buildRules" : [
+
+      ],
+      "customTasks" : [
+
+      ],
+      "dependencies" : [
+
+      ],
+      "guid" : "PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable",
+      "name" : "SecondBrain",
+      "productReference" : {
+        "guid" : "PRODUCTREF-PACKAGE-TARGET:SecondBrain--75748FA68163EDAD-testable",
+        "name" : "$(EXECUTABLE_NAME)",
+        "type" : "file"
+      },
+      "productTypeIdentifier" : "org.swift.product-type.common.object",
+      "type" : "standard"
+    },
+    "signature" : "bee68b2c5418ddb191b3f761557d01a21df93cef87fa448b918b472f7805be4d",
+    "type" : "target"
+  },
+  {
+    "contents" : {
+      "buildConfigurations" : [
+        {
+          "buildSettings" : {
+
+          },
+          "guid" : "PACKAGE-PRODUCT:secondbrain-SecondBrainPackageTests.SecondBrainPackageTests::BUILDCONFIG_0",
+          "impartedBuildProperties" : {
+            "buildSettings" : {
+
+            }
+          },
+          "name" : "Debug"
+        },
+        {
+          "buildSettings" : {
+
+          },
+          "guid" : "PACKAGE-PRODUCT:secondbrain-SecondBrainPackageTests.SecondBrainPackageTests::BUILDCONFIG_1",
+          "impartedBuildProperties" : {
+            "buildSettings" : {
+
+            }
+          },
+          "name" : "Release"
+        }
+      ],
+      "buildPhases" : [
+
+      ],
+      "buildRules" : [
+
+      ],
+      "customTasks" : [
+
+      ],
+      "dependencies" : [
+
+      ],
+      "guid" : "PACKAGE-PRODUCT:secondbrain-SecondBrainPackageTests.SecondBrainPackageTests",
+      "name" : "SecondBrainPackageTests-product",
+      "type" : "aggregate"
+    },
+    "signature" : "37adf614f81b0729aaec13b8a44f2028862ac870638aca124834b301d8968754",
+    "type" : "target"
+  },
+  {
+    "contents" : {
+      "buildConfigurations" : [
+        {
+          "buildSettings" : {
+            "PRODUCT_NAME" : "$(TARGET_NAME)",
+            "SDKROOT" : "auto",
+            "SDK_VARIANT" : "auto",
+            "SKIP_INSTALL" : "YES",
+            "SUPPORTED_PLATFORMS" : [
+              "$(AVAILABLE_PLATFORMS)"
+            ]
+          },
+          "guid" : "AGGREGATE::BUILDCONFIG_0",
+          "impartedBuildProperties" : {
+            "buildSettings" : {
+
+            }
+          },
+          "name" : "Debug"
+        },
+        {
+          "buildSettings" : {
+            "PRODUCT_NAME" : "$(TARGET_NAME)",
+            "SDKROOT" : "auto",
+            "SDK_VARIANT" : "auto",
+            "SKIP_INSTALL" : "YES",
+            "SUPPORTED_PLATFORMS" : [
+              "$(AVAILABLE_PLATFORMS)"
+            ]
+          },
+          "guid" : "AGGREGATE::BUILDCONFIG_1",
+          "impartedBuildProperties" : {
+            "buildSettings" : {
+
+            }
+          },
+          "name" : "Release"
+        }
+      ],
+      "defaultConfigurationName" : "Release",
+      "developmentRegion" : "en",
+      "groupTree" : {
+        "children" : [
+
+        ],
+        "guid" : "AGGREGATE::MAINGROUP",
+        "name" : "",
+        "path" : "",
+        "sourceTree" : "<group>",
+        "type" : "group"
+      },
+      "guid" : "AGGREGATE",
+      "path" : "/Users/oscarthorogood/Developer/SecondBrain/Package.swift",
+      "projectDirectory" : "/Users/oscarthorogood/Developer/SecondBrain",
+      "projectIsPackage" : "true",
+      "projectName" : "Aggregate",
+      "targets" : [
+        "fe1d77e61a70291f716ae666db0993748f59feab4789c364701504e1a2743234",
+        "96645d1baa60d4602fcf4955e56633888fe339eb3f84fce0b1597daaa8208507"
+      ]
+    },
+    "signature" : "3ebbe01362ec1f84584480cca4ec16546a3603bf959010a6d5acd477a13fff5d",
+    "type" : "project"
+  },
+  {
+    "contents" : {
+      "buildConfigurations" : [
+        {
+          "buildSettings" : {
+
+          },
+          "guid" : "ALL-INCLUDING-TESTS::BUILDCONFIG_0",
+          "impartedBuildProperties" : {
+            "buildSettings" : {
+
+            }
+          },
+          "name" : "Debug"
+        },
+        {
+          "buildSettings" : {
+
+          },
+          "guid" : "ALL-INCLUDING-TESTS::BUILDCONFIG_1",
+          "impartedBuildProperties" : {
+            "buildSettings" : {
+
+            }
+          },
+          "name" : "Release"
+        }
+      ],
+      "buildPhases" : [
+
+      ],
+      "buildRules" : [
+
+      ],
+      "customTasks" : [
+
+      ],
+      "dependencies" : [
+        {
+          "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain",
+          "platformFilters" : [
+
+          ]
+        }
+      ],
+      "guid" : "ALL-INCLUDING-TESTS",
+      "name" : "AllIncludingTests",
+      "type" : "aggregate"
+    },
+    "signature" : "fe1d77e61a70291f716ae666db0993748f59feab4789c364701504e1a2743234",
+    "type" : "target"
+  },
+  {
+    "contents" : {
+      "buildConfigurations" : [
+        {
+          "buildSettings" : {
+
+          },
+          "guid" : "ALL-EXCLUDING-TESTS::BUILDCONFIG_0",
+          "impartedBuildProperties" : {
+            "buildSettings" : {
+
+            }
+          },
+          "name" : "Debug"
+        },
+        {
+          "buildSettings" : {
+
+          },
+          "guid" : "ALL-EXCLUDING-TESTS::BUILDCONFIG_1",
+          "impartedBuildProperties" : {
+            "buildSettings" : {
+
+            }
+          },
+          "name" : "Release"
+        }
+      ],
+      "buildPhases" : [
+
+      ],
+      "buildRules" : [
+
+      ],
+      "customTasks" : [
+
+      ],
+      "dependencies" : [
+        {
+          "guid" : "PACKAGE-PRODUCT:secondbrain_SecondBrain.SecondBrain",
+          "platformFilters" : [
+
+          ]
+        }
+      ],
+      "guid" : "ALL-EXCLUDING-TESTS",
+      "name" : "AllExcludingTests",
+      "type" : "aggregate"
+    },
+    "signature" : "96645d1baa60d4602fcf4955e56633888fe339eb3f84fce0b1597daaa8208507",
+    "type" : "target"
+  }
+]
