@@ -36,6 +36,13 @@ Each can be switched off in the **Manager menu** (top right of the Agents page).
 
 1. **Keyword rules**, instant and free. 2. **The on-device model** when the rules are unsure. 3. **Fallback**: the closest rule match, then the course agent if a course is named, then Planner. Chat requests only need to go to an agent; the answer comes from that agent.
 
+## Chat: editing, delegating, and the general agent
+
+- **Agents may edit notes in chat when Oscar asks** (edit, rewrite, fix, add, remove, replace, merge, split, convert, format, tidy, apply a template…). The run may write in the note folders only (never `Agents/` or `Templates/` outside its own folder). The app keeps a snapshot of every note first; afterwards it lists what changed, puts back any existing note that lost its frontmatter, and logs one Undo.
+- **An agent that can't do the request replies `DELEGATE: <why>`** (outside its role, or no access). Nothing is shown; the Manager picks a different agent (rules, then the on-device model, never one that already declined) and tells Oscar where it went. Up to three hand-backs.
+- **The Manager is the general agent, the last resort.** When every agent that fits has declined, the Manager does the request itself with Claude (the one time it does): it can create, edit, rewrite, restructure, merge, split, convert, summarise, fix links and frontmatter, replace text across notes and apply a template, with the same checks and Undo. It can't move, rename or delete: it ends with `MOVE: a -> b` lines and the app performs them (copy, check, original to `.trash/`). So there is always an agent that can take a task.
+- **Applying a template to existing notes** ("apply the MCQ template to the existing MCQ files"): the chosen agent does it a few notes at a time, then the Manager checks each against what it was, restores any that lost text or changed a value, and tidies what is still off the template.
+
 ## Limits and safeguards
 
 - **Budget.** It reads the real Claude plan usage. Background jobs start only below the budget preset: Cautious 50%, Balanced 60% (default), Generous 75% of the 5-hour window, with the week at 60 / 70 / 85%; Opus jobs below 30 / 40 / 55%. A runaway guard of 12 jobs an hour always applies, and a Claude usage limit pauses it for an hour.
@@ -58,7 +65,7 @@ Each can be switched off in the **Manager menu** (top right of the Agents page).
 
 - One helper per background job, with course agents only as advisers. No fan-out.
 - **Teams in chat (2026-10-03).** A chat request can go through up to three agents in order when one needs what the other produces (Librarian → Tutor, Researcher → Writer, Analyst → Tutor, Planner → Writer), or when Oscar names two agents. The course agent advises first (its briefing is refreshed if it was last written before today). Each stage receives the earlier output and ends with a `Handoff` section; the last stage produces the result, and a different agent then checks it against the handoff and flags anything unsupported. Every chat and job prompt also carries the date, the teaching week and the team's last ten Activity Log entries.
-- Chat never edits notes. A job lets a helper edit one note, or add one new note. Files move only through the app (copy, check, original to `.trash/`); nothing is deleted.
+- In chat an agent edits notes only when Oscar asks (see above); a job lets a helper edit one note, or add one new note. Files move only through the app (copy, check, original to `.trash/`); nothing is deleted.
 
 ## Open items
 

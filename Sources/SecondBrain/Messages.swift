@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// Chat looks like iMessage everywhere, in Liquid Glass: blue-tinted glass bubbles for you on the right, clear glass for the agent on the
-/// left, a small tail on the last bubble of a run, centred time stamps, "Delivered" / "Read", and three dots while the agent works.
+/// Chat looks like Apple Messages everywhere: your blue bubbles on the right, the agent's grey ones on the left, a small tail on the last bubble of a run
+/// (and tighter spacing inside a run), centred time stamps, "Read 13:06" under your latest message, and three dots while the agent works.
 enum IM {
     static let blue = Color(light: 0x0A84FF, dark: 0x0A84FF)
+    static let grey = Color(light: 0xE9E9EB, dark: 0x303033)
     static func shape(mine: Bool, tail: Bool = true) -> UnevenRoundedRectangle {
         UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: mine || !tail ? 18 : 5, bottomTrailingRadius: mine && tail ? 5 : 18, topTrailingRadius: 18, style: .continuous)
     }
@@ -25,7 +26,7 @@ struct IMBubble: View {
         Text(LocalizedStringKey(text)).font(.system(size: size)).lineSpacing(2).textSelection(.enabled)
             .foregroundStyle(mine ? Color.white : Color.ink)
             .padding(.horizontal, size * 0.9).padding(.vertical, size * 0.55)
-            .glassEffect(mine ? .regular.tint(IM.blue) : .regular, in: IM.shape(mine: mine, tail: tail))
+            .background(mine ? IM.blue : IM.grey, in: IM.shape(mine: mine, tail: tail))
     }
 }
 
@@ -33,14 +34,14 @@ struct IMBubble: View {
 struct IMTyping: View {
     var body: some View {
         TypingDots().padding(.horizontal, 16).padding(.vertical, 14)
-            .glassEffect(.regular, in: IM.shape(mine: false))
+            .background(IM.grey, in: IM.shape(mine: false))
     }
 }
 
 struct MessageRow: View {
     let message: Message
     var firstInRun = true, lastInRun = true
-    var receipt: String? = nil     // "Delivered" or "Read", under your latest message
+    var receipt: String? = nil     // "**Read** 13:06" or "**Delivered**", under your latest message
     var body: some View {
         let mine = !message.fromAgent
         if !mine && message.text.hasPrefix("→") {   // the Manager saying where it sent your request
@@ -54,7 +55,7 @@ struct MessageRow: View {
                     IMBubble(text: text, mine: mine, tail: lastInRun)
                     if !mine { Spacer(minLength: 56) }
                 }
-                if let receipt { Text(receipt).font(.system(size: 10, weight: .medium)).foregroundStyle(Color.ink2).padding(.trailing, 4) }
+                if let receipt { Text(LocalizedStringKey(receipt)).font(.system(size: 10)).foregroundStyle(Color.ink2).padding(.trailing, 4) }
             }.frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
         }
     }
@@ -94,7 +95,10 @@ struct MessagesInbox: View {
             VStack(spacing: 10) {
                 VStack(spacing: 3) {
                     AgentPortrait(id: selected, size: 46)
-                    Text(role.name).font(.system(size: 12, weight: .semibold))
+                    HStack(spacing: 3) {
+                        Text(role.name).font(.system(size: 12, weight: .semibold))
+                        Image(systemName: "chevron.right").font(.system(size: 7, weight: .bold)).foregroundStyle(Color.ink2)
+                    }
                     Text(store.thinking.contains(selected) ? "Working…" : role.job).font(.system(size: 10)).foregroundStyle(Color.ink2).lineLimit(1)
                 }
                 AgentChatCard(code: selected, suggest: true).id(selected)

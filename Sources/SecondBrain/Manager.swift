@@ -145,12 +145,21 @@ enum Manager {
         if let c = course(t) { return route(c, text, why: "It’s about \(Agent.role(c).name).", by: "rules") }
         return route("planner", text, why: "Couldn’t tell, so Planner will look at it.", by: "default")
     }
+    /// A request to change notes, not just to read or answer: the run is allowed to edit the note folders (and the edits are checked and can be undone).
+    static func isEdit(_ text: String) -> Bool {
+        text.lowercased().range(of: #"\b(edit|rewrite|reword|rephrase|change|update|fix|correct|add|insert|append|remove|delete|replace|rename|merge|split|combine|reformat|restructure|reorgani[sz]e|convert|clean ?up|tidy|shorten|expand|translate|proofread|format|fill in|complete|tick|untick|apply|move)\b"#, options: .regularExpression) != nil
+    }
+
     /// `previous` is who last answered in this chat: a short message with no clues ("start with what you know") is a follow-up to them.
-    static func decide(_ text: String, previous: String? = nil) async -> Route {
-        if let r = byRules(text) { return r }
-        if let previous, text.count < 80 { return route(previous, text, why: "Following on from \(Agent.role(previous).name).", by: "follow-up") }
-        if let r = await onDevice(text) { return r }
-        return fallback(text)
+    /// `excluding` are agents that already said they couldn't do it; when none is left, the Manager does it itself, as the general agent.
+    static func decide(_ text: String, previous: String? = nil, excluding: Set<String> = []) async -> Route {
+        if let r = byRules(text), !excluding.contains(r.agent) { return r }
+        if !excluding.isEmpty, let other = hits(text.lowercased()).first(where: { !excluding.contains($0.agent) }) { return route(other.agent, text, why: Agent.role(other.agent).job + ".", by: "rules") }
+        if let previous, !excluding.contains(previous), text.count < 80 { return route(previous, text, why: "Following on from \(Agent.role(previous).name).", by: "follow-up") }
+        if let r = await onDevice(text, excluding: excluding) { return r }
+        let f = fallback(text)
+        if !excluding.contains(f.agent) { return f }
+        return Route(agent: Agent.manager.id, tier: .standard, reason: "No other agent fits, so the Manager does it itself.", by: "last resort")
     }
 
     /// Part of `--check`: routing the rules settle must keep going where it should, at the effort it should.
@@ -181,6 +190,8 @@ enum Manager {
         precondition(Manager.needsBrief("Paste the exact essay question") && !Manager.needsBrief("The question: why?"), "blank brief")
         precondition(Store.lineDiff("a\nb\nc", "a\nx\nc") == "- b\n+ x", "diff of what you changed: \(Store.lineDiff("a\nb\nc", "a\nx\nc"))")
         precondition(Tier.quick < Tier.deep && Tier.clamp(.deep, max: .standard) == .standard, "tier ceiling")
+        precondition(isEdit("rewrite my lecture 3 notes") && isEdit("Fix the typos in this essay") && !isEdit("What's due this week?") && !isEdit("explain Porter's five forces"), "edit requests")
+        precondition(Agent.Reply(text: "DELEGATE: I can't edit files\nsorry", session: "s").delegation == "I can't edit files" && Agent.Reply(text: "Done.", session: "s").delegation == nil && Agent.Reply(text: "DELEGATE: x", session: nil).delegation == nil, "delegation")
         print("routing ok: \(cases.count) requests go where they should")
     }
 
@@ -194,9 +205,9 @@ enum Manager {
     }
 
     /// Free and offline (Apple Intelligence). nil when it isn't available or fails.
-    static func onDevice(_ text: String) async -> Route? {
+    static func onDevice(_ text: String, excluding: Set<String> = []) async -> Route? {
         guard case .available = SystemLanguageModel.default.availability else { return nil }
-        let team = (Agent.roles + Agent.courseRoles).map { "\($0.course ?? $0.id) = \($0.name): \($0.job)" }.joined(separator: "\n")
+        let team = (Agent.roles + Agent.courseRoles).filter { !excluding.contains($0.id) }.map { "\($0.course ?? $0.id) = \($0.name): \($0.job)" }.joined(separator: "\n")
         let prompt = """
         You route requests from a university student to one agent. Agents:
         \(team)
@@ -204,7 +215,7 @@ enum Manager {
         Request: \(text)
         """
         guard let c = try? await LanguageModelSession().respond(to: prompt, generating: Choice.self).content,
-              Agent.all.contains(where: { $0.id == c.agent }) else { return nil }
+              Agent.all.contains(where: { $0.id == c.agent }), !excluding.contains(c.agent) else { return nil }
         return Route(agent: c.agent, tier: tier(text, role: c.agent), reason: c.reason.trimmingCharacters(in: .whitespaces), by: "on-device")
     }
 }

@@ -97,7 +97,7 @@ struct AgentSettings: View {
                 }
             }.padding(.top, 8)
             LabeledContent("Permissions:") {
-                Text("Chat never edits your notes: an agent may only write in its own folder (notes to itself, rules it has learned). A job lets a helper edit just the one note it is given, or add the one new note it is told to. Agents never delete; originals go to .trash. Helpers never ask for approval: the Manager checks the work and undoes it if it fails.")
+                Text("In chat an agent edits your notes only when you ask it to (the app keeps every old version, puts back any note that loses its frontmatter, and logs an Undo); otherwise it writes only in its own folder. If an agent can’t do what you ask it passes it back to the Manager, who picks another and, as a last resort, does it as the general agent. A job lets a helper edit just the one note it is given, or add the one new note it is told to. Agents never delete; originals go to .trash. Helpers never ask for approval: the Manager checks the work and undoes it if it fails.")
                     .fixedSize(horizontal: false, vertical: true)
             }.padding(.top, 8)
         }
@@ -115,8 +115,17 @@ struct AgentSettings: View {
 }
 
 struct RulesSettings: View {
+    @State private var installed = AppFiles.statusLine()
     var body: some View {
         Form {
+            LabeledContent("Templates and Agents:") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(installed).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+                    Button("Reinstall Now") { installed = AppFiles.reinstall() }
+                    Text("Each new version of the app copies its templates and the agents’ instructions into your vault. This does it again now; the old text of anything replaced stays in the vault’s .history folder.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+            }.padding(.bottom, 8)
             LabeledContent("Vault rules:") {
                 VStack(alignment: .leading, spacing: 6) {
                     open("Open AGENTS.md", "Agents/Shared Agents/AGENTS.md")
