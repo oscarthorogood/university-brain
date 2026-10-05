@@ -472,7 +472,6 @@ struct ContentView: View {
                     .modifier(GlassPane())
                 }
             }
-            .overlay(alignment: .bottomTrailing) { AssistantButton().padding(18) }
             .padding(.top, 12).ignoresSafeArea(.container, edges: .top)
         }
         .padding(12)

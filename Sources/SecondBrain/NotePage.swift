@@ -313,7 +313,11 @@ struct NotePage: View {
             if showInspector {
                 NoteInspector(title: title, subtitle: subtitle, tint: note?.course == nil ? nil : Color.course(note?.course), text: saved,
                               jump: { jump = $0 }, edit: { change in edit(change) }) {
-                    propertiesTab(fm, lists)
+                    propertiesTab(fm)
+                } files: {
+                    filesTab(lists)
+                } links: {
+                    linksTab
                 } agent: {
                     agentTab
                 }
@@ -331,11 +335,11 @@ struct NotePage: View {
         let rel = Vault.rel(url)
         return SideNav.grouped.contains { name in rel.hasPrefix(Vault.dir(name) + "/") }
     }
-    func relationSide(_ fm: [String: String], _ lists: [String: [String]]) -> some View {
+    /// Notes in Files and Apps: what the item is (type, course, year, source…).
+    func relationDetails(_ fm: [String: String]) -> some View {
         func clean(_ v: String?) -> String? { v.map { Vault.unlink($0).trimmingCharacters(in: CharacterSet(charactersIn: "\" ")) }.flatMap { $0.isEmpty ? nil : $0 } }
         let details: [(String, String)] = [("Type", clean(fm["type"] ?? fm["Type"])), ("Course", clean(fm["course"] ?? fm["Course"])), ("Year", clean(fm["year"])),
                                           ("Source", clean(fm["publication"])), ("Date", clean(fm["date"])), ("Status", clean(fm["status"]))].compactMap { k, v in v.map { (k, $0) } }
-        let relates = (lists["related"] ?? []).map { (Vault.plain($0), false) } + (lists["collections"] ?? []).map { ($0, true) }
         return VStack(spacing: 12) {
             Card(title: "Details") {
                 VStack(alignment: .leading, spacing: 8) {
@@ -347,10 +351,16 @@ struct NotePage: View {
                     if details.isEmpty { Text("No details").font(.system(size: 12)).foregroundStyle(Color.ink2) }
                 }.padding(.horizontal, 16).padding(.bottom, 12)
             }.fixedSize(horizontal: false, vertical: true)
+        }
+    }
+    /// Notes in Files and Apps: what they relate to.
+    func relationRelates(_ lists: [String: [String]]) -> some View {
+        let relates = (lists["related"] ?? []).map { (Vault.plain($0), false) } + (lists["collections"] ?? []).map { ($0, true) }
+        return VStack(spacing: 12) {
             Card(title: "Relates to") {
                 ScrollView {
                     VStack(spacing: 2) {
-                        if relates.isEmpty && (note.map { store.backlinks(to: $0).isEmpty } ?? true) { Text("Nothing linked yet").font(.system(size: 13)).foregroundStyle(Color.ink2).padding(10) }
+                        if relates.isEmpty { Text("Nothing related yet").font(.system(size: 13)).foregroundStyle(Color.ink2).padding(10) }
                         ForEach(relates, id: \.0) { value, plain in
                             if plain { Label(value, systemImage: "folder").font(.system(size: 12)).foregroundStyle(Color.ink2).padding(.horizontal, 10).padding(.vertical, 6).frame(maxWidth: .infinity, alignment: .leading) }
                             else {
@@ -358,10 +368,6 @@ struct NotePage: View {
                                     .font(.system(size: 12)).padding(.horizontal, 10).padding(.vertical, 7) }.buttonStyle(.glassRow)
                             }
                         }
-                        if let note { ForEach(store.backlinks(to: note)) { n in
-                            Button { store.page = .note(n.id) } label: { HStack(spacing: 8) { Circle().fill(Color.course(n.course)).frame(width: 7, height: 7); Text(n.display).lineLimit(1); Spacer() }
-                                .font(.system(size: 12)).padding(.horizontal, 10).padding(.vertical, 6) }.buttonStyle(.glassRow)
-                        } }
                     }.padding(.horizontal, 6).padding(.bottom, 8)
                 }
             }
@@ -420,10 +426,9 @@ struct NotePage: View {
 
     // MARK: Inspector tabs that hold what the old side column did
     /// What the note is (course, date, status, tags) and what it relates to. Notes in Files and Apps show their details instead.
-    @ViewBuilder func propertiesTab(_ fm: [String: String], _ lists: [String: [String]]) -> some View {
-        if isRelation { relationSide(fm, lists) }
+    @ViewBuilder func propertiesTab(_ fm: [String: String]) -> some View {
+        if isRelation { relationDetails(fm) }
         else {
-            VStack(spacing: 12) {
                     Card(title: "Properties") {
                         VStack(alignment: .leading, spacing: 10) {
                             PropRow(icon: "graduationcap.fill", label: "Course") {
@@ -469,16 +474,43 @@ struct NotePage: View {
                             }
                         }.padding(.horizontal, 16).padding(.bottom, 14).disabled(text != saved)
                     }.fixedSize(horizontal: false, vertical: true)
-                if let note {
+        }
+    }
+    /// The Files tab: what in the vault relates to this note (Resources, Research, Zotero, other notes) and a field to relate another.
+    @ViewBuilder func filesTab(_ lists: [String: [String]]) -> some View {
+        if isRelation { relationRelates(lists) }
+        else if let note {
                         RelationsCard(note: note, newLink: $newLink) { q in
                             let q = q.trimmingCharacters(in: .whitespaces); newLink = ""
                             guard let n = store.notes.first(where: { $0.title.caseInsensitiveCompare(q) == .orderedSame || $0.display.caseInsensitiveCompare(q) == .orderedSame }) else { saveError = "No note called “\(q)”."; return }
                             edit { Vault.editList($0, "related") { if !$0.contains(where: { Vault.plain($0) == n.title }) { $0.append("\"[[\(n.title)]]\"") } } }
                         }
-                        LinksToCard(note: note)
-                }
+        }
+    }
+    /// The Links tab: the notes this one links to, and the notes that link here.
+    @ViewBuilder var linksTab: some View {
+        if let note {
+            VStack(spacing: 12) {
+                LinksToCard(note: note)
+                linkedFrom(note)
             }
         }
+    }
+    func linkedFrom(_ note: Note) -> some View {
+        let from = store.backlinks(to: note)
+        return Card(title: "Linked from", trailing: from.isEmpty ? "" : "\(from.count)") {
+            if from.isEmpty { Text("No other notes link here.").font(.system(size: 12)).foregroundStyle(Color.ink2).padding(.horizontal, 16).padding(.bottom, 12) }
+            else {
+                ScrollView {
+                    VStack(spacing: 2) {
+                        ForEach(from) { n in
+                            Button { store.page = .note(n.id) } label: { HStack(spacing: 8) { Circle().fill(Color.course(n.course)).frame(width: 7, height: 7); Text(n.display).lineLimit(1); Spacer(); Text(n.kind).font(.system(size: 10)).foregroundStyle(Color.ink2) }
+                                .font(.system(size: 12)).padding(.horizontal, 10).padding(.vertical, 6).contentShape(.rect) }.buttonStyle(.glassRow)
+                        }
+                    }.padding(.horizontal, 6).padding(.bottom, 8)
+                }.frame(maxHeight: 200)
+            }
+        }.fixedSize(horizontal: false, vertical: true)
     }
     @ViewBuilder var agentTab: some View {
         if let note {

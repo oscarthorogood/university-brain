@@ -4,7 +4,7 @@ import SwiftUI
 // Contents, Tasks, Attachments and Find read the note's own text; Properties and Agent hold what the old side column did.
 
 enum InspectorTab: String, CaseIterable {
-    case contents, tasks, attachments, find, properties, agent
+    case contents, tasks, attachments, find, properties, files, links, agent
     var icon: String {
         switch self {
         case .contents: "list.bullet"
@@ -12,6 +12,8 @@ enum InspectorTab: String, CaseIterable {
         case .attachments: "paperclip"
         case .find: "doc.text.magnifyingglass"
         case .properties: "slider.horizontal.3"
+        case .files: "folder"
+        case .links: "link"
         case .agent: "sparkles"
         }
     }
@@ -22,6 +24,8 @@ enum InspectorTab: String, CaseIterable {
         case .attachments: "Attachments"
         case .find: "Find"
         case .properties: "Properties"
+        case .files: "Files"
+        case .links: "Links"
         case .agent: "Agent"
         }
     }
@@ -116,7 +120,7 @@ struct InspectorTabs: View {
     }
 }
 
-struct NoteInspector<Props: View, AgentView: View>: View {
+struct NoteInspector<Props: View, FilesView: View, LinksView: View, AgentView: View>: View {
     @Environment(Store.self) private var store
     @AppStorage("inspectorTab") private var tab = InspectorTab.properties
     let title: String
@@ -126,6 +130,8 @@ struct NoteInspector<Props: View, AgentView: View>: View {
     let jump: (String) -> Void                        // scroll the reader to a block id
     let edit: ((String) -> String) -> Void            // apply a change to the note's text and save it
     @ViewBuilder var properties: Props
+    @ViewBuilder var files: FilesView
+    @ViewBuilder var links: LinksView
     @ViewBuilder var agent: AgentView
     @State private var current: String?
     @State private var hideDone = false
@@ -158,6 +164,8 @@ struct NoteInspector<Props: View, AgentView: View>: View {
         case .attachments: attachments
         case .find: FindPane(text: text, jump: jump)
         case .properties: properties.scrollsWhenShort()
+        case .files: files.scrollsWhenShort()
+        case .links: links.scrollsWhenShort()
         case .agent: agent.scrollsWhenShort()
         }
     }
