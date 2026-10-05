@@ -37,6 +37,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>CFBundleVersion</key><string>$BUILD</string>
 <key>LSMinimumSystemVersion</key><string>26.0</string>
 <key>NSHighResolutionCapable</key><true/>
+<key>NSRemindersFullAccessUsageDescription</key><string>University Brain keeps your tasks and a Reminders list in step, both ways, and adds reminders you create to Unsorted.</string>
+<key>NSRemindersUsageDescription</key><string>University Brain keeps your tasks and a Reminders list in step, both ways, and adds reminders you create to Unsorted.</string>
 <key>NSMicrophoneUsageDescription</key><string>University Brain records voice memos into your Unsorted folder.</string>
 <key>NSSpeechRecognitionUsageDescription</key><string>University Brain turns your voice memos into text on this Mac.</string>
 </dict></plist>

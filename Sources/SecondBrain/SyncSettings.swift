@@ -10,6 +10,11 @@ struct SyncSettings: View {
     @AppStorage("lastCalendarSync") private var last: Double = 0
     @AppStorage("lastCalendarResult") private var result = ""
     @State private var note = ""
+    @AppStorage("remindersOn") private var remindersOn = false
+    @AppStorage("remindersList") private var remindersList = "University"
+    @AppStorage("lastRemindersSync") private var remindersLast: Double = 0
+    @AppStorage("lastRemindersResult") private var remindersResult = ""
+    @State private var remindersBusy = false
 
     static let every: [(Int, String)] = [(15, "15 minutes"), (30, "30 minutes"), (60, "hour"), (180, "3 hours"), (0, "Only when I press Sync Now")]
 
@@ -43,6 +48,20 @@ struct SyncSettings: View {
                     Button("Open Note") { NSWorkspace.shared.open(Vault.root.appending(path: CalendarSync.file)) }
                 }
             }.padding(.top, 8)
+            LabeledContent("Reminders:") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle("Keep tasks in step with Apple Reminders", isOn: $remindersOn)
+                    HStack(spacing: 10) {
+                        TextField("List", text: $remindersList).textFieldStyle(.roundedBorder).frame(width: 160).disabled(!remindersOn)
+                        Button(remindersBusy ? "Syncing…" : "Sync Now") { syncReminders() }.disabled(!remindersOn || remindersBusy)
+                        if remindersBusy { ProgressView().controlSize(.small) }
+                    }
+                    Text(remindersLast == 0 ? "Not synced yet." : "\(remindersResult) · \(Date(timeIntervalSince1970: remindersLast).formatted(.relative(presentation: .named)))")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Text("Every task note (classes, tutorials, essays, projects, assignments) becomes a reminder in this list. Ticking one, or changing its due date, in either place updates the other. A reminder you add in Reminders goes to Unsorted for the Sorter. Deletes never sync, and a note’s text and title never change from Reminders. It checks every few minutes while the Manager is on.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+            }.padding(.top, 8)
             LabeledContent("Status:") {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 10) {
@@ -56,7 +75,13 @@ struct SyncSettings: View {
         }
         .formStyle(.columns).padding(24)
         .onChange(of: cfg) { cfg.save() }
+        .onChange(of: remindersOn) { _, on in if on { syncReminders() } }   // switching it on asks for access, then syncs
         .sheet(isPresented: $adding) { AddCalendar { cfg.feeds.append($0) } }
+    }
+
+    func syncReminders() {
+        remindersBusy = true
+        Task { _ = await store.syncReminders(); remindersBusy = false }
     }
 
     func sync() {

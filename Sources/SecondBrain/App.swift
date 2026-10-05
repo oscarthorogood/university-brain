@@ -257,6 +257,7 @@ struct SecondBrainApp: App {
     var newStructured = false
     var voiceMemo = false
     var zoteroSyncing = false
+    var remindersSyncing = false
     var newKind = NoteKind.lecture
     var newCourse: String?
     @ObservationIgnored var bodyCache: (rev: Int, bodies: [URL: String], backlinks: [String: [Note]])?
@@ -1222,6 +1223,7 @@ enum Check {
         print("filing ok: copy verified, original in .trash, no overwrite, no escape")
         AppFiles.check()
         TemplateApply.check()
+        ReminderKeys.check()
         CalendarSync.check()
         Zotero.check()
         CalendarSync.checkNotes()

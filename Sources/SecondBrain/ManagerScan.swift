@@ -144,6 +144,11 @@ extension Store {
             let r = await syncZotero()
             if r.changed { log("librarian", r.text) }
         }
+        // Apple Reminders: every three minutes while it is switched on in Settings → Sync, both ways. Only changes reach the log.
+        if RemindersSync.on, Date.now.timeIntervalSince1970 - UserDefaults.standard.double(forKey: "lastRemindersSync") > 3 * 60 {
+            let r = await syncReminders()
+            if r.changed { log("planner", r.text) }
+        }
         maybeBrief()
         notifyDueToday()
         // Paused, quiet hours, on battery: the Manager still keeps the calendar but starts nothing.
