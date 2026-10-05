@@ -36,6 +36,10 @@ Each can be switched off in the **Manager menu** (top right of the Agents page).
 
 1. **Keyword rules**, instant and free. 2. **The on-device model** when the rules are unsure. 3. **Fallback**: the closest rule match, then the course agent if a course is named, then Planner. Chat requests only need to go to an agent; the answer comes from that agent.
 
+## Applying a template to existing notes
+
+Asked in any chat ("apply the MCQ template to the existing MCQ files"), the Manager does it on the Mac without Claude: for each note of that type it puts the frontmatter in the template's order and spelling, fills an empty `type` or `base` from the template, and adds missing sections at the end. Body text is never changed, every old version is kept in `.history/`, a note changed in the last two minutes is skipped, and the Activity Log gets one entry with an Undo. It reports how many notes changed and how many already matched.
+
 ## Limits and safeguards
 
 - **Budget.** It reads the real Claude plan usage. Background jobs start only below the budget preset: Cautious 50%, Balanced 60% (default), Generous 75% of the 5-hour window, with the week at 60 / 70 / 85%; Opus jobs below 30 / 40 / 55%. A runaway guard of 12 jobs an hour always applies, and a Claude usage limit pauses it for an hour.

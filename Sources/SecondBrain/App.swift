@@ -280,6 +280,8 @@ struct SecondBrainApp: App {
     func ask(_ code: String, _ text: String, tier: Manager.Tier? = nil) {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !thinking.contains(code) else { return }
+        // "apply the MCQ template to the existing MCQ files": agents never edit existing notes from chat, so the app does it itself
+        if let folder = Self.templateRequest(text) { applyTemplates(folder, asked: text, in: code); return }
         if code == Agent.manager.id { dispatch(text, tier: tier) } else { send(code, text, tier: tier ?? Manager.tier(text, role: code)) }
     }
     /// The last few turns of the Manager's chat, so the agent it hands a follow-up to knows what "that" and "these" mean.
@@ -1203,6 +1205,7 @@ enum Check {
         precondition((try? Vault.perform(.init(from: "Unsorted/x.pdf", to: "../escape.pdf"), in: box)) == nil, "never leaves the vault")
         print("filing ok: copy verified, original in .trash, no overwrite, no escape")
         AppFiles.check()
+        TemplateApply.check()
         CalendarSync.check()
         Zotero.check()
         CalendarSync.checkNotes()
