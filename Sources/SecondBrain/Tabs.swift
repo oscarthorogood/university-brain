@@ -73,21 +73,23 @@ struct WindowTabBar: View {
     var body: some View {
         let count = store.notices().count
         HStack(spacing: 0) {
+            // One glass pill the width of the sidebar pane below it: the window buttons, then the icons.
             HStack(spacing: 0) {
-                Color.clear.frame(width: 98, height: 1)   // the window buttons
-                GlassEffectContainer(spacing: 0) {
-                    HStack(spacing: 2) {
-                        ChromeButton(icon: "sidebar.left", help: collapsed ? "Show Sidebar" : "Hide Sidebar") { withAnimation(.spring(duration: 0.45, bounce: 0.15)) { collapsed.toggle() } }
-                        ChromeButton(icon: "gearshape", help: "Settings (⌘,)") { openSettings() }
-                        ChromeButton(icon: count > 0 ? "bell.badge" : "bell", help: count > 0 ? "Notifications, \(count)" : "Notifications") { showNotices.toggle() }
-                            .popover(isPresented: $showNotices, arrowEdge: .bottom) { NoticeBox().padding(10).frame(width: 300, height: 380) }
-                        ChromeButton(icon: "house", help: "Home", on: store.page == .overview) { store.openHome() }
-                    }
-                    .padding(3).glassEffect(.regular, in: .capsule)
+                Color.clear.frame(width: 76, height: 1)   // the window buttons sit here, inside the glass
+                Spacer(minLength: 0)
+                HStack(spacing: 2) {
+                    ChromeButton(icon: "sidebar.left", help: collapsed ? "Show Sidebar" : "Hide Sidebar") { withAnimation(.spring(duration: 0.45, bounce: 0.15)) { collapsed.toggle() } }
+                    ChromeButton(icon: "gearshape", help: "Settings (⌘,)") { openSettings() }
+                    ChromeButton(icon: count > 0 ? "bell.badge" : "bell", help: count > 0 ? "Notifications, \(count)" : "Notifications") { showNotices.toggle() }
+                        .popover(isPresented: $showNotices, arrowEdge: .bottom) { NoticeBox().padding(10).frame(width: 300, height: 380) }
+                    ChromeButton(icon: "house", help: "Home", on: store.page == .overview) { store.openHome() }
                 }
                 Spacer(minLength: 0)
             }
-            .frame(width: 258)
+            .padding(.horizontal, 4)
+            .frame(width: 240, height: 38)
+            .glassEffect(.regular, in: .capsule)
+            .padding(.leading, 12).padding(.trailing, 6)
             Rectangle().fill(Color.line.opacity(0.8)).frame(width: 1, height: 28)
             HStack(spacing: 0) { TabBar(); Spacer(minLength: 0) }.padding(.leading, 5).padding(.trailing, 12)
         }
