@@ -1,17 +1,17 @@
 import SwiftUI
 
-// The other kinds of note that open as what they are rather than as text, the way the four apps do: a past paper you work through, a mind map you fold,
-// and summaries, research briefs and exams as cards, one per section. "Edit note" is the only way to see the Markdown.
+// The other study notes that open as what they are rather than as text, the way the four apps do: a past paper you work through, a mind map you fold,
+// and summaries and research briefs as cards, one per section. "Edit note" is the only way to see the Markdown. (Exams are Items, and open as ordinary notes.)
 
 enum SheetKind: String {
-    case pastPaper = "Past Papers", summary = "Summaries", mindMap = "Mind Maps", research = "Research", exam = "Exams"
+    case pastPaper = "Past Papers", summary = "Summaries", mindMap = "Mind Maps", research = "Research"
     var noun: String {
-        switch self { case .pastPaper: "Past Paper"; case .summary: "Summary"; case .mindMap: "Mind Map"; case .research: "Research brief"; case .exam: "Exam" }
+        switch self { case .pastPaper: "Past Paper"; case .summary: "Summary"; case .mindMap: "Mind Map"; case .research: "Research brief" }
     }
     var icon: String {
         switch self {
         case .pastPaper: "doc.text.magnifyingglass"; case .summary: "list.bullet.rectangle"; case .mindMap: "point.3.connected.trianglepath.dotted"
-        case .research: "magnifyingglass.circle"; case .exam: "pencil.and.list.clipboard"
+        case .research: "magnifyingglass.circle"
         }
     }
 }
@@ -59,7 +59,7 @@ struct SheetPage: View {
                 case .mindMap:
                     let nodes = StudyParse.tree(text)
                     if nodes.count < 2 { empty("No map yet", "Add a nested list: the first item is the centre and each indent is a branch.") } else { MindMapExplorer(nodes: nodes) }
-                case .summary, .research, .exam:
+                case .summary, .research:
                     SectionCards(url: url, kind: kind)
                 }
             }
@@ -164,7 +164,7 @@ struct MindMapExplorer: View {
     }
 }
 
-/// Summaries, research briefs and exams: each section of the note as a card of its own, with the Markdown's marks (quote bars, callout lines, `##`) gone.
+/// Summaries and research briefs: each section of the note as a card of its own, with the Markdown's marks (quote bars, callout lines, `##`) gone.
 /// A section that is still only the template's scaffolding is left out, and named at the bottom so you know what is waiting to be filled in.
 struct SectionCards: View {
     let url: URL
