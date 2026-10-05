@@ -18,14 +18,11 @@ The arrow icon next to Settings, at the top left of the window, checks GitHub fo
 
 ## Releasing
 
-```sh
-git tag v1.0.0
-git push origin v1.0.0
-```
+Every merge into `main` that changes the app (`Sources/`, `Package.swift`, `Icon/`, `bundle.sh` or `make-dmg.sh`) cuts a release automatically: the patch number goes up by one (`1.0.3` → `1.0.4`). Edits to docs or the workflow alone don't.
 
-Or, without a terminal: **Actions → Release → Run workflow**, and type the version (`1.0.0`).
+For a bigger jump, use **Actions → Release → Run workflow** and type the version (`1.1.0`, `2.0.0`); later merges count on from there. Pushing a tag such as `v1.1.0` does the same.
 
-The **Release** workflow (`.github/workflows/release.yml`) builds the app on a macOS 26 runner, packs the DMG with `make-dmg.sh` and publishes the release. Versions come from the tag, so keep them increasing (`1.0.0`, `1.0.1`, `1.1.0`…).
+The **Release** workflow (`.github/workflows/release.yml`) builds the app on a macOS 26 runner, packs the DMG with `make-dmg.sh` and publishes the release.
 
 ## Build locally
 
