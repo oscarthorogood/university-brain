@@ -32,7 +32,7 @@ extension Color {
     static func course(_ c: String?) -> Color { c.flatMap { courseColors[$0] } ?? .ink2.opacity(0.4) }
 }
 
-enum Page: Hashable { case messages, inbox, overview, week, month, semester, sortNow, course(String), folder(String), unsorted(URL), search, agent(String), note(URL), file(URL), tags }
+enum Page: Hashable { case newTab, messages, inbox, overview, week, month, semester, sortNow, course(String), folder(String), unsorted(URL), search, agent(String), note(URL), file(URL), tags }
 
 extension Page {
     /// Pages that show a note (and so draw their own document pane and inspector pane).
@@ -215,7 +215,18 @@ struct SecondBrainApp: App {
             guard tabs.indices.contains(activeIndex), tabs[activeIndex].page != newValue else { return }
             tabs[activeIndex].back = Array((tabs[activeIndex].back + [tabs[activeIndex].page]).suffix(50))
             tabs[activeIndex].page = newValue
-            if case .agent(let id) = newValue { touchAgent(id) }
+            visited(newValue)
+        }
+    }
+    /// Notes opened lately, newest first (the New Tab page lists them).
+    var recentNotes: [URL] = (UserDefaults.standard.stringArray(forKey: "recentNotes") ?? []).map { URL(fileURLWithPath: $0) }
+    func visited(_ p: Page) {
+        switch p {
+        case .agent(let id): touchAgent(id)
+        case .note(let u), .unsorted(let u) where u.pathExtension == "md":
+            recentNotes = Array(([u] + recentNotes.filter { $0 != u }).prefix(10))
+            UserDefaults.standard.set(recentNotes.map(\.path), forKey: "recentNotes")
+        default: break
         }
     }
     /// Agents in the order they were last opened or asked, newest first (the dock shows the top three).
@@ -448,33 +459,27 @@ struct ContentView: View {
         .containerBackground(.ultraThinMaterial, for: .window)
     }
     var shell: some View {
-        HStack(spacing: 12) {
-            // One glass pane that resizes; the full sidebar and the icon rail cross-fade inside it.
-            ZStack(alignment: .topLeading) {
-                if collapsed { SidebarRail().frame(width: 80).transition(.opacity) }
-                else { Sidebar().frame(width: 240).transition(.opacity) }
-            }
-            .frame(width: collapsed ? 80 : 240, alignment: .leading)
-            .clipShape(.rect(cornerRadius: DS.Radius.pane))
-            .modifier(GlassPane())
-            .background(TrafficLights())
-            .padding(.top, 12).ignoresSafeArea(.container, edges: .top)
-            Group {
+        VStack(spacing: 8) {
+            WindowTabBar()
+            HStack(spacing: 12) {
+                // One glass pane that resizes; the full sidebar and the icon rail cross-fade inside it.
+                ZStack(alignment: .topLeading) {
+                    if collapsed { SidebarRail().frame(width: 80).transition(.opacity) }
+                    else { Sidebar().frame(width: 240).transition(.opacity) }
+                }
+                .frame(width: collapsed ? 80 : 240, alignment: .leading)
+                .clipShape(.rect(cornerRadius: DS.Radius.pane))
+                .modifier(GlassPane())
                 if store.page.isNote {
                     // A note draws its own two panes: the document, and the inspector as a sidebar of its own.
                     MainPanel().frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    VStack(spacing: 0) {
-                        TabBar().padding(.horizontal, 14).padding(.top, 10)
-                        MainPanel().frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .modifier(GlassPane())
+                    MainPanel().frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .modifier(GlassPane())
                 }
             }
-            .padding(.top, 12).ignoresSafeArea(.container, edges: .top)
+            .padding(.horizontal, 12).padding(.bottom, 12)
         }
-        .padding(12)
         .ignoresSafeArea(.container, edges: .top)
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { windowWidth = $0 }
         .containerBackground(for: .window) { WindowBackdrop() }
@@ -586,12 +591,8 @@ struct Sidebar: View {
 
             NoticeButton()
         }
-        .padding(.horizontal, 10).padding(.top, 52).padding(.bottom, 12)
+        .padding(.horizontal, 10).padding(.top, 14).padding(.bottom, 12)
         .frame(maxHeight: .infinity, alignment: .top)
-        .overlay(alignment: .topTrailing) {
-            // Level with the window buttons, top right.
-            HStack(spacing: 4) { SettingsButton(); CollapseButton() }.padding(.top, 7).padding(.trailing, 10)
-        }
     }
 }
 
@@ -718,7 +719,6 @@ struct SidebarRail: View {
     }
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 2) { CollapseButton(); SettingsButton() }.padding(.bottom, 6)
             ScrollView {
                 VStack(spacing: 2) {
                     RailItem(icon: "house", label: "Home", on: store.page == .overview) { store.page = .overview }
@@ -740,7 +740,7 @@ struct SidebarRail: View {
             }.scrollIndicators(.hidden)
             RailItem(icon: "square.and.pencil", label: "New Note") { store.newNote() }.padding(.top, 6)
         }
-        .padding(.horizontal, 10).padding(.top, 38).padding(.bottom, 14)
+        .padding(.horizontal, 10).padding(.top, 14).padding(.bottom, 14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
@@ -853,6 +853,7 @@ struct MainPanel: View {
         case .note(let url): NotePage(url: url)
         case .file(let url): FilePage(url: url)
         case .tags: TagsPage()
+        case .newTab: NewTabPage()
         }
     }
 }
@@ -1308,7 +1309,7 @@ struct TrafficLights: NSViewRepresentable {
                 for (i, type) in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].enumerated() {
                     guard let b = w.standardWindowButton(type), let bar = b.superview else { continue }
                     let size = b.frame.size
-                    let y = bar.isFlipped ? 32 - size.height / 2 : bar.bounds.height - 32 - size.height / 2
+                    let y = bar.isFlipped ? 22 - size.height / 2 : bar.bounds.height - 22 - size.height / 2
                     b.setFrameOrigin(NSPoint(x: 34 - size.width / 2 + CGFloat(i) * 20, y: y))
                 }
             }

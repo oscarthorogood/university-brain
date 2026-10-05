@@ -35,11 +35,12 @@ struct ViewModePicker: View {
 /// The notification bell in a page header: the same notices as the sidebar's Notifications button.
 struct NoticeBell: View {
     @Environment(Store.self) private var store
+    var size: CGFloat = DS.Height.header
     @State private var open = false
     var body: some View {
         let n = store.notices().count
         Button { open.toggle() } label: { Image(systemName: n > 0 ? "bell.badge" : "bell").font(.system(size: 15)) }
-            .buttonStyle(.glassIcon())
+            .buttonStyle(.glassIcon(size))
             .popover(isPresented: $open, arrowEdge: .bottom) { NoticeBox().padding(10).frame(width: 300, height: 380) }
             .help("Notifications").accessibilityLabel(n > 0 ? "Notifications, \(n)" : "Notifications")
     }
@@ -81,7 +82,6 @@ struct PageToolbar<More: View>: View {
                     TextField("Filter", text: $query).textFieldStyle(.roundedBorder).frame(width: 220).padding(12)
                 }
                 .help("Filter").accessibilityLabel("Filter")
-            NoticeBell()
         }
     }
 }

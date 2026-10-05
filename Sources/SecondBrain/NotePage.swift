@@ -280,7 +280,6 @@ struct NotePage: View {
         let subtitle = sub.isEmpty ? url.deletingLastPathComponent().lastPathComponent : sub
         HStack(spacing: 12) {
             VStack(spacing: 0) {
-                TabBar().padding(.horizontal, 14).padding(.top, 10)
                 noteToolbar
                 Card {
                     if editing {
