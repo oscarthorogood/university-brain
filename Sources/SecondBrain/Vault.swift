@@ -113,7 +113,7 @@ enum Vault {
 
     /// Called for every note on every load, so the formatters are made once. A configured DateFormatter is safe to read from any thread;
     /// these are never changed after they are made.
-    nonisolated(unsafe) private static let dateFormatters: [DateFormatter] = ["yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd"].map { format in
+    private static let dateFormatters: [DateFormatter] = ["yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd"].map { format in
         let f = DateFormatter(); f.locale = Locale(identifier: "en_GB_POSIX"); f.dateFormat = format; return f
     }
     static func parseDate(_ s: String?) -> Date? {

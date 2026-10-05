@@ -13,10 +13,19 @@ struct NoteMenu: View {
         Divider()
         Menu("Status") { ForEach(TaskState.allCases, id: \.self) { s in Button { store.set(note, s) } label: { Label(s.label, systemImage: note.state == s ? "checkmark" : s.icon) } } }
         Menu("Ask an Agent") {
-            ForEach([Agent.manager] + (note.course.map { c in Agent.courseRoles.filter { $0.id == c } } ?? []) + Agent.roles) { r in
-                Button(r.id == Agent.manager.id ? "Manager (picks for me)" : r.name) { store.page = .agent(r.id); store.ask(r.id, "Tell me what matters in “\(note.display)” (\(note.id.lastPathComponent)) and what I should do next.") }
+            ForEach(askable) { r in
+                Button(r.id == Agent.manager.id ? "Manager (picks for me)" : r.name) { ask(r) }
             }
         }
+    }
+    /// The Manager, this note's course agent, then the helpers. (Built as one long expression inside the ForEach, it timed out the type checker.)
+    private var askable: [Agent.Role] {
+        let course: [Agent.Role] = Agent.courseRoles.filter { $0.id == note.course }
+        return [Agent.manager] + course + Agent.roles
+    }
+    private func ask(_ r: Agent.Role) {
+        store.page = .agent(r.id)
+        store.ask(r.id, "Tell me what matters in “\(note.display)” (\(note.id.lastPathComponent)) and what I should do next.")
     }
 }
 

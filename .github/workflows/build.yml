@@ -1,0 +1,20 @@
+# Compiles the app on every pull request, so a change that doesn't build is caught before it is merged (and released).
+name: Build
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-26   # the app needs the macOS 26 SDK (Xcode 26, Swift 6.2)
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: xcodebuild -version && swift --version
+      - name: Build
+        run: swift build -c release

@@ -1,12 +1,21 @@
-# Builds the app, packs a DMG and publishes it as a GitHub Release. Two ways to start it:
-#   - push a tag like v1.2.0, or
-#   - Actions → Release → Run workflow, with a version like 1.2.0 (the tag is created on the commit it runs on).
+# Builds the app, packs a DMG and publishes it as a GitHub Release. Three ways to start it:
+#   - merge into main: the patch number goes up by one (v1.0.3 → v1.0.4). Only changes to the app itself count
+#     (Sources, Package.swift, Icon, bundle.sh, make-dmg.sh), so a README edit doesn't make a release;
+#   - Actions → Release → Run workflow, with a version like 1.2.0 (for a minor or major bump);
+#   - push a tag like v1.2.0.
 # The app's updater reads the latest release, so publishing is all an update needs.
 name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    tags: ["v*"]   # paths below don't apply to tag pushes
+    paths:
+      - "Sources/**"
+      - "Package.swift"
+      - "Icon/**"
+      - "bundle.sh"
+      - "make-dmg.sh"
   workflow_dispatch:
     inputs:
       version:
@@ -16,31 +25,53 @@ on:
 permissions:
   contents: write   # to create the tag and the release
 
+concurrency:
+  group: release    # two merges close together release one after the other, so they can't both take the same number
+  cancel-in-progress: false
+
 jobs:
   dmg:
     runs-on: macos-26   # the app needs the macOS 26 SDK (Xcode 26, Swift 6.2)
-    env:
-      # passed through env, not pasted into the scripts, so the typed version can't run as shell code
-      TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
     steps:
-      - name: Check the version
-        run: |
-          echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || { echo "Version must look like 1.2.0 (got $TAG)"; exit 1; }
-
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # bundle.sh counts commits for the build number
+          fetch-depth: 0   # all tags (for the next number) and commits (bundle.sh counts them for the build number)
+
+      - name: Work out the version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}   # through env, not pasted into the script, so typed text can't run as shell code
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            TAG="v$INPUT_VERSION"
+          elif [ "$GITHUB_REF_TYPE" = tag ]; then
+            TAG="$GITHUB_REF_NAME"
+          else
+            # a merge into main: skip a commit that already has a release, else bump the patch of the newest one
+            if git tag --points-at HEAD | grep -q '^v'; then echo "This commit is already released."; echo "SKIP=1" >> "$GITHUB_ENV"; exit 0; fi
+            LAST=$(git tag -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+            if [ -z "$LAST" ]; then TAG=v1.0.0; else
+              V=${LAST#v}; MAJOR=${V%%.*}; REST=${V#*.}; MINOR=${REST%%.*}; PATCH=${REST#*.}
+              TAG="v$MAJOR.$MINOR.$((PATCH + 1))"
+            fi
+          fi
+          echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || { echo "Version must look like 1.2.0 (got $TAG)"; exit 1; }
+          echo "Releasing $TAG"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
 
       - name: Toolchain
+        if: env.SKIP != '1'
         run: xcodebuild -version && swift --version
 
       - name: Build the app
+        if: env.SKIP != '1'
         run: VERSION="${TAG#v}" ./bundle.sh
 
       - name: Make the disk image
+        if: env.SKIP != '1'
         run: ./make-dmg.sh
 
       - name: Publish the release
+        if: env.SKIP != '1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
