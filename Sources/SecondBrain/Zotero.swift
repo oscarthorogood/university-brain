@@ -100,6 +100,11 @@ enum Zotero {
     }
 
     // MARK: Web API
+    /// One element of a listing that may fail to decode on its own (an odd field in a single item) without taking the other 99 with it.
+    struct Lossy<T: Decodable>: Decodable {
+        let value: T?
+        init(from decoder: Decoder) throws { value = try? T(from: decoder) }
+    }
     struct Failure: LocalizedError {
         let code: Int, message: String
         var errorDescription: String? {
@@ -146,8 +151,8 @@ enum Zotero {
                                             headers: start == 0 ? since.map { ["If-Modified-Since-Version": "\($0)"] } ?? [:] : [:])
                 if r.statusCode == 304 { return nil }
                 if start == 0 { version = Int(r.value(forHTTPHeaderField: "Last-Modified-Version") ?? "") ?? 0 }
-                let page = try JSONDecoder().decode([T].self, from: d)
-                out += page; start += page.count
+                let page = try JSONDecoder().decode([Lossy<T>].self, from: d)   // an item that doesn't decode is skipped, not fatal to the whole sync
+                out += page.compactMap(\.value); start += page.count
                 if page.isEmpty || start >= (Int(r.value(forHTTPHeaderField: "Total-Results") ?? "") ?? 0) { return (out, version) }
             }
         }
@@ -243,7 +248,8 @@ enum Zotero {
             texts[n] = t; keyOf[n] = Vault.frontmatter(t)["zotero"]
         }
         for name in texts.keys.sorted() {
-            let text = texts[name]!, url = dir.appending(path: name)
+            guard let text = texts[name] else { continue }
+            let url = dir.appending(path: name)
             do {
                 if let key = keyOf[name] {
                     guard var e = st.items[key] else { continue }
@@ -329,7 +335,7 @@ enum Zotero {
             taken.insert(n)
             if n.hasSuffix(".md"), let t = try? String(contentsOf: dir.appending(path: n), encoding: .utf8), let k = Vault.frontmatter(t)["zotero"] { fileOf[k] = n }
         }
-        let kids = Dictionary(grouping: all.filter { $0.data.parentItem != nil }, by: { $0.data.parentItem! })
+        let kids = Dictionary(grouping: all.compactMap { it in it.data.parentItem.map { (parent: $0, item: it) } }, by: \.parent).mapValues { $0.map(\.item) }
         for it in all where it.data.parentItem == nil && !["attachment", "note", "annotation"].contains(it.data.itemType) {
             let name = fileOf[it.key] ?? fileName(it, taken: taken)
             taken.insert(name)
@@ -418,7 +424,7 @@ enum Zotero {
 
     /// Zotero notes are HTML. Paragraphs, lists, headings, bold and italic survive the trip; the rest is plain text.
     static func md(_ html: String) -> String {
-        var s = html.replacing(/<h([1-6])[^>]*>/) { String(repeating: "#", count: Int($0.1)!) + " " }
+        var s = html.replacing(/<h([1-6])[^>]*>/) { String(repeating: "#", count: Int($0.1) ?? 1) + " " }
         for (pattern, rep) in [("</(p|div|ul|ol|h[1-6]|blockquote)>", "\n\n"), ("</li>", "\n"), ("<br\\s*/?>", "\n"), ("<li[^>]*>", "- "),
                                ("</?(strong|b)>", "**"), ("</?(em|i)>", "*"), ("<[^>]+>", "")] {
             s = s.replacingOccurrences(of: pattern, with: rep, options: [.regularExpression, .caseInsensitive])

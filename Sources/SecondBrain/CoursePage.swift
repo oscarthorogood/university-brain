@@ -84,10 +84,10 @@ extension Store {
     /// Semester week (Week 1 starts 21 Sep) for a date, or 0 when it has none.
     func week(of d: Date?) -> Int {
         guard let d else { return 0 }
-        let days = Calendar.current.dateComponents([.day], from: Vault.parseDate("2026-09-21")!, to: d).day ?? 0
+        let days = Calendar.current.dateComponents([.day], from: Vault.semesterOneStart, to: d).day ?? 0
         return Int((Double(days) / 7).rounded(.down)) + 1
     }
-    func weekStart(_ w: Int) -> Date { Calendar.current.date(byAdding: .day, value: (w - 1) * 7, to: Vault.parseDate("2026-09-21")!)! }
+    func weekStart(_ w: Int) -> Date { Calendar.current.date(byAdding: .day, value: (w - 1) * 7, to: Vault.semesterOneStart) ?? Vault.semesterOneStart }
 }
 
 // MARK: Outline
@@ -123,13 +123,13 @@ struct CourseOutline: View {
                                             if now { Text("now").font(.system(size: 9, weight: .bold)).padding(.horizontal, 6).padding(.vertical, 1).background(Color.course(code).opacity(0.25), in: .capsule) }
                                             if let r = readsIn(reads, w) { Text("· \(r) reading\(r == 1 ? "" : "s")").font(.system(size: 10)).foregroundStyle(Color.ink2) }
                                         }
-                                        ForEach(notes.sorted { $0.when! < $1.when! }) { n in
+                                        ForEach(notes.sorted { $0.whenOrFar < $1.whenOrFar }) { n in
                                             Button { store.page = .note(n.id) } label: {
                                                 HStack(spacing: 8) {
                                                     Image(systemName: n.state == .notStarted ? icon(n) : n.state.icon).font(.system(size: 11)).foregroundStyle(n.state == .notStarted ? Color.course(code) : n.state.color).frame(width: 16)
                                                     Text(n.display).font(.system(size: 12)).foregroundStyle(n.done ? Color.ink2 : Color.ink).lineLimit(1)
                                                     Spacer(minLength: 0)
-                                                    Text(n.when!.formatted(.dateTime.weekday(.abbreviated).day())).font(.system(size: 10)).foregroundStyle(Color.ink2)
+                                                    Text(n.whenOrFar.formatted(.dateTime.weekday(.abbreviated).day())).font(.system(size: 10)).foregroundStyle(Color.ink2)
                                                 }.padding(.horizontal, 8).padding(.vertical, 4).contentShape(.rect)
                                             }.buttonStyle(.glassRow)
                                         }
@@ -319,7 +319,7 @@ struct CourseTimeline: View {
     struct Track: View {
         let work: [Note]; let code: String; let today: Date
         var body: some View {
-            let start = Vault.parseDate("2026-09-21")!
+            let start = Vault.semesterOneStart
             let last = work.compactMap(\.when).max() ?? start
             let end = max(last, Calendar.current.date(byAdding: .day, value: 84, to: start)!).addingTimeInterval(7 * 86400)
             let tint = Color.course(code)

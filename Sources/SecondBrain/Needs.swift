@@ -49,22 +49,22 @@ extension Store {
                                      : Need(title: Vault.label(u), sub: "Waiting in Unsorted", open: .unsorted(u))
         }
         n["scribe"] = current.filter { ["Lectures", "Tutorials"].contains($0.folder) && $0.unfilled && ($0.when ?? .distantFuture) < .now }
-            .sorted { $0.when! > $1.when! }
-            .map { Need(title: $0.display, sub: "Not written up · " + $0.when!.formatted(short), open: .note($0.id)) }
+            .sorted { $0.whenOrFar > $1.whenOrFar }
+            .map { Need(title: $0.display, sub: "Not written up · " + $0.whenOrFar.formatted(short), open: .note($0.id)) }
         n["librarian"] = current.filter { $0.folder == "Readings" && !$0.done && ($0.status == "To Find" || $0.title.contains("Title To Confirm")) }
             .sorted { ($0.when ?? .distantFuture) < ($1.when ?? .distantFuture) }
             .map { Need(title: $0.title, sub: $0.status == "To Find" ? "Source still to find" : "Citation to confirm", open: .note($0.id)) }
         let soon = current.filter { ["Essays", "Projects"].contains($0.folder) } + notes.filter { $0.folder == "TaskNotes/Tasks" }
         n["planner"] = notes.filter { $0.folder == "Courses" && Vault.courses[$0.title] != nil && $0.unfilled }
             .map { Need(title: "\($0.title): no key dates", sub: "Add exam and deadline dates", open: .note($0.id)) }
-            + soon.filter { !$0.done && $0.when != nil && (0...7).contains(days($0.when!)) }.sorted { $0.when! < $1.when! }
-            .map { Need(title: $0.title, sub: days($0.when!) == 0 ? "Due today" : "Due in \(days($0.when!))d · \($0.status)", open: .note($0.id)) }
-        n["writer"] = current.filter { ["Essays", "Projects"].contains($0.folder) && !$0.done && $0.when != nil && (0...28).contains(days($0.when!)) }
-            .sorted { $0.when! < $1.when! }
-            .map { Need(title: $0.display, sub: "Due in \(days($0.when!))d · \($0.status)", open: .note($0.id)) }
+            + soon.filter { !$0.done && $0.when != nil && (0...7).contains(days($0.whenOrFar)) }.sorted { $0.whenOrFar < $1.whenOrFar }
+            .map { Need(title: $0.title, sub: days($0.whenOrFar) == 0 ? "Due today" : "Due in \(days($0.whenOrFar))d · \($0.status)", open: .note($0.id)) }
+        n["writer"] = current.filter { ["Essays", "Projects"].contains($0.folder) && !$0.done && $0.when != nil && (0...28).contains(days($0.whenOrFar)) }
+            .sorted { $0.whenOrFar < $1.whenOrFar }
+            .map { Need(title: $0.display, sub: "Due in \(days($0.whenOrFar))d · \($0.status)", open: .note($0.id)) }
         n["tutor"] = current.filter { $0.folder == "Lectures" && $0.done && ($0.when.map { days($0) >= -7 && $0 < .now } ?? false) }
-            .sorted { $0.when! > $1.when! }
-            .map { Need(title: "Quiz yourself on \($0.display)", sub: "Lecture " + $0.when!.formatted(short), prompt: "Make 5 MCQs with answers from \($0.title), quoting the slides.") }
+            .sorted { $0.whenOrFar > $1.whenOrFar }
+            .map { Need(title: "Quiz yourself on \($0.display)", sub: "Lecture " + $0.whenOrFar.formatted(short), prompt: "Make 5 MCQs with answers from \($0.title), quoting the slides.") }
         needs = n
     }
 }
@@ -155,14 +155,14 @@ extension Store {
             (Calendar.current.isDateInToday(d) ? "today" : d.formatted(.dateTime.weekday(.wide))) + " at " + d.formatted(.dateTime.hour().minute())
         }
         let current = notes.filter { $0.course != nil }
-        for n in current.filter({ ["Lectures", "Tutorials"].contains($0.folder) && !$0.done && ($0.when ?? .distantPast) > .now }).sorted(by: { $0.when! < $1.when! }).prefix(2) {
-            out.append(Say(text: "\(n.display) is \(when(n.when!)).", go: .note(n.id)))
+        for n in current.filter({ ["Lectures", "Tutorials"].contains($0.folder) && !$0.done && ($0.when ?? .distantPast) > .now }).sorted(by: { $0.whenOrFar < $1.whenOrFar }).prefix(2) {
+            out.append(Say(text: "\(n.display) is \(when(n.whenOrFar)).", go: .note(n.id)))
         }
         for c in Vault.courses.values.sorted() {
             if let d = nextDeliverable(c), let w = d.when, days(w) <= 45 { out.append(Say(text: "\(c == "SM" ? "Strategy" : c): \(d.display) is due in \(days(w)) days.", go: .note(d.id))) }
         }
         let stubs = current.filter { ["Lectures", "Tutorials"].contains($0.folder) && $0.unfilled && ($0.when ?? .distantFuture) < .now }
-        if let last = stubs.max(by: { $0.when! < $1.when! }) { out.append(Say(text: "\(stubs.count) class\(stubs.count == 1 ? "" : "es") still need writing up.", go: .note(last.id))) }
+        if let last = stubs.max(by: { $0.whenOrFar < $1.whenOrFar }) { out.append(Say(text: "\(stubs.count) class\(stubs.count == 1 ? "" : "es") still need writing up.", go: .note(last.id))) }
         let due = current.filter { $0.folder == "Readings" && !$0.done && ($0.when.map { (0...7).contains(days($0)) } ?? false) }.count
         if due > 0 { out.append(Say(text: "\(due) reading\(due == 1 ? "" : "s") due this week.", go: .folder("Readings"))) }
         let find = current.filter { $0.folder == "Readings" && $0.status == "To Find" }.count
@@ -193,10 +193,10 @@ extension Store {
             (Calendar.current.isDateInToday(d) ? "today" : d.formatted(.dateTime.weekday(.wide))) + " at " + d.formatted(.dateTime.hour().minute())
         }
         let classes = mine.filter { ["Lectures", "Tutorials"].contains($0.folder) }
-        for next in classes.filter({ !$0.done && ($0.when ?? .distantPast) > .now }).sorted(by: { $0.when! < $1.when! }).prefix(2) {
-            out.append(Say(text: "\(next.display.replacingOccurrences(of: c + " ", with: "")) is \(when(next.when!)).", go: .note(next.id)))
+        for next in classes.filter({ !$0.done && ($0.when ?? .distantPast) > .now }).sorted(by: { $0.whenOrFar < $1.whenOrFar }).prefix(2) {
+            out.append(Say(text: "\(next.display.replacingOccurrences(of: c + " ", with: "")) is \(when(next.whenOrFar)).", go: .note(next.id)))
         }
-        if let stub = classes.filter({ $0.unfilled && ($0.when ?? .distantFuture) < .now }).max(by: { $0.when! < $1.when! }) {
+        if let stub = classes.filter({ $0.unfilled && ($0.when ?? .distantFuture) < .now }).max(by: { $0.whenOrFar < $1.whenOrFar }) {
             out.append(Say(text: "I haven’t written up \(stub.display.replacingOccurrences(of: c + " ", with: "")) yet.", go: .note(stub.id)))
         }
         if let d = nextDeliverable(c), let w = d.when { out.append(Say(text: "\(d.display) is due in \(days(w)) days.", go: .note(d.id))) }

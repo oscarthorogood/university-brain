@@ -48,6 +48,8 @@ extension Page {
 struct Message: Identifiable, Codable { var id = UUID(); let fromAgent: Bool; let text: String; var time = Date.now }
 
 extension Note {
+    /// `when` for code that has already filtered to dated notes: a note with no date sorts last, where `when!` would have crashed.
+    var whenOrFar: Date { when ?? .distantFuture }
     /// Short, readable name: drops the course prefix the vault's naming convention adds.
     var display: String {
         var t = title
@@ -356,7 +358,7 @@ struct SecondBrainApp: App {
         rewatch(); computeNeeds(); scheduleAutopilot(after: 8)
     }
     func rewatch() {
-        watcher = VaultWatcher(path: Vault.root.path) { [weak self] in MainActor.assumeIsolated { self?.reload() } }
+        watcher = VaultWatcher(path: Vault.root.path) { [weak self] in MainActor.assumeIsolated { self?.reloadInBackground() } }
     }
     func addLink() {
         let alert = NSAlert()
@@ -376,11 +378,22 @@ struct SecondBrainApp: App {
         reload()
     }
     var revision = 0
+    @ObservationIgnored private var reloadTask: Task<Void, Never>?
+    /// What the file watcher calls. Reading every note used to happen on the main thread, so each autosave (or Obsidian touching a file) stalled typing;
+    /// now the vault is read in the background and applied here, and a newer change cancels an older read that hasn't been applied yet.
+    func reloadInBackground() {
+        reloadTask?.cancel()
+        reloadTask = Task { [weak self] in
+            let loaded = await Task.detached(priority: .utility) { (notes: Vault.load(), unsorted: Vault.unsorted()) }.value
+            guard !Task.isCancelled, let self else { return }
+            releaseStaleClaims(); notes = loaded.notes; unsorted = loaded.unsorted; computeNeeds(); revision += 1; scheduleAutopilot()
+        }
+    }
     func reload() { releaseStaleClaims(); notes = Vault.load(); unsorted = Vault.unsorted(); computeNeeds(); revision += 1; scheduleAutopilot() }
-    var semesterStart: Date { Vault.parseDate("2026-09-21")! }   // Semester 1, which the week numbers count from
+    var semesterStart: Date { Vault.parseDate("2026-09-21") ?? today }   // Semester 1, which the week numbers count from
     /// The semesters the Semester page can switch between. ponytail: Semester 2's start is a guess (mid-January); correct it here.
     static let semesters = [(name: "Semester 1", start: "2026-09-21"), (name: "Semester 2", start: "2027-01-18")]
-    var currentSemester: Int { Self.semesters.lastIndex { Vault.parseDate($0.start)! <= today } ?? 0 }
+    var currentSemester: Int { Self.semesters.lastIndex { (Vault.parseDate($0.start) ?? .distantFuture) <= today } ?? 0 }
     var semesterWeek: Int { (Calendar.current.dateComponents([.day], from: semesterStart, to: today).day ?? 0) / 7 + 1 }
     /// The next things on: classes still to come and open deadlines, soonest first.
     func upcoming(_ n: Int) -> [Note] {
@@ -388,10 +401,10 @@ struct SecondBrainApp: App {
             guard !x.done, let w = x.when else { return false }
             if ["Lectures", "Tutorials"].contains(x.folder) { return w > .now }
             return ["Essays", "Projects", "TaskNotes/Tasks"].contains(x.folder) && w >= today
-        }.sorted { $0.when! < $1.when! }.prefix(n).map { $0 }
+        }.sorted { $0.whenOrFar < $1.whenOrFar }.prefix(n).map { $0 }
     }
     func nextDeliverable(_ c: String) -> Note? {
-        notes.filter { $0.course == c && ["Essays", "Projects"].contains($0.folder) && !$0.done && ($0.when ?? .distantPast) >= today }.min { $0.when! < $1.when! }
+        notes.filter { $0.course == c && ["Essays", "Projects"].contains($0.folder) && !$0.done && ($0.when ?? .distantPast) >= today }.min { $0.whenOrFar < $1.whenOrFar }
     }
     func newNote() {
         let dir = Vault.root.appending(path: "Unsorted")
@@ -420,7 +433,7 @@ struct SecondBrainApp: App {
         notes.filter { n in
             guard let w = n.when, ["Lectures", "Tutorials", "Essays", "Projects", "TaskNotes/Tasks"].contains(n.folder) else { return false }
             return Calendar.current.isDate(w, inSameDayAs: .now) && matches(n)
-        }.sorted { $0.when! < $1.when! }
+        }.sorted { $0.whenOrFar < $1.whenOrFar }
     }
     func list(_ tab: Tab) -> [Note] {
         let folders: Set<String> = switch tab {
@@ -431,7 +444,7 @@ struct SecondBrainApp: App {
         return notes.filter { n in
             guard folders.contains(n.folder), !n.done, matches(n), let w = n.when else { return false }
             return tab == .readings ? isCurrentSemester(n) : w >= today
-        }.sorted { $0.when! < $1.when! }
+        }.sorted { $0.whenOrFar < $1.whenOrFar }
     }
     func course(_ c: String, _ folders: Set<String>) -> [Note] {
         notes.filter { $0.course == c && folders.contains($0.folder) && isCurrentSemester($0) }.sorted { ($0.when ?? .distantFuture) < ($1.when ?? .distantFuture) }
@@ -1168,7 +1181,7 @@ enum Check {
         Vault.checkEditing()
         Manager.check()
         let tags = TagsPage.build(notes); precondition(!tags.isEmpty, "tags are indexed from frontmatter")
-        let week: (Date?) -> Int = { d in d.map { Int((Double(Calendar.current.dateComponents([.day], from: Vault.parseDate("2026-09-21")!, to: $0).day ?? 0) / 7).rounded(.down)) + 1 } ?? 0 }
+        let week: (Date?) -> Int = { d in d.map { Int((Double(Calendar.current.dateComponents([.day], from: Vault.semesterOneStart, to: $0).day ?? 0) / 7).rounded(.down)) + 1 } ?? 0 }
         let mapped = CourseGraph.build(notes.filter { $0.course == "SM" && CourseGraph.row($0) != nil }, week: week)
         precondition(mapped.nodes.count > 5 && mapped.edges.contains(where: \.explicit), "the course map finds notes and the links written between them")
         let essay = notes.first { $0.folder == "Essays" && $0.course == "SM" }

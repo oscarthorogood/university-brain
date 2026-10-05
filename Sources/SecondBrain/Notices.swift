@@ -32,7 +32,7 @@ extension Store {
             out.append(AppNotice(id: "heads-\(h.gotIt ?? h.text)", source: "Manager", icon: "bell.fill", tint: Color(light: 0xC77A00, dark: 0xF0B366), title: h.text, go: h.go))
         }
         for n in upcoming(3) {
-            let w = n.when!, isClass = ["Lectures", "Tutorials"].contains(n.folder)
+            let w = n.whenOrFar, isClass = ["Lectures", "Tutorials"].contains(n.folder)
             out.append(AppNotice(id: "up-\(n.id.path)", source: isClass ? "Classes" : "Deadlines", icon: isClass ? "play.rectangle.fill" : "flag.fill", tint: Color.course(n.course), title: n.display,
                                  body: isClass ? w.formatted(.dateTime.weekday(.abbreviated).hour().minute()) : "Due " + w.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)),
                                  time: isClass || days(w) == 0 ? Self.until(w) : "\(days(w))d", go: .note(n.id)))

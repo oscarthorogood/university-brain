@@ -30,10 +30,12 @@ struct AgentChatCard: View {
                                 }
                             }
                         }
+                        // found once for the whole list; checking the messages after each one made every redraw quadratic in the length of the chat
+                        let lastMineAt = messages.lastIndex { !$0.fromAgent }, lastAnswerAt = messages.lastIndex { $0.fromAgent && !$0.text.hasPrefix("→") }   // a routing note isn't an answer
                         ForEach(Array(messages.enumerated()), id: \.element.id) { i, m in
                             let prev = i > 0 ? messages[i - 1] : nil, next = i + 1 < messages.count ? messages[i + 1] : nil
-                            let lastMine = !m.fromAgent && !messages[(i + 1)...].contains { !$0.fromAgent }
-                            let replied = messages[(i + 1)...].contains { $0.fromAgent && !$0.text.hasPrefix("→") }   // a routing note isn't an answer
+                            let lastMine = i == lastMineAt
+                            let replied = (lastAnswerAt ?? -1) > i
                             if prev == nil || m.time.timeIntervalSince(prev!.time) > 600 { IMStamp(date: m.time).padding(.top, i == 0 ? 0 : 8) }
                             MessageRow(message: m, firstInRun: prev?.fromAgent != m.fromAgent, lastInRun: next?.fromAgent != m.fromAgent || next?.text.hasPrefix("→") == true,
                                        receipt: lastMine ? (replied ? "Read" : (busy ? "Delivered" : nil)) : nil)

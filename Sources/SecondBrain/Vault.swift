@@ -116,6 +116,8 @@ enum Vault {
     private static let dateFormatters: [DateFormatter] = ["yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd"].map { format in
         let f = DateFormatter(); f.locale = Locale(identifier: "en_GB_POSIX"); f.dateFormat = format; return f
     }
+    /// Week 1 of Semester 1, which the week numbers count from (the app's one hard-coded term date; see PLAN.md).
+    static var semesterOneStart: Date { parseDate("2026-09-21") ?? .now }
     static func parseDate(_ s: String?) -> Date? {
         guard let s else { return nil }
         for f in dateFormatters { if let d = f.date(from: s) { return d } }
@@ -176,10 +178,21 @@ extension Vault {
         }
     }
 
+    /// SHA-256 of a file, read in 1 MB pieces so a large PDF or recording is never held in memory whole (and never twice). Nil when it can't be read.
+    static func digest(_ url: URL) -> String? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        var sha = SHA256()
+        do {
+            while let piece = try handle.read(upToCount: 1 << 20), !piece.isEmpty { sha.update(data: piece) }
+        } catch { return nil }
+        return sha.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
     /// Files that are byte-for-byte copies of something already under Resources/ (size first, then SHA-256): [vault path: the Resources path it matches].
     static func duplicates(of files: [URL], in root: URL = Vault.root) -> [String: String] {
         let size = { (u: URL) in (try? u.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? -1 }
-        let sha = { (u: URL) in (try? Data(contentsOf: u)).map { SHA256.hash(data: $0).description } }
+        let sha = { (u: URL) in Vault.digest(u) }
         let wanted = Dictionary(grouping: files, by: size)
         var out: [String: String] = [:], cache: [URL: String] = [:]
         let base = root.appending(path: dir("Resources", root: root))
@@ -225,7 +238,6 @@ extension Vault {
         guard !fm.fileExists(atPath: dst.path) else { throw MoveError.exists(m.to) }
         try fm.createDirectory(at: dst.deletingLastPathComponent(), withIntermediateDirectories: true)
         try fm.copyItem(at: src, to: dst)
-        let digest = { (u: URL) in (try? Data(contentsOf: u)).map { SHA256.hash(data: $0).description } }
         guard let a = digest(src), a == digest(dst) else { try? fm.removeItem(at: dst); throw MoveError.mismatch(m.from) }
         let trash = root.appending(path: ".trash/Unsorted-filed-" + Date.now.formatted(.iso8601.year().month().day()))
         try fm.createDirectory(at: trash, withIntermediateDirectories: true)

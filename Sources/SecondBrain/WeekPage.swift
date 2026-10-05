@@ -9,7 +9,7 @@ extension Store {
         return notes.filter { n in
             guard folders.contains(n.folder), let w = n.when, matches(n) else { return false }
             return w >= start && w < end
-        }.sorted { $0.when! < $1.when! }
+        }.sorted { $0.whenOrFar < $1.whenOrFar }
     }
     /// Everything a week block shows.
     func weekNotes(_ monday: Date) -> [Note] { WeekBlock.rows.flatMap { r in WeekBlock.days(monday).flatMap { weekItems(r.1, on: $0) } } }
@@ -136,7 +136,7 @@ struct WeekRow: View {
     let note: Note; let day: Date
     var body: some View {
         let cal = Calendar.current
-        let w = note.when!
+        let w = note.whenOrFar
         let off = !cal.isDate(w, inSameDayAs: day)       // a weekend item shown on Friday
         let time = cal.component(.hour, from: w) == 0 ? "" : w.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
         HStack(alignment: .top, spacing: 6) {

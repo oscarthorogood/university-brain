@@ -221,7 +221,7 @@ extension Store {
         var researchText: String?, revisionText: String?   // read once, only if needed
         // a revision set is only made for the newest written-up lecture of each course, so a batch of lectures doesn't become a batch of jobs
         let newestLecture = Dictionary(grouping: notes.filter { $0.folder == "Lectures" && !$0.unfilled && $0.course != nil && ($0.when.map { (-5...0).contains(days($0)) } ?? false) }, by: \.course)
-            .compactMapValues { $0.max { $0.when! < $1.when! }?.id }
+            .compactMapValues { $0.max { $0.whenOrFar < $1.whenOrFar }?.id }
         for n in notes where n.course != nil {
             guard !inUse(n.id) else { continue }
             let text = (try? String(contentsOf: n.id, encoding: .utf8)) ?? ""

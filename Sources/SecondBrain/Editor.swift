@@ -258,9 +258,17 @@ struct MarkdownEditor: NSViewRepresentable {
         var parent: MarkdownEditor
         init(_ parent: MarkdownEditor) { self.parent = parent }
 
+        /// Styling walks the whole text, so past this size it waits for a pause in typing instead of running on every keystroke.
+        private static let instantStyleLimit = 20_000
+        private var restyleTask: Task<Void, Never>?
+
         func textDidChange(_ n: Notification) {
             guard let tv = n.object as? MDTextView else { return }
-            if !tv.hasMarkedText() { tv.restyle() }
+            restyleTask?.cancel()
+            if !tv.hasMarkedText() {
+                if (tv.textStorage?.length ?? 0) <= Self.instantStyleLimit { tv.restyle() }
+                else { restyleTask = Task { [weak tv] in try? await Task.sleep(for: .milliseconds(150)); if !Task.isCancelled { tv?.restyle() } } }
+            }
             parent.text = tv.string
         }
 

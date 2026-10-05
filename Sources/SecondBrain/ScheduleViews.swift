@@ -4,7 +4,7 @@ import SwiftUI
 enum ScheduleView: String, CaseIterable, Identifiable {
     case calendar = "Calendar", list = "List", board = "Board", timeline = "Timeline", tree = "Tree"
     var id: Self { self }
-    var icon: String { ["Calendar": "calendar", "List": "list.bullet", "Board": "rectangle.split.3x1", "Timeline": "chart.bar.xaxis", "Tree": "list.bullet.indent"][rawValue]! }
+    var icon: String { ["Calendar": "calendar", "List": "list.bullet", "Board": "rectangle.split.3x1", "Timeline": "chart.bar.xaxis", "Tree": "list.bullet.indent"][rawValue] ?? "calendar" }
 }
 
 /// The view dropdown in a page header.
@@ -48,7 +48,7 @@ struct ScheduleTable: View {
     }
     let notes: [Note]
     var body: some View {
-        let rows = notes.sorted { up ? value($0) < value($1) : value($0) > value($1) }
+        let rows = notes.map { (note: $0, key: value($0)) }.sorted { up ? $0.key < $1.key : $0.key > $1.key }.map(\.note)
         Card(title: "\(rows.count) items") {
             if rows.isEmpty { Text("Nothing in this range").font(.system(size: 13)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity, maxHeight: .infinity) }
             else {
@@ -68,7 +68,7 @@ struct ScheduleTable: View {
             }
         }
     }
-    static func width(_ c: String) -> CGFloat { ["Title": .infinity, "Course": 70, "Type": 80, "Date": 110, "Status": 90][c]! }
+    static func width(_ c: String) -> CGFloat { ["Title": .infinity, "Course": 70, "Type": 80, "Date": 110, "Status": 90][c] ?? 90 }
 }
 
 private struct TableRow: View {
@@ -119,7 +119,7 @@ struct ScheduleTimeline: View {
                                 HStack(spacing: 4) { Circle().fill(Color.course(code)).frame(width: 7, height: 7); Text(label).font(.system(size: 11, weight: .semibold)) }.frame(width: 56, alignment: .leading).padding(.top, 8)
                                 ForEach(days, id: \.self) { d in
                                     VStack(alignment: .leading, spacing: 3) {
-                                        ForEach(mine.filter { $0.when.map { cal.isDate($0, inSameDayAs: d) } == true }.sorted { $0.when! < $1.when! }) { n in
+                                        ForEach(mine.filter { $0.when.map { cal.isDate($0, inSameDayAs: d) } == true }.sorted { $0.whenOrFar < $1.whenOrFar }) { n in
                                             Button { store.page = .note(n.id) } label: {
                                                 Text(colW > 60 ? n.display : String(n.kind.prefix(1))).font(.system(size: 10, weight: .medium)).lineLimit(1)
                                                     .padding(.horizontal, 5).padding(.vertical, 3).frame(maxWidth: .infinity, alignment: colW > 60 ? .leading : .center)

@@ -52,7 +52,7 @@ import Speech
         let req = SFSpeechURLRecognitionRequest(url: url)
         if rec.supportsOnDeviceRecognition { req.requiresOnDeviceRecognition = true }
         req.shouldReportPartialResults = false
-        return await withCheckedContinuation { c in
+        let text: String? = await withCheckedContinuation { c in
             var done = false
             _ = rec.recognitionTask(with: req) { result, error in
                 guard !done else { return }
@@ -60,6 +60,8 @@ import Speech
                 else if error != nil { done = true; c.resume(returning: nil) }
             }
         }
+        withExtendedLifetime(rec) {}   // the recogniser must outlive its task: released at its last use above, the task could stop and the memo would wait for ever
+        return text
     }
 }
 
