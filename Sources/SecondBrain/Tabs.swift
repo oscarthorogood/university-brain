@@ -69,9 +69,10 @@ struct WindowTabBar: View {
     @Environment(\.openSettings) private var openSettings
     @AppStorage("sidebarCollapsed") private var collapsed = false
     @State private var showNotices = false
+    @State private var showUpdates = false
 
     var body: some View {
-        let count = store.notices().count
+        let count = store.notices().count, update = Updater.shared.available
         HStack(spacing: 0) {
             // One glass pill the width of the sidebar pane below it: the window buttons, then the icons.
             HStack(spacing: 0) {
@@ -80,6 +81,9 @@ struct WindowTabBar: View {
                 HStack(spacing: 2) {
                     ChromeButton(icon: "sidebar.left", help: collapsed ? "Show Sidebar" : "Hide Sidebar") { withAnimation(.spring(duration: 0.45, bounce: 0.15)) { collapsed.toggle() } }
                     ChromeButton(icon: "gearshape", help: "Settings (⌘,)") { openSettings() }
+                    ChromeButton(icon: update == nil ? "arrow.down.circle" : "arrow.down.circle.fill",
+                                 help: update.map { "Update available: version \($0.version)" } ?? "Check for updates", on: update != nil, tint: update == nil ? nil : IM.blue) { showUpdates.toggle() }
+                        .popover(isPresented: $showUpdates, arrowEdge: .bottom) { UpdatePanel() }
                     ChromeButton(icon: count > 0 ? "bell.badge" : "bell", help: count > 0 ? "Notifications, \(count)" : "Notifications") { showNotices.toggle() }
                         .popover(isPresented: $showNotices, arrowEdge: .bottom) { NoticeBox().padding(10).frame(width: 300, height: 380) }
                     ChromeButton(icon: "house", help: "Home", on: store.page == .overview) { store.openHome() }
@@ -95,21 +99,23 @@ struct WindowTabBar: View {
         }
         .frame(height: 36)
         .background(TrafficLights())
+        .task { Updater.shared.startChecking() }
         .padding(.top, 12)        // the same room above the pill as at its left edge
     }
 }
 
-/// One round icon inside a glass group in the top strip.
+/// One round icon inside a glass group in the top strip. 28pt wide, so five fit beside the window buttons in the 240pt pill.
 private struct ChromeButton: View {
     let icon: String
     let help: String
     var on = false
+    var tint: Color? = nil
     let action: () -> Void
     @State private var hover = false
     var body: some View {
         Button(action: action) {
-            Image(systemName: icon).font(.system(size: 13)).foregroundStyle(on ? Color.ink : Color.ink2)
-                .frame(width: 32, height: 30).contentShape(.capsule)
+            Image(systemName: icon).font(.system(size: 13)).foregroundStyle(tint ?? (on ? Color.ink : Color.ink2))
+                .frame(width: 28, height: 30).contentShape(.capsule)
                 .background(Capsule().fill(Color.ink.opacity(on ? 0.1 : hover ? 0.06 : 0)))
         }
         .buttonStyle(.plain).onHover { hover = $0 }
