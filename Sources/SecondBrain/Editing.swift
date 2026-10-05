@@ -61,7 +61,7 @@ extension Vault {
     }
 
     /// Snapshot file names; made once because a job snapshots every note. Never changed after it is made, so safe on any thread.
-    nonisolated(unsafe) private static let stampFormatter: DateFormatter = {
+    private static let stampFormatter: DateFormatter = {
         let f = DateFormatter(); f.locale = Locale(identifier: "en_GB_POSIX"); f.dateFormat = "yyyyMMdd-HHmmss-SSS"; return f
     }()
     /// Keeps the note's current text in `.history/` (unless it equals the newest snapshot), then prunes to the last 50.
