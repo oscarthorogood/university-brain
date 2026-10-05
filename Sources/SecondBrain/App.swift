@@ -32,7 +32,18 @@ extension Color {
     static func course(_ c: String?) -> Color { c.flatMap { courseColors[$0] } ?? .ink2.opacity(0.4) }
 }
 
-enum Page: Hashable { case messages, inbox, overview, week, month, semester, sortNow, course(String), folder(String), unsorted(URL), search, agent(String), note(URL), file(URL), tags }
+enum Page: Hashable { case newTab, messages, inbox, overview, week, month, semester, sortNow, course(String), folder(String), unsorted(URL), search, agent(String), note(URL), file(URL), tags }
+
+extension Page {
+    /// Pages that show a note (and so draw their own document pane and inspector pane).
+    var isNote: Bool {
+        switch self {
+        case .note: true
+        case .unsorted(let u): u.pathExtension == "md"
+        default: false
+        }
+    }
+}
 
 struct Message: Identifiable, Codable { var id = UUID(); let fromAgent: Bool; let text: String; var time = Date.now }
 
@@ -148,6 +159,7 @@ struct SecondBrainApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("New Note") { store.newNote() }.keyboardShortcut("n")
+                Button("New Tab") { store.newTab() }.keyboardShortcut("t")
                 Button("Add File…") { store.addFile() }.keyboardShortcut("o")
                 Button("New Note from Template…") { store.newStructured = true }.keyboardShortcut("n", modifiers: [.command, .shift])
                 Button("Open Quickly…") { store.quickOpen = true }.keyboardShortcut("p")
@@ -155,11 +167,15 @@ struct SecondBrainApp: App {
                 Button("New Voice Memo…") { store.voiceMemo = true }.keyboardShortcut("m", modifiers: [.command, .shift])
                 Button("Sync Calendar") { Task { store.log("planner", await store.syncCalendar()) } }
             }
+            CommandGroup(replacing: .saveItem) {
+                Button("Close Tab") { store.closeCurrentTab() }.keyboardShortcut("w")
+            }
             CommandGroup(before: .toolbar) {
                 Button(collapsed ? "Show Sidebar" : "Hide Sidebar") { withAnimation(.spring(duration: 0.45, bounce: 0.15)) { collapsed.toggle() } }
                     .keyboardShortcut("s", modifiers: [.control, .command])
             }
             CommandMenu("Go") {
+                Button("Back") { store.goBack() }.keyboardShortcut("[").disabled(!store.canGoBack)
                 Button("Home") { store.page = .overview }.keyboardShortcut("1")
                 Button("Week") { store.page = .week }.keyboardShortcut("2")
                 Button("Month") { store.page = .month }.keyboardShortcut("3")
@@ -189,9 +205,30 @@ struct SecondBrainApp: App {
 @MainActor @Observable final class Store {
     var notes = Vault.load()
     var unsorted = Vault.unsorted()
-    var page: Page = .overview {
-        didSet {
-            if case .agent(let id) = page { touchAgent(id) }
+    /// Every open tab and which one is showing. Pages are opened in the current tab (`page = …`), or in a new one with `newTab(_:)`.
+    var tabs: [PageTab] = [PageTab(page: .overview)]
+    var activeIndex = 0
+    /// The page the current tab shows. Moving to another page keeps the old one for Back.
+    var page: Page {
+        get { tabs.indices.contains(activeIndex) ? tabs[activeIndex].page : .overview }
+        set {
+            guard tabs.indices.contains(activeIndex), tabs[activeIndex].page != newValue else { return }
+            tabs[activeIndex].back = Array((tabs[activeIndex].back + [tabs[activeIndex].page]).suffix(50))
+            tabs[activeIndex].page = newValue
+            visited(newValue)
+        }
+    }
+    /// Notes opened lately, newest first (the New Tab page lists them).
+    /// Notes of an app (a quiz, a deck…) that are open as text for editing, rather than as the app's own page.
+    var editingApps: Set<URL> = []
+    var recentNotes: [URL] = (UserDefaults.standard.stringArray(forKey: "recentNotes") ?? []).map { URL(fileURLWithPath: $0) }
+    func visited(_ p: Page) {
+        switch p {
+        case .agent(let id): touchAgent(id)
+        case .note(let u), .unsorted(let u) where u.pathExtension == "md":
+            recentNotes = Array(([u] + recentNotes.filter { $0 != u }).prefix(10))
+            UserDefaults.standard.set(recentNotes.map(\.path), forKey: "recentNotes")
+        default: break
         }
     }
     /// Agents in the order they were last opened or asked, newest first (the dock shows the top three).
@@ -423,22 +460,27 @@ struct ContentView: View {
         .containerBackground(.ultraThinMaterial, for: .window)
     }
     var shell: some View {
-        HStack(spacing: 12) {
-            // One glass pane that resizes; the full sidebar and the icon rail cross-fade inside it.
-            ZStack(alignment: .topLeading) {
-                if collapsed { SidebarRail().frame(width: 80).transition(.opacity) }
-                else { Sidebar().frame(width: 240).transition(.opacity) }
-            }
-            .frame(width: collapsed ? 80 : 240, alignment: .leading)
-            .clipShape(.rect(cornerRadius: DS.Radius.pane))
-            .modifier(GlassPane())
-            .background(TrafficLights())
-            .padding(.top, 12).ignoresSafeArea(.container, edges: .top)
-            MainPanel().frame(maxWidth: .infinity, maxHeight: .infinity)
+        VStack(spacing: 12) {
+            WindowTabBar()
+            HStack(spacing: 12) {
+                // One glass pane that resizes; the full sidebar and the icon rail cross-fade inside it.
+                ZStack(alignment: .topLeading) {
+                    if collapsed { SidebarRail().frame(width: 80).transition(.opacity) }
+                    else { Sidebar().frame(width: 240).transition(.opacity) }
+                }
+                .frame(width: collapsed ? 80 : 240, alignment: .leading)
+                .clipShape(.rect(cornerRadius: DS.Radius.pane))
                 .modifier(GlassPane())
-                .padding(.top, 12).ignoresSafeArea(.container, edges: .top)
+                if store.page.isNote && store.appKind(for: store.page) == nil {
+                    // A note draws its own two panes: the document, and the inspector as a sidebar of its own.
+                    MainPanel().frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    MainPanel().frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .modifier(GlassPane())
+                }
+            }
+            .padding(.horizontal, 12).padding(.bottom, 12)
         }
-        .padding(12)
         .ignoresSafeArea(.container, edges: .top)
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { windowWidth = $0 }
         .containerBackground(for: .window) { WindowBackdrop() }
@@ -505,7 +547,9 @@ struct Sidebar: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 1) {
                     NavRow(icon: "house", title: "Home", page: .overview)
-                    NavRow(icon: "tray", title: "Unsorted", page: .inbox, meta: store.unsorted.count, on: { switch store.page { case .inbox, .unsorted, .sortNow: true; default: false } }())
+                    if !SideNav.isHidden(SideNav.pinned, hidden) {
+                        NavRow(icon: "tray", title: "Unsorted", page: .inbox, meta: store.unsorted.count, on: { switch store.page { case .inbox, .folder("Unsorted"), .unsorted, .sortNow: true; default: false } }())
+                    }
                     NavRow(icon: "message", title: "Messages", page: .messages, on: { switch store.page { case .messages, .agent: true; default: false } }())
                     NavRow(icon: "number", title: "Tags", page: .tags)
 
@@ -519,7 +563,7 @@ struct Sidebar: View {
                             NavRow(icon: shape, title: c == "SM" ? "Strategy" : c, page: .course(c), iconTint: .course(c)).contextMenu { CourseMenu(code: c) }
                         }
                     }
-                    NavSection("Items") { entries(SideNav.items) }
+                    NavSection("Items") { entries(SideNav.items.filter { $0.name != SideNav.pinned }) }
                     NavSection("Files") { entries(SideNav.files) }
                     NavSection("Apps") { entries(SideNav.apps) }
                 }
@@ -527,12 +571,8 @@ struct Sidebar: View {
 
             NoticeButton()
         }
-        .padding(.horizontal, 10).padding(.top, 52).padding(.bottom, 12)
+        .padding(.horizontal, 10).padding(.top, 14).padding(.bottom, 12)
         .frame(maxHeight: .infinity, alignment: .top)
-        .overlay(alignment: .topTrailing) {
-            // Level with the window buttons, top right.
-            HStack(spacing: 4) { SettingsButton(); CollapseButton() }.padding(.top, 7).padding(.trailing, 10)
-        }
     }
 }
 
@@ -560,20 +600,27 @@ struct NoticeButton: View {
 /// The three note groups the sidebar lists, and the folders in each. Page ids are the short folder names (see `Vault.places`).
 enum SideNav {
     struct Entry { let name: String; let icon: String }
-    static let items: [Entry] = [.init(name: "Lectures", icon: "play.rectangle"), .init(name: "Tutorials", icon: "person.2"), .init(name: "Readings", icon: "book"),
+    /// Unsorted is an Items page too, but it is pinned at the top of the sidebar instead of listed under Items.
+    static let pinned = "Unsorted"
+    static let items: [Entry] = [.init(name: "Unsorted", icon: "tray"), .init(name: "Lectures", icon: "play.rectangle"), .init(name: "Tutorials", icon: "person.2"), .init(name: "Readings", icon: "book"),
                                  .init(name: "Essays", icon: "doc.text"), .init(name: "Projects", icon: "folder"), .init(name: "Exams", icon: "pencil.and.list.clipboard"),
                                  .init(name: "Tasks", icon: "checkmark.circle")]
-    static let files: [Entry] = [.init(name: "Resources", icon: "square.stack.3d.up"), .init(name: "OneDrive", icon: "cloud"), .init(name: "Zotero", icon: "text.book.closed")]
-    static let apps: [Entry] = Study.kinds.map { .init(name: $0.folder, icon: $0.icon) } + [.init(name: "Research", icon: "magnifyingglass")]
+    static let files: [Entry] = {
+        let documents: [Entry] = [Entry(name: "Resources", icon: "square.stack.3d.up"), Entry(name: "OneDrive", icon: "cloud"), Entry(name: "Zotero", icon: "text.book.closed")]
+        let study: [Entry] = Study.kinds.filter { Study.inFiles.contains($0.folder) }.map { Entry(name: $0.folder, icon: $0.icon) }
+        return documents + study + [Entry(name: "Research", icon: "magnifyingglass")]
+    }()
+    static let apps: [Entry] = Study.kinds.filter { !Study.inFiles.contains($0.folder) }.map { Entry(name: $0.folder, icon: $0.icon) }
     static let folders = items + files + apps
-    /// Files and Apps pages show a browser instead of a plain list.
+    /// Files and Apps pages show a browser instead of a plain list. Every Files page browses its folder on disk; Apps pages list their notes.
     static let grouped = Set((files + apps).map(\.name))
     static func isHidden(_ name: String, _ raw: String) -> Bool { raw.split(separator: ",").contains(Substring(name)) }
     /// Tasks is shown as "Assignments"; its id stays "Tasks" (folder and page names).
     static func label(_ name: String) -> String { name == "Tasks" ? "Assignments" : name }
-    /// Notes still to do in a folder; Files have none.
+    /// Notes still to do in a folder; the document folders (Resources, OneDrive, Zotero) have none.
     @MainActor static func openCount(_ name: String, _ store: Store) -> Int {
-        files.contains { $0.name == name } ? 0 : store.openCount(name == "Tasks" ? "TaskNotes/Tasks" : name)
+        if name == pinned { return store.unsorted.count }
+        return ["Resources", "OneDrive", "Zotero"].contains(name) ? 0 : store.openCount(name == "Tasks" ? "TaskNotes/Tasks" : name)
     }
 }
 
@@ -659,11 +706,12 @@ struct SidebarRail: View {
     }
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 2) { CollapseButton(); SettingsButton() }.padding(.bottom, 6)
             ScrollView {
                 VStack(spacing: 2) {
                     RailItem(icon: "house", label: "Home", on: store.page == .overview) { store.page = .overview }
-                    RailItem(icon: "tray", label: "Unsorted", badge: store.unsorted.count, on: { switch store.page { case .inbox, .unsorted, .sortNow: true; default: false } }()) { store.page = .inbox }
+                    if !SideNav.isHidden(SideNav.pinned, hidden) {
+                        RailItem(icon: "tray", label: "Unsorted", badge: store.unsorted.count, on: { switch store.page { case .inbox, .folder("Unsorted"), .unsorted, .sortNow: true; default: false } }()) { store.page = .inbox }
+                    }
                     RailItem(icon: "message", label: "Messages", on: { switch store.page { case .messages, .agent: true; default: false } }()) { store.page = .messages }
                     RailItem(icon: "number", label: "Tags", on: store.page == .tags) { store.page = .tags }
                     RailItem(icon: "chart.bar", label: "Week", on: store.page == .week) { store.page = .week }
@@ -674,14 +722,14 @@ struct SidebarRail: View {
                         RailItem(icon: shape, label: c == "SM" ? "Strategy" : c, tint: .course(c), on: store.page == .course(c)) { store.page = .course(c) }
                     }
                     Divider().padding(.vertical, 6).padding(.horizontal, 12)
-                    group("Items", icon: "tray.full", SideNav.items)
+                    group("Items", icon: "tray.full", SideNav.items.filter { $0.name != SideNav.pinned })
                     group("Files", icon: "doc.on.doc", SideNav.files)
                     group("Apps", icon: "square.grid.2x2", SideNav.apps)
                 }
             }.scrollIndicators(.hidden)
             RailItem(icon: "square.and.pencil", label: "New Note") { store.newNote() }.padding(.top, 6)
         }
-        .padding(.horizontal, 10).padding(.top, 38).padding(.bottom, 14)
+        .padding(.horizontal, 10).padding(.top, 14).padding(.bottom, 14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
@@ -754,6 +802,7 @@ struct MainPanel: View {
     }
     @ViewBuilder var page: some View {
         switch store.page {
+        case .inbox, .folder("Unsorted"): ItemsPage(title: "Unsorted", folders: ["Unsorted"], inbox: true).id("Unsorted")
         case .overview: OverviewPage()
         case .week: WeekPage()
         case .month: MonthPage()
@@ -762,19 +811,22 @@ struct MainPanel: View {
         case .folder(let f) where SideNav.grouped.contains(f):
             switch f {
             case "Zotero": ZoteroPage()
-            case "Resources", "OneDrive": FileBrowserPage(root: f).id(f)
+            case _ where SideNav.files.contains(where: { $0.name == f }):
+                FileBrowserPage(root: f, loose: !["Resources", "OneDrive"].contains(f)).id(f)
+            case _ where AppKind(rawValue: f) != nil: AppHomePage(kind: AppKind(rawValue: f) ?? .mcq).id(f)
             default: NoteBrowserPage(title: f, folders: [f]).id(f)
             }
         case .folder(let f): ItemsPage(title: f, folders: [f == "Tasks" ? "TaskNotes/Tasks" : f]).id(f)
-        case .inbox: InboxPage()
-        case .unsorted(let url): UnsortedPage(url: url)
+        case .unsorted(let url): if url.pathExtension == "md" { NotePage(url: url).id(url) } else { UnsortedPage(url: url) }
         case .search: SearchPage()
         case .sortNow: SortNowPage()
         case .agent(let c): AgentPage(code: c)
         case .messages: MessagesPage()
-        case .note(let url): NotePage(url: url)
+        case .note(let url):
+            if let kind = store.appKind(for: .note(url)) { AppSubPage(url: url, kind: kind).id(url) } else { NotePage(url: url).id(url) }
         case .file(let url): FilePage(url: url)
         case .tags: TagsPage()
+        case .newTab: NewTabPage()
         }
     }
 }
@@ -782,6 +834,7 @@ struct MainPanel: View {
 struct PageHeader<Trailing: View>: View {
     @Environment(Store.self) private var store
     let title: String; let subtitle: String
+    var compact = false   // a one-line title, as in a Craft toolbar
     @ViewBuilder var trailing: Trailing
     /// A round + for a new note, then the title in a serif, as in Craft's page headers.
     var titleBlock: some View {
@@ -789,8 +842,11 @@ struct PageHeader<Trailing: View>: View {
             Button { store.newNote() } label: { Image(systemName: "plus").font(.system(size: 15, weight: .medium)) }
                 .buttonStyle(.glassIcon()).help("New Note (⌘N)").accessibilityLabel("New note")
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.system(size: 28, weight: .semibold, design: .serif)).lineLimit(1)
-                Text(subtitle).font(.system(size: 13)).foregroundStyle(Color.ink2).lineLimit(1)
+                if compact { Text(title).font(.system(size: 18, weight: .semibold)).lineLimit(1) }
+                else {
+                    Text(title).font(.system(size: 28, weight: .semibold, design: .serif)).lineLimit(1)
+                    Text(subtitle).font(.system(size: 13)).foregroundStyle(Color.ink2).lineLimit(1)
+                }
             }
         }
     }
@@ -983,80 +1039,28 @@ struct Chip: View {
     }
 }
 
+/// A file waiting in Unsorted that isn't a note (notes open in the normal note page): a preview with Open and Show in Finder.
+/// Filing is done by Sort Now and the Manager.
 struct UnsortedPage: View {
-    @Environment(Store.self) private var store
     let url: URL
-    @State private var detected: String?
-    @State private var detectedBy = ""
-    @State private var key: String?
-    @State private var finished = false
-    @State private var text = ""
-    @State private var saved = ""
-    @State private var selection: TextSelection?
     var risky: Bool { url.pathExtension == "txt" }
 
     var body: some View {
         VStack(spacing: 0) {
-            PageHeader(title: url.pathExtension == "md" ? "Quick Note" : Vault.label(url),
-                       subtitle: url.pathExtension == "md" ? "Waiting in Unsorted" : "\(url.pathExtension.uppercased()) · waiting in Unsorted") {
-                HStack(spacing: 0) {
-                    if url.pathExtension == "md" { QuickNote(url: url, text: $text, saved: $saved, selection: $selection).formatBar }
-                    Button { NSWorkspace.shared.open(url) } label: { Label("Open", systemImage: "arrow.up.forward.app") }
-                        .buttonStyle(.glassAction(.header))
-                        // Open sits over the 340pt side column, so the bar's right edge lines up with the note box:
-                        // column 340 + gap 12 − (header inset 28 − content inset 12) = 336.
-                        .frame(width: 336, alignment: .trailing)
-                }
+            PageHeader(title: Vault.label(url), subtitle: "\(url.pathExtension.uppercased()) · waiting in Unsorted") {
+                Button { NSWorkspace.shared.open(url) } label: { Label("Open", systemImage: "arrow.up.forward.app") }.buttonStyle(.glassAction(.header))
             }
-            SplitPane(fixed: .second, width: 340, stacked: (440, 440)) {
-                Card {
-                    if url.pathExtension == "md" {
-                        QuickNote(url: url, text: $text, saved: $saved, selection: $selection).id(url)
-                    } else if url.pathExtension.lowercased() == "pdf" {
-                        PDFViewer(url: url).id(url)
-                        Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }.buttonStyle(.glassRow).padding(16)
-                    } else {
-                        Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().scaledToFit().frame(width: 128, height: 128)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }.buttonStyle(.glassRow).padding(16)
-                    }
+            Card {
+                if risky { Label("Looks like credentials, so it won’t be filed. Move it out of the vault and rotate the key if it’s real.", systemImage: "exclamationmark.triangle").font(.system(size: 13)).foregroundStyle(Color.redFG).padding(16).frame(maxWidth: .infinity, alignment: .leading) }
+                if url.pathExtension.lowercased() == "pdf" {
+                    PDFViewer(url: url).id(url)
+                } else {
+                    Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().scaledToFit().frame(width: 128, height: 128)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-            } second: {
-                VStack(spacing: 12) {
-                    Card(title: "Detected") {
-                        Group {
-                            if risky { Label("Looks like credentials, so it won’t be filed. Move it out of the vault and rotate the key if it’s real.", systemImage: "exclamationmark.triangle").foregroundStyle(Color.redFG) }
-                            else if let d = detected { Label("\(d == "SM" ? "Strategy" : d) course file · \(detectedBy)", systemImage: "circle.fill").foregroundStyle(Color.course(d)) }
-                            else if detectedBy.isEmpty { Label("Checking…", systemImage: "hourglass").foregroundStyle(Color.ink2) }
-                            else { Label("No course detected", systemImage: "questionmark.circle").foregroundStyle(Color.ink2) }
-                        }.font(.system(size: 13)).padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                    }.frame(height: 110)
-                    Card(title: "Filing") { filing.padding(.horizontal, 16).padding(.bottom, 16).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading) }
-                }
+                Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }.buttonStyle(.glassRow).padding(16)
             }.padding([.horizontal, .bottom], 12)
         }
-        .task(id: url) {
-            key = nil; finished = false; detected = nil; detectedBy = ""; selection = nil
-            saved = url.pathExtension == "md" ? ((try? String(contentsOf: url, encoding: .utf8)) ?? "") : ""; text = saved
-            if let d = Detect.fromName(url) { detected = d; detectedBy = "from the filename" }
-            else { detected = await Detect.onDevice(url); detectedBy = "on-device" }
-        }
-    }
-
-    @ViewBuilder var filing: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let key { JobProgress(key: key, finished: finished) }
-            else {
-                Text(risky ? "This one stays put until you deal with it." : "The Sorter files it and the Manager checks the result. You can undo it afterwards. Or use Sort Now to file everything at once.")
-                    .font(.system(size: 13)).foregroundStyle(Color.ink2)
-                if !risky { Button { run() } label: { Label("File Now", systemImage: "sparkle") }.buttonStyle(.glassAction(.control, prominent: true)) }
-            }
-        }
-    }
-    func run() {
-        let k = "manual:file:" + UUID().uuidString
-        key = k; finished = false
-        Task { await store.manualJob(.sorting([url], key: k)); finished = true }
     }
 }
 
@@ -1252,7 +1256,7 @@ struct TrafficLights: NSViewRepresentable {
                 for (i, type) in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].enumerated() {
                     guard let b = w.standardWindowButton(type), let bar = b.superview else { continue }
                     let size = b.frame.size
-                    let y = bar.isFlipped ? 32 - size.height / 2 : bar.bounds.height - 32 - size.height / 2
+                    let y = bar.isFlipped ? 28 - size.height / 2 : bar.bounds.height - 28 - size.height / 2
                     b.setFrameOrigin(NSPoint(x: 34 - size.width / 2 + CGFloat(i) * 20, y: y))
                 }
             }

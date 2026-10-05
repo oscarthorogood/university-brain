@@ -208,7 +208,7 @@ struct WindowBackdrop: View {
         ZStack {
             Rectangle().fill(.ultraThinMaterial)
             LinearGradient(colors: [Color(light: 0xFFC9A3, dark: 0x8A4B2A), Color(light: 0xF6E7D8, dark: 0x3A2C25), Color(light: 0xBFD6EE, dark: 0x1F3550)],
-                           startPoint: .topLeading, endPoint: .bottomTrailing).opacity(scheme == .dark ? 0.35 : 0.5)
+                           startPoint: .topLeading, endPoint: .bottomTrailing).opacity(scheme == .dark ? 0.35 : 0.18)
         }
     }
 }
