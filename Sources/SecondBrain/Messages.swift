@@ -131,8 +131,10 @@ struct MessagesInbox: View {
 
 extension MessagesInbox {
     /// Pinned at the top: everything the agents say to each other.
+    /// "Tutor: On it." for the list.
+    fileprivate static func preview(_ m: Message) -> String { let (sender, body) = m.text.senderAndBody; return (sender.map { $0 + ": " } ?? "") + body.replacingOccurrences(of: "\n", with: " ") }
     fileprivate var groupRow: some View {
-        let m = store.agentTalk.last
+        let m = store.chats[Self.group]?.last
         return Button { selected = Self.group } label: {
             HStack(spacing: 10) {
                 Image(systemName: "person.3.fill").font(.system(size: 16)).foregroundStyle(Color.ink).frame(width: 38, height: 38).background(Color.ink.opacity(0.1), in: .circle)
@@ -142,7 +144,7 @@ extension MessagesInbox {
                         Spacer(minLength: 4)
                         if let m { Text(m.time.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))).font(.system(size: 11)).foregroundStyle(Color.ink2) }
                     }
-                    Text(m.map { "\(Agent.role($0.agent).name): \($0.text)" } ?? "Everyone, in one place")
+                    Text(m.map(Self.preview) ?? "Everyone, in one place")
                         .font(.system(size: 12)).foregroundStyle(Color.ink2).lineLimit(2).multilineTextAlignment(.leading)
                 }
             }
@@ -154,38 +156,53 @@ extension MessagesInbox {
 }
 
 extension Store {
-    /// Every line an agent has logged (assignments, advice, finished work, the Manager's checks), oldest first. This is the group chat.
-    // ponytail: read from the Activity Log (last 200 entries) rather than a second store; give it its own file if it should outlive that.
-    var agentTalk: [Activity] { activity.filter { a in Agent.all.contains { $0.id == a.agent } }.reversed() }
+    /// One text in the Group Chat, as iMessage shows a group: the sender's name over the bubble. The Group Chat is where agents talk to each other
+    /// ("@Tutor can you take this one?"); what the agent has to say to you goes to your private chat with them.
+    func say(_ agent: String, _ text: String) {
+        chats[MessagesInbox.group, default: []].append(Message(fromAgent: true, text: "**\(Agent.role(agent).name)**\n\n" + text))
+    }
+    /// Short enough for a text.
+    func clipped(_ s: String, _ n: Int) -> String {
+        let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        return t.count > n ? String(t.prefix(n)).trimmingCharacters(in: .whitespacesAndNewlines) + "…" : t
+    }
+    /// What one agent tells the next: the `Handoff` section of its answer, or its opening lines.
+    func handoff(_ text: String) -> String {
+        if let r = text.range(of: "handoff", options: .caseInsensitive) { return clipped(String(text[r.upperBound...]).trimmingCharacters(in: CharacterSet(charactersIn: " :*#-\n")), 500) }
+        return clipped(text, 300)
+    }
 }
 
-/// The agents talking to each other: assignments, advice, results and checks, in the order they happened.
+/// The agents talking to each other, like a group in Messages: the Manager hands a job to an agent by name, the course agent adds what matters,
+/// the agent says it is on it, hands over to the next one, and says when it has texted you.
 struct GroupChat: View {
     @Environment(Store.self) private var store
     var body: some View {
-        let talk = store.agentTalk, ids = Agent.all.map(\.id)
+        let talk = store.chats[MessagesInbox.group] ?? [], ids = Agent.all.map(\.id)
         VStack(spacing: 10) {
             VStack(spacing: 3) {
                 HStack(spacing: -8) { ForEach(ids.prefix(6), id: \.self) { AgentPortrait(id: $0, size: 30) } }
                 Text("Group Chat").font(.system(size: 12, weight: .semibold))
-                Text("\(ids.count) agents · everything they say to each other").font(.system(size: 10)).foregroundStyle(Color.ink2)
+                Text("\(ids.count) agents · what they say to each other").font(.system(size: 10)).foregroundStyle(Color.ink2)
             }
             Card {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: 10) {
-                            if talk.isEmpty { Text("Nothing yet. When the Manager hands out a job, the agents will talk about it here.").font(.system(size: 13)).foregroundStyle(Color.ink2).padding(.top, 8) }
-                            ForEach(Array(talk.enumerated()), id: \.element.id) { i, a in
+                            if talk.isEmpty { Text("Nothing yet. When you message the Manager or a job starts, the agents will talk about it here.").font(.system(size: 13)).foregroundStyle(Color.ink2).padding(.top, 8) }
+                            ForEach(Array(talk.enumerated()), id: \.element.id) { i, m in
+                                let (sender, text) = m.text.senderAndBody
+                                let who = Agent.all.first { $0.name == sender }?.id ?? Agent.manager.id
                                 let prev = i > 0 ? talk[i - 1] : nil
-                                if prev == nil || a.time.timeIntervalSince(prev!.time) > 600 { IMStamp(date: a.time).padding(.top, i == 0 ? 0 : 8) }
+                                if prev == nil || m.time.timeIntervalSince(prev!.time) > 600 { IMStamp(date: m.time).padding(.top, i == 0 ? 0 : 8) }
                                 VStack(alignment: .leading, spacing: 2) {
-                                    if prev?.agent != a.agent { Text(Agent.role(a.agent).name).font(.system(size: 11)).foregroundStyle(Color.ink2).padding(.leading, 40) }
+                                    if prev?.text.senderAndBody.sender != sender { Text(sender ?? "").font(.system(size: 11)).foregroundStyle(Color.ink2).padding(.leading, 40) }
                                     HStack(alignment: .bottom, spacing: 6) {
-                                        AgentPortrait(id: a.agent, size: 28)
-                                        IMBubble(text: a.text, mine: false)
+                                        AgentPortrait(id: who, size: 28)
+                                        IMBubble(text: text, mine: false)
                                         Spacer(minLength: 56)
                                     }
-                                }.id(a.id)
+                                }.id(m.id)
                             }
                         }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
                     }

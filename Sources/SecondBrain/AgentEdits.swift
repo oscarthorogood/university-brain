@@ -67,6 +67,7 @@ extension Store {
             chats[chat, default: []].append(Message(fromAgent: true, text: "→ \(from) can’t do this (\(why.prefix(120))) · **\(Agent.role(route.agent).name)** · \(route.reason)"))
             log(Agent.manager.id, "Passed “\(text.prefix(50))” on to \(Agent.role(route.agent).name): \(from) couldn’t (\(why.prefix(80)))")
             let general = route.agent == Agent.manager.id
+            say(Agent.manager.id, general ? "Nobody else can take this one, so I'll do it: \(clipped(text, 100))" : "@\(Agent.role(route.agent).name) \(from) can't do this (\(clipped(why, 120))). Can you take it? Oscar says “\(clipped(text, 100))”")
             let reply = await converse(route.agent, shown: text, prompt: text, tier: tier ?? route.tier, mirror: chat == route.agent || chat == Agent.manager.id ? nil : chat, echo: route.agent != chat && !general)
             guard let next = reply.delegation else { return }
             if general { break }

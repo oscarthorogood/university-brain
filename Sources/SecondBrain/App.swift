@@ -361,18 +361,20 @@ struct SecondBrainApp: App {
                 ? "→ **\(names.joined(separator: " → "))** · working together, in that order"
                 : "→ **\(names[0])** · \((tier ?? first.tier).rawValue) effort\(tier == nil ? "" : " (your choice)") · \(first.reason)"))
             log(m, "Sent “\(text.prefix(50))” to \(names.joined(separator: ", then ")) (\(first.by))")
+            say(m, team
+                ? "\(names.map { "@" + $0 }.joined(separator: " then ")), can you take this one together, in that order? Oscar says “\(clipped(text, 140))”"
+                : "@\(names[0]) can you take this one? Oscar says “\(clipped(text, 140))”. \(first.reason)")
             // the course agent says what matters in its course before the work starts
             var advice = ""
             if let c = Manager.course(text.lowercased()), Agent.role(first.agent).course == nil, first.tier != .quick, !thinking.contains(c) {
                 if Agent.briefingStale(c, root: Vault.root) { _ = await Agent.refreshBriefing(c, root: Vault.root) }
                 if let a = await Agent.consult(c, helper: first.agent, job: text, note: nil, root: Vault.root) {
                     advice = "\n\nThe \(Agent.role(c).name) course agent advises:\n\(a)"
-                    chats[m, default: []].append(Message(fromAgent: true, text: "→ **\(Agent.role(c).name)** advised first"))
+                    say(c, "@\(names[0]) from the course side: \(clipped(a, 400))")
                 }
             }
             var done: [(name: String, text: String)] = []
             for (i, r) in steps.enumerated() {
-                if team && i > 0 { chats[m, default: []].append(Message(fromAgent: true, text: "→ **\(names[i])** · stage \(i + 1) of \(steps.count)")) }
                 var prompt = text + advice + (earlier.isEmpty ? "" : "\n\n(Earlier in Oscar's chat with the Manager, newest last; it may be what he means:\n\(earlier))")
                 if team {
                     prompt += "\n\nThis is a team job: \(names.joined(separator: " then ")), in that order. You are \(names[i]), stage \(i + 1) of \(steps.count)."
@@ -381,13 +383,15 @@ struct SecondBrainApp: App {
                         ? "\nDo only your stage; don't produce the final result. End with a `Handoff` section giving \(names[i + 1]) exactly what they need: sources actually read (note, PDF page range or URL), the facts, and any gaps."
                         : "\nYou are the last stage: produce the finished result the request asks for from the handed-over material. If something it needed is missing, say so plainly instead of inventing it."
                 }
+                if i == 0 { say(r.agent, team ? "On it. \(names[1]) is next after me." : "On it. I'll message Oscar directly when it's done.") }
                 let reply = await converse(r.agent, shown: team ? "\(text) (stage \(i + 1) of \(steps.count), from the Manager)" : text, prompt: prompt, tier: tier ?? r.tier, mirror: nil)   // the Manager only forwards: the agent answers in its own chat
                 if let why = reply.delegation { await passOn(text, tried: [r.agent], why: why, in: m, tier: tier); break }
-                if reply.session == nil { chats[m, default: []].append(Message(fromAgent: true, text: reply.stopped ? "Stopped." : "\(names[i]) couldn’t finish, so I stopped there.")); break }
+                if reply.session == nil { say(r.agent, reply.stopped ? "Stopped." : "I couldn't finish that one."); chats[m, default: []].append(Message(fromAgent: true, text: reply.stopped ? "Stopped." : "\(names[i]) couldn’t finish, so I stopped there.")); break }
+                say(r.agent, i < steps.count - 1 ? "@\(names[i + 1]) over to you. \(handoff(reply.text))" : "Done. I've messaged Oscar.")
                 if team, i == steps.count - 1, !done.isEmpty {   // a different agent checks the finished result against what was handed over
-                    chats[m, default: []].append(Message(fromAgent: true, text: "→ **Checking** the result against what was handed over"))
                     let problems = await Agent.verify(result: reply.text, handoff: done.map(\.text).joined(separator: "\n\n"), root: Vault.root)
-                    chats[m, default: []].append(Message(fromAgent: true, text: problems.map { "**Check found problems**\n\n" + $0 } ?? "→ Checked: every claim traces to what was handed over"))
+                    say(m, problems.map { "@\(names[i]) I checked your result against what the others handed over and found problems: \(clipped($0, 400))" } ?? "@\(names[i]) I checked your result against what the others handed over: every claim traces back.")
+                    if let problems { chats[m, default: []].append(Message(fromAgent: true, text: "**Check found problems**\n\n" + problems)) }
                 }
                 done.append((names[i], reply.text))
             }
