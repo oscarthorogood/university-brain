@@ -606,16 +606,7 @@ struct Sidebar: View {
         }
     }
     var body: some View {
-        @Bindable var store = store
         VStack(spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundStyle(Color.ink2)
-                TextField("Search", text: $store.query).textFieldStyle(.plain)
-                    .onSubmit { if !store.query.isEmpty { store.page = .search } }
-                    .onChange(of: store.query) { _, q in if !q.isEmpty { store.page = .search } }
-            }
-            .font(.system(size: 13)).glassField(height: 32)
-
             ScrollView {
                 VStack(alignment: .leading, spacing: 1) {
                     NavRow(icon: "house", title: "Home", page: .overview)
@@ -1174,7 +1165,7 @@ struct SearchPage: View {
     var body: some View {
         let r = store.search(store.query)
         VStack(spacing: 0) {
-            PageHeader(title: "Search", subtitle: store.query.isEmpty ? "Type in the sidebar" : "\(r.count) results for “\(store.query)”") { EmptyView() }
+            PageHeader(title: "Search", subtitle: store.query.isEmpty ? "Type in the search box at the top right" : "\(r.count) results for “\(store.query)”") { EmptyView() }
             Card {
                 if r.isEmpty { Text("No matches").font(.system(size: 13)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity, maxHeight: .infinity) }
                 else {
