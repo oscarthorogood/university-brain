@@ -219,6 +219,8 @@ struct SecondBrainApp: App {
         }
     }
     /// Notes opened lately, newest first (the New Tab page lists them).
+    /// Notes of an app (a quiz, a deck…) that are open as text for editing, rather than as the app's own page.
+    var editingApps: Set<URL> = []
     var recentNotes: [URL] = (UserDefaults.standard.stringArray(forKey: "recentNotes") ?? []).map { URL(fileURLWithPath: $0) }
     func visited(_ p: Page) {
         switch p {
@@ -470,7 +472,7 @@ struct ContentView: View {
                 .frame(width: collapsed ? 80 : 240, alignment: .leading)
                 .clipShape(.rect(cornerRadius: DS.Radius.pane))
                 .modifier(GlassPane())
-                if store.page.isNote {
+                if store.page.isNote && store.appKind(for: store.page) == nil {
                     // A note draws its own two panes: the document, and the inspector as a sidebar of its own.
                     MainPanel().frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -846,6 +848,7 @@ struct MainPanel: View {
             case "Zotero": ZoteroPage()
             case _ where SideNav.files.contains(where: { $0.name == f }):
                 FileBrowserPage(root: f, loose: !["Resources", "OneDrive"].contains(f)).id(f)
+            case _ where AppKind(rawValue: f) != nil: AppHomePage(kind: AppKind(rawValue: f) ?? .mcq).id(f)
             default: NoteBrowserPage(title: f, folders: [f]).id(f)
             }
         case .folder(let f): ItemsPage(title: f, folders: [f == "Tasks" ? "TaskNotes/Tasks" : f]).id(f)
@@ -855,7 +858,8 @@ struct MainPanel: View {
         case .sortNow: SortNowPage()
         case .agent(let c): AgentPage(code: c)
         case .messages: MessagesPage()
-        case .note(let url): NotePage(url: url).id(url)
+        case .note(let url):
+            if let kind = store.appKind(for: .note(url)) { AppSubPage(url: url, kind: kind).id(url) } else { NotePage(url: url).id(url) }
         case .file(let url): FilePage(url: url)
         case .tags: TagsPage()
         case .newTab: NewTabPage()

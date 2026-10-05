@@ -284,7 +284,7 @@ struct NotePage: View {
             VStack(spacing: 0) {
                 noteToolbar
                 Card {
-                    if isStudy && editing {
+                    if !liveEdit && editing {
                         // Quizzes, flashcards and the like read as what they are; Edit shows their Markdown beside the result.
                         HStack(spacing: 0) {
                             NoteEditor(url: url, text: $text, saved: $saved)
@@ -297,7 +297,7 @@ struct NotePage: View {
                                 Text(title).font(.system(size: 30, weight: .bold)).lineLimit(3)
                                 Text(subtitle).font(.system(size: 13)).foregroundStyle(Color.ink2).lineLimit(1)
                                 Rectangle().fill(Color.line.opacity(0.6)).frame(height: 1).padding(.vertical, 6)
-                                if isStudy { readView }
+                                if !liveEdit { readView }
                                 else {
                                     MarkdownEditor(text: Binding(get: { NoteText.body(text) }, set: { text = NoteText.front(text) + $0 }), controller: editor)
                                         .overlay(alignment: .topLeading) {
@@ -311,7 +311,7 @@ struct NotePage: View {
                     if let saveError { Text(saveError).font(.caption).foregroundStyle(Color.redFG).padding(10) }
                 }
                 .overlay(alignment: .bottom) {
-                    if !isStudy {
+                    if liveEdit {
                         ZStack(alignment: .bottom) {
                             LinearGradient(colors: [Color.card.opacity(0), Color.card.opacity(0.92)], startPoint: .top, endPoint: .bottom)
                                 .frame(height: 96).allowsHitTesting(false)
@@ -417,17 +417,19 @@ struct NotePage: View {
     @ViewBuilder var toolbarTrailing: some View {
         if isRelation {
             HStack(spacing: 10) {
+                doneButton
                 Button { openInObsidian() } label: { Label("Open", systemImage: "arrow.up.forward.app") }.buttonStyle(.glassAction(.header)).help("Open in Obsidian")
                 infoButton
             }
         } else {
             HStack(spacing: 10) {
+                doneButton
                 if let note {
                     Button { withAnimation(.spring(duration: 0.3)) { store.cycle(note) } } label: {
                         Label(note.state.label, systemImage: note.state.icon)
                     }.buttonStyle(.glassAction(.header)).help("Press to go to: \(note.state.next.label)")
                 }
-                if isStudy {
+                if !liveEdit {
                     Pills(options: [(false, "Read"), (true, "Edit")], selection: $editing)
                     if editing {
                         Button("Save") { save() }.keyboardShortcut("s").disabled(text == saved)
@@ -584,6 +586,14 @@ struct NotePage: View {
             try text.write(to: url, atomically: true, encoding: .utf8)
             saved = text; saveError = nil
         } catch { saveError = "Couldn’t save: \(error.localizedDescription)" }
+    }
+    /// Plain notes, and an app's note while it is open for editing, are edited in place; other study notes read as what they are, with Read / Edit.
+    var liveEdit: Bool { !isStudy || store.editingApps.contains(url) }
+    /// Returns an app's note from its text to the app's own page.
+    @ViewBuilder var doneButton: some View {
+        if store.editingApps.contains(url) {
+            Button { store.editingApps.remove(url) } label: { Label("Done", systemImage: "checkmark") }.buttonStyle(.glassAction(.header, prominent: true))
+        }
     }
     var isStudy: Bool { note.flatMap { Study.kind($0.folder) } != nil }
     @ViewBuilder func dateControl(_ fm: [String: String]) -> some View {
