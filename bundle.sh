@@ -1,6 +1,11 @@
 #!/bin/sh
 # Wraps the SwiftPM build in a minimal .app so macOS treats it as a real app.
 set -e
+cd "$(dirname "$0")"
+# The version the updater compares: $VERSION (the release workflow passes the tag), else the latest git tag, else 0.0.0.
+VERSION="${VERSION:-$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')}"
+VERSION="${VERSION:-0.0.0}"
+BUILD="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 swift build -c release
 APP=build/SecondBrain.app
 mkdir -p "$APP/Contents/MacOS"
@@ -21,6 +26,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>CFBundleDisplayName</key><string>University Brain</string>
 <key>CFBundleExecutable</key><string>SecondBrain</string>
 <key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>$VERSION</string>
+<key>CFBundleVersion</key><string>$BUILD</string>
 <key>LSMinimumSystemVersion</key><string>26.0</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSMicrophoneUsageDescription</key><string>University Brain records voice memos into your Unsorted folder.</string>
