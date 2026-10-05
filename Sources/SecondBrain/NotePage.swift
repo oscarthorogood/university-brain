@@ -15,16 +15,7 @@ struct MarkdownView: View {
                 open(target); return .handled
             })
     }
-    /// [[Note]] → that note; [[Resources/…/file.pdf]] or a bare filename → the file.
-    func open(_ target: String) {
-        if let n = store.notes.first(where: { $0.title == target || $0.path == target || target.hasSuffix("/" + $0.title) }) { store.page = .note(n.id); return }
-        let direct = Vault.root.appending(path: Vault.real(target))
-        if FileManager.default.fileExists(atPath: direct.path) { store.openFile(direct); return }
-        let name = (target as NSString).lastPathComponent
-        let found = FileManager.default.enumerator(at: Vault.root.appending(path: Vault.dir("Resources")), includingPropertiesForKeys: nil)?
-            .lazy.compactMap { $0 as? URL }.first { $0.lastPathComponent == name }
-        if let found { store.openFile(found) }
-    }
+    func open(_ target: String) { store.openTarget(target) }
 }
 
 enum MD {
@@ -258,6 +249,7 @@ struct NotePage: View {
     @State private var newTag = ""
     @State private var newLink = ""
     @State private var showOutline = false
+    @AppStorage("noteInspector") private var showInspector = true
     @State private var jump: String?
 
     /// Headings of the note being read, with the id of the block each one lives in.
@@ -285,37 +277,10 @@ struct NotePage: View {
         let fm = Vault.frontmatter(saved), lists = Vault.lists(saved)
         let title = note?.display ?? url.deletingPathExtension().lastPathComponent
         let sub = (isRelation ? [fm["type"] ?? fm["Type"], fm["year"], fm["publication"], note?.course] : [note?.course, note?.kind, note?.when.map(NoteRow.format), fm["location"]]).compactMap { $0 }.joined(separator: " · ")
+        let subtitle = sub.isEmpty ? url.deletingLastPathComponent().lastPathComponent : sub
         VStack(spacing: 0) {
-            PageHeader(title: title, subtitle: sub.isEmpty ? url.deletingLastPathComponent().lastPathComponent : sub) {
-                if isRelation {
-                    Button { openInObsidian() } label: { Label("Open", systemImage: "arrow.up.forward.app") }.buttonStyle(.glassAction(.header)).help("Open in Obsidian")
-                } else {
-                HStack(spacing: 10) {
-                    if let note {
-                        Button { withAnimation(.spring(duration: 0.3)) { store.cycle(note) } } label: {
-                            Label(note.state.label, systemImage: note.state.icon)
-                        }.buttonStyle(.glassAction(.header)).help("Press to go to: \(note.state.next.label)")
-                    }
-                    Pills(options: [(false, "Read"), (true, "Edit")], selection: $editing)
-                    RoundButton(icon: "waveform.circle", label: "Dictate: speak and it types into the note") {
-                        editing = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { Dictation.start() }
-                    }
-                    if editing {
-                        Button("Save") { save() }.keyboardShortcut("s").disabled(text == saved)
-                            .buttonStyle(.glassAction(.header, prominent: true))
-                    }
-                    if !editing, headings(saved).count >= 4 {
-                        RoundButton(icon: "list.bullet.indent", label: "Outline: jump to a heading") { showOutline = true }
-                            .popover(isPresented: $showOutline) { outline(headings(saved)) }
-                    }
-                    RoundButton(icon: "clock.arrow.circlepath", label: "Version history") { showHistory = true }
-                        .popover(isPresented: $showHistory) { history }
-                    RoundButton(icon: "arrow.up.forward.app", label: "Open in Obsidian") { openInObsidian() }
-                }
-                }
-            }
-            SplitPane(fixed: .second, width: 300, stacked: (620, 780)) {
+            noteToolbar
+            HStack(spacing: 12) {
                 Card {
                     if editing {
                         HStack(spacing: 0) {
@@ -326,80 +291,27 @@ struct NotePage: View {
                     }
                     else {
                         ScrollViewReader { proxy in
-                            ScrollView { readView }
-                                .onChange(of: jump) { if let j = jump { withAnimation(.smooth) { proxy.scrollTo(j, anchor: .top) }; jump = nil } }
+                            ScrollView {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(title).font(.system(size: 30, weight: .bold)).lineLimit(3)
+                                    Text(subtitle).font(.system(size: 13)).foregroundStyle(Color.ink2).lineLimit(1)
+                                    Rectangle().fill(Color.line.opacity(0.6)).frame(height: 1).padding(.vertical, 6)
+                                    readView
+                                }
+                                .frame(maxWidth: 760, alignment: .leading).padding(.horizontal, 40).padding(.vertical, 30).frame(maxWidth: .infinity)
+                            }
+                            .onChange(of: jump) { if let j = jump { withAnimation(.smooth) { proxy.scrollTo(j, anchor: .top) }; jump = nil } }
                         }
                     }
                     if let saveError { Text(saveError).font(.caption).foregroundStyle(Color.redFG).padding(10) }
                 }
-            } second: {
-                if isRelation { relationSide(fm, lists) } else {
-                VStack(spacing: 12) {
-                    Card(title: "Properties") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            PropRow(icon: "graduationcap.fill", label: "Course") {
-                                let name = fm["course"].map(Vault.unlink) ?? ""
-                                Button { if let c = note?.course { store.page = .course(c) } } label: {
-                                    GlassChip(tint: Color.course(note?.course)) {
-                                        HStack(spacing: 6) { Circle().fill(Color.course(note?.course)).frame(width: 7, height: 7); Text(name.isEmpty ? "—" : name).lineLimit(1) }
-                                    }
-                                }.buttonStyle(.plain).disabled(note?.course == nil)
-                            }
-                            PropRow(icon: "calendar", label: "Date") { dateControl(fm) }
-                            PropRow(icon: "circle.dotted", label: "Status") {
-                                let st = fm["status"] ?? ""
-                                Menu {
-                                    ForEach(Array(NSOrderedSet(array: TaskState.allCases.map(\.rawValue) + [fm["status"]].compactMap { $0 })) as! [String], id: \.self) { opt in
-                                        Button(opt) { edit { Vault.setField($0, "status", to: opt) } }
-                                    }
-                                } label: {
-                                    GlassChip(tint: NoteColor.status(st)) {
-                                        HStack(spacing: 6) { Image(systemName: (TaskState(rawValue: st) ?? .notStarted).icon); Text(st.isEmpty ? "—" : st) }.foregroundStyle(NoteColor.status(st) == .ink2 ? Color.ink : NoteColor.status(st))
-                                    }
-                                }.menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
-                            }
-                            PropRow(icon: "tag.fill", label: "Tags") {
-                                FlowLayout(spacing: 6) {
-                                    ForEach(lists["tags"] ?? [], id: \.self) { t in
-                                        GlassChip(tint: NoteColor.tag(t)) {
-                                            HStack(spacing: 5) {
-                                                Text(t)
-                                                Button { edit { Vault.editList($0, "tags") { $0.removeAll { Vault.plain($0) == t } } } } label: { Image(systemName: "xmark").font(.system(size: 8, weight: .bold)).foregroundStyle(Color.ink2) }
-                                                    .buttonStyle(.plain).accessibilityLabel("Remove tag \(t)")
-                                            }
-                                        }
-                                    }
-                                    TextField("Add tag", text: $newTag).textFieldStyle(.plain).font(.system(size: 12)).frame(width: 80).padding(.horizontal, 10).padding(.vertical, 5)
-                                        .glassEffect(.regular, in: .capsule)
-                                        .onSubmit {
-                                            let t = newTag.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }).joined(separator: "-")
-                                            newTag = ""
-                                            if !t.isEmpty { edit { Vault.editList($0, "tags") { if !$0.contains(t) { $0.append(t) } } } }
-                                        }
-                                }
-                            }
-                        }.padding(.horizontal, 16).padding(.bottom, 14).disabled(text != saved)
-                    }.fixedSize(horizontal: false, vertical: true)
-                    if let note {
-                        RelationsCard(note: note, newLink: $newLink) { q in
-                            let q = q.trimmingCharacters(in: .whitespaces); newLink = ""
-                            guard let n = store.notes.first(where: { $0.title.caseInsensitiveCompare(q) == .orderedSame || $0.display.caseInsensitiveCompare(q) == .orderedSame }) else { saveError = "No note called “\(q)”."; return }
-                            edit { Vault.editList($0, "related") { if !$0.contains(where: { Vault.plain($0) == n.title }) { $0.append("\"[[\(n.title)]]\"") } } }
-                        }
-                        LinksToCard(note: note)
-                        Card {
-                            VStack(spacing: 0) {
-                                AgentStage(id: note.course ?? Agent.manager.id, says: store.noteSays(note), chat: false).frame(height: 340)
-                                if let w = AgentWork.forNote(note) {
-                                    Button { work = w } label: {
-                                        HStack(spacing: 8) { AgentPortrait(id: w.role, size: 20); Text(w.label).fontWeight(.medium); Spacer() }
-                                            .font(.system(size: 12)).padding(.horizontal, 10).padding(.vertical, 6)
-                                    }.buttonStyle(.glassRow).padding(.horizontal, 6).padding(.bottom, 8)
-                                }
-                            }
-                        }.fixedSize(horizontal: false, vertical: true)
-                    }
-                }.scrollsWhenShort()
+                if showInspector {
+                    NoteInspector(title: title, subtitle: subtitle, tint: note?.course == nil ? nil : Color.course(note?.course), text: saved,
+                                  jump: { jump = $0 }, edit: { change in edit(change) }) {
+                        propertiesTab(fm, lists)
+                    } agent: {
+                        agentTab
+                    }.frame(width: 300)
                 }
             }.padding([.horizontal, .bottom], 12)
         }
@@ -450,10 +362,140 @@ struct NotePage: View {
         }
     }
 
+    // MARK: Toolbar
+    /// Back and New Note on the left; the note's controls and the inspector switch on the right.
+    var noteToolbar: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center) { toolbarLeading; Spacer(minLength: 16); toolbarTrailing.fixedSize() }
+            VStack(alignment: .leading, spacing: 10) { toolbarLeading; ScrollView(.horizontal) { toolbarTrailing.padding(.vertical, 2) }.scrollIndicators(.hidden) }
+        }.padding(.horizontal, 24).padding(.top, 18).padding(.bottom, 10)
+    }
+    var toolbarLeading: some View {
+        HStack(spacing: 10) {
+            Button { store.goBack() } label: { Image(systemName: "chevron.left").font(.system(size: 15, weight: .medium)) }
+                .buttonStyle(.glassIcon()).disabled(!store.canGoBack).help("Back (⌘[)").accessibilityLabel("Back")
+            Button { store.newNote() } label: { Image(systemName: "plus").font(.system(size: 15, weight: .medium)) }
+                .buttonStyle(.glassIcon(prominent: true)).help("New Note (⌘N)").accessibilityLabel("New note")
+        }
+    }
+    var infoButton: some View {
+        Button { withAnimation(.snappy(duration: 0.25)) { showInspector.toggle() } } label: { Image(systemName: "info.circle").font(.system(size: 15)) }
+            .buttonStyle(.glassIcon(prominent: showInspector)).help("Inspector: contents, tasks, attachments, find, properties, agent").accessibilityLabel("Inspector")
+    }
+    @ViewBuilder var toolbarTrailing: some View {
+        if isRelation {
+            HStack(spacing: 10) {
+                Button { openInObsidian() } label: { Label("Open", systemImage: "arrow.up.forward.app") }.buttonStyle(.glassAction(.header)).help("Open in Obsidian")
+                infoButton
+            }
+        } else {
+            HStack(spacing: 10) {
+                if let note {
+                    Button { withAnimation(.spring(duration: 0.3)) { store.cycle(note) } } label: {
+                        Label(note.state.label, systemImage: note.state.icon)
+                    }.buttonStyle(.glassAction(.header)).help("Press to go to: \(note.state.next.label)")
+                }
+                Pills(options: [(false, "Read"), (true, "Edit")], selection: $editing)
+                RoundButton(icon: "waveform.circle", label: "Dictate: speak and it types into the note") {
+                    editing = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { Dictation.start() }
+                }
+                if editing {
+                    Button("Save") { save() }.keyboardShortcut("s").disabled(text == saved)
+                        .buttonStyle(.glassAction(.header, prominent: true))
+                }
+                RoundButton(icon: "clock.arrow.circlepath", label: "Version history") { showHistory = true }
+                    .popover(isPresented: $showHistory) { history }
+                RoundButton(icon: "arrow.up.forward.app", label: "Open in Obsidian") { openInObsidian() }
+                infoButton
+            }
+        }
+    }
+
+    // MARK: Inspector tabs that hold what the old side column did
+    /// What the note is (course, date, status, tags) and what it relates to. Notes in Files and Apps show their details instead.
+    @ViewBuilder func propertiesTab(_ fm: [String: String], _ lists: [String: [String]]) -> some View {
+        if isRelation { relationSide(fm, lists) }
+        else {
+            VStack(spacing: 12) {
+                    Card(title: "Properties") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            PropRow(icon: "graduationcap.fill", label: "Course") {
+                                let name = fm["course"].map(Vault.unlink) ?? ""
+                                Button { if let c = note?.course { store.page = .course(c) } } label: {
+                                    GlassChip(tint: Color.course(note?.course)) {
+                                        HStack(spacing: 6) { Circle().fill(Color.course(note?.course)).frame(width: 7, height: 7); Text(name.isEmpty ? "—" : name).lineLimit(1) }
+                                    }
+                                }.buttonStyle(.plain).disabled(note?.course == nil)
+                            }
+                            PropRow(icon: "calendar", label: "Date") { dateControl(fm) }
+                            PropRow(icon: "circle.dotted", label: "Status") {
+                                let st = fm["status"] ?? ""
+                                Menu {
+                                    ForEach(Array(NSOrderedSet(array: TaskState.allCases.map(\.rawValue) + [fm["status"]].compactMap { $0 })) as! [String], id: \.self) { opt in
+                                        Button(opt) { edit { Vault.setField($0, "status", to: opt) } }
+                                    }
+                                } label: {
+                                    GlassChip(tint: NoteColor.status(st)) {
+                                        HStack(spacing: 6) { Image(systemName: (TaskState(rawValue: st) ?? .notStarted).icon); Text(st.isEmpty ? "—" : st) }.foregroundStyle(NoteColor.status(st) == .ink2 ? Color.ink : NoteColor.status(st))
+                                    }
+                                }.menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+                            }
+                            PropRow(icon: "tag.fill", label: "Tags") {
+                                FlowLayout(spacing: 6) {
+                                    ForEach(lists["tags"] ?? [], id: \.self) { t in
+                                        GlassChip(tint: NoteColor.tag(t)) {
+                                            HStack(spacing: 5) {
+                                                Text(t)
+                                                Button { edit { Vault.editList($0, "tags") { $0.removeAll { Vault.plain($0) == t } } } } label: { Image(systemName: "xmark").font(.system(size: 8, weight: .bold)).foregroundStyle(Color.ink2) }
+                                                    .buttonStyle(.plain).accessibilityLabel("Remove tag \(t)")
+                                            }
+                                        }
+                                    }
+                                    TextField("Add tag", text: $newTag).textFieldStyle(.plain).font(.system(size: 12)).frame(width: 80).padding(.horizontal, 10).padding(.vertical, 5)
+                                        .glassEffect(.regular, in: .capsule)
+                                        .onSubmit {
+                                            let t = newTag.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }).joined(separator: "-")
+                                            newTag = ""
+                                            if !t.isEmpty { edit { Vault.editList($0, "tags") { if !$0.contains(t) { $0.append(t) } } } }
+                                        }
+                                }
+                            }
+                        }.padding(.horizontal, 16).padding(.bottom, 14).disabled(text != saved)
+                    }.fixedSize(horizontal: false, vertical: true)
+                if let note {
+                        RelationsCard(note: note, newLink: $newLink) { q in
+                            let q = q.trimmingCharacters(in: .whitespaces); newLink = ""
+                            guard let n = store.notes.first(where: { $0.title.caseInsensitiveCompare(q) == .orderedSame || $0.display.caseInsensitiveCompare(q) == .orderedSame }) else { saveError = "No note called “\(q)”."; return }
+                            edit { Vault.editList($0, "related") { if !$0.contains(where: { Vault.plain($0) == n.title }) { $0.append("\"[[\(n.title)]]\"") } } }
+                        }
+                        LinksToCard(note: note)
+                }
+            }
+        }
+    }
+    @ViewBuilder var agentTab: some View {
+        if let note {
+                        Card {
+                            VStack(spacing: 0) {
+                                AgentStage(id: note.course ?? Agent.manager.id, says: store.noteSays(note), chat: false).frame(height: 340)
+                                if let w = AgentWork.forNote(note) {
+                                    Button { work = w } label: {
+                                        HStack(spacing: 8) { AgentPortrait(id: w.role, size: 20); Text(w.label).fontWeight(.medium); Spacer() }
+                                            .font(.system(size: 12)).padding(.horizontal, 10).padding(.vertical, 6)
+                                    }.buttonStyle(.glassRow).padding(.horizontal, 6).padding(.bottom, 8)
+                                }
+                            }
+                        }.fixedSize(horizontal: false, vertical: true)
+        } else {
+            Text("Agents work on notes in your vault. This one isn’t in it yet.").font(.system(size: 12)).foregroundStyle(Color.ink2).padding(6)
+        }
+    }
+
     /// Study notes read as what they are (a quiz, a deck, a player…); everything else as Markdown.
     @ViewBuilder var readView: some View {
         if let k = note.flatMap({ Study.kind($0.folder) }) { StudyPreview(kind: k, text: Vault.body(saved)) }
-        else { MarkdownView(text: Vault.body(saved)).padding(22) }
+        else { MarkdownView(text: Vault.body(saved)).padding(.vertical, 8) }
     }
     func openInObsidian() {
         var c = URLComponents(string: "obsidian://open")!

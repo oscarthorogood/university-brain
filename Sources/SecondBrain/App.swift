@@ -148,6 +148,7 @@ struct SecondBrainApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("New Note") { store.newNote() }.keyboardShortcut("n")
+                Button("New Tab") { store.newTab() }.keyboardShortcut("t")
                 Button("Add File…") { store.addFile() }.keyboardShortcut("o")
                 Button("New Note from Template…") { store.newStructured = true }.keyboardShortcut("n", modifiers: [.command, .shift])
                 Button("Open Quickly…") { store.quickOpen = true }.keyboardShortcut("p")
@@ -155,11 +156,15 @@ struct SecondBrainApp: App {
                 Button("New Voice Memo…") { store.voiceMemo = true }.keyboardShortcut("m", modifiers: [.command, .shift])
                 Button("Sync Calendar") { Task { store.log("planner", await store.syncCalendar()) } }
             }
+            CommandGroup(replacing: .saveItem) {
+                Button("Close Tab") { store.closeCurrentTab() }.keyboardShortcut("w")
+            }
             CommandGroup(before: .toolbar) {
                 Button(collapsed ? "Show Sidebar" : "Hide Sidebar") { withAnimation(.spring(duration: 0.45, bounce: 0.15)) { collapsed.toggle() } }
                     .keyboardShortcut("s", modifiers: [.control, .command])
             }
             CommandMenu("Go") {
+                Button("Back") { store.goBack() }.keyboardShortcut("[").disabled(!store.canGoBack)
                 Button("Home") { store.page = .overview }.keyboardShortcut("1")
                 Button("Week") { store.page = .week }.keyboardShortcut("2")
                 Button("Month") { store.page = .month }.keyboardShortcut("3")
@@ -189,9 +194,17 @@ struct SecondBrainApp: App {
 @MainActor @Observable final class Store {
     var notes = Vault.load()
     var unsorted = Vault.unsorted()
-    var page: Page = .overview {
-        didSet {
-            if case .agent(let id) = page { touchAgent(id) }
+    /// Every open tab and which one is showing. Pages are opened in the current tab (`page = …`), or in a new one with `newTab(_:)`.
+    var tabs: [PageTab] = [PageTab(page: .overview)]
+    var activeIndex = 0
+    /// The page the current tab shows. Moving to another page keeps the old one for Back.
+    var page: Page {
+        get { tabs.indices.contains(activeIndex) ? tabs[activeIndex].page : .overview }
+        set {
+            guard tabs.indices.contains(activeIndex), tabs[activeIndex].page != newValue else { return }
+            tabs[activeIndex].back = Array((tabs[activeIndex].back + [tabs[activeIndex].page]).suffix(50))
+            tabs[activeIndex].page = newValue
+            if case .agent(let id) = newValue { touchAgent(id) }
         }
     }
     /// Agents in the order they were last opened or asked, newest first (the dock shows the top three).
@@ -435,7 +448,11 @@ struct ContentView: View {
             .modifier(GlassPane())
             .background(TrafficLights())
             .padding(.top, 12).ignoresSafeArea(.container, edges: .top)
-            MainPanel().frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 0) {
+                TabBar().padding(.horizontal, 14).padding(.top, 10)
+                MainPanel().frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .modifier(GlassPane())
                 .overlay(alignment: .bottomTrailing) { AssistantButton().padding(18) }
                 .padding(.top, 12).ignoresSafeArea(.container, edges: .top)

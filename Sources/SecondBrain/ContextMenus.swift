@@ -7,6 +7,7 @@ struct NoteMenu: View {
     let note: Note
     var body: some View {
         Button("Open") { store.page = .note(note.id) }
+        Button("Open in New Tab") { store.newTab(.note(note.id)) }
         Button("Open in Obsidian") { NSWorkspace.shared.open(Vault.obsidianURL(note)) }
         Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([note.id]) }
         Divider()
