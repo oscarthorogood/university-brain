@@ -57,8 +57,6 @@ struct InboxItem: Identifiable, Codable {
 
 extension Store {
     func saveInbox() { InboxItem.save(inbox) }
-    func inboxReady(_ agent: String) -> Int { 0 }   // nothing waits for a tick any more; kept for the views that still ask
-    var inboxReadyCount: Int { 0 }
     /// Jobs the Manager is working on right now.
     var activeJobs: [InboxItem] { inbox.filter { [.planning, .consulting, .working, .checking].contains($0.state) } }
 
@@ -70,7 +68,10 @@ extension Store {
         autopilotTimer?.cancel()
         autopilotTimer = Task { [weak self] in
             try? await Task.sleep(for: .seconds(seconds))
-            if !Task.isCancelled { await self?.autopilotTick() }
+            guard !Task.isCancelled, let self else { return }
+            // The tick runs in a task of its own. Every vault reload reschedules (and so cancels) this timer; if the tick ran inside it,
+            // a reload part-way through would cancel the tick's own network calls, and the review would read the cancelled link checks as dead links.
+            Task { await self.autopilotTick() }
         }
     }
     func setAutopilot(_ on: Bool) {
@@ -124,6 +125,12 @@ extension Store {
 
     // MARK: The tick
     func autopilotTick() async {
+        guard !tickRunning else { return }   // the running tick schedules the next one when it ends
+        tickRunning = true
+        defer { tickRunning = false }
+        await tick()
+    }
+    private func tick() async {
         guard autopilotOn, !agentBusy else { return }
         // The calendar is plain fetching and a rewrite of one managed section, so it just happens, as often as Settings → Sync says.
         let cfg = SyncConfig.load()
@@ -133,7 +140,7 @@ extension Store {
             log("planner", r.hasPrefix("Synced") ? r : "Calendar sync failed: \(r)")
         }
         // Zotero: every 15 minutes while connected, both ways. Only changes and failures reach the log.
-        if Zotero.Config.load() != nil, Date.now.timeIntervalSince1970 - UserDefaults.standard.double(forKey: "lastZoteroSync") > 15 * 60 {
+        if Zotero.Config.connected, Date.now.timeIntervalSince1970 - UserDefaults.standard.double(forKey: "lastZoteroSync") > 15 * 60 {
             let r = await syncZotero()
             if r.changed { log("librarian", r.text) }
         }
@@ -186,10 +193,16 @@ extension Store {
     }
 
     func known(_ key: String) -> Bool { inbox.contains { $0.key == key && $0.state != .rejected } || handled.contains(key) }
-    func markHandled(_ key: String) { handled.insert(key); UserDefaults.standard.set(Array(handled.suffix(500)), forKey: "autopilotHandled") }
+    /// Remembers a key, oldest dropped first. (Trimming the Set itself dropped arbitrary keys, recent ones included, so finished jobs and one-off alerts came back.)
+    func markHandled(_ key: String) {
+        guard handled.insert(key).inserted else { return }
+        var order = UserDefaults.standard.stringArray(forKey: "autopilotHandled") ?? []
+        order.append(key)
+        if order.count > 2000 { order.removeFirst(order.count - 2000); handled = Set(order) }
+        UserDefaults.standard.set(order, forKey: "autopilotHandled")
+    }
 
     /// The Manager's scan: everything a helper could usefully do right now, ranked, best first.
-    func nextJob(allowDeep: Bool = true) -> Job? { scan(allowDeep: allowDeep).first?.job }
     func scan(allowDeep: Bool = true) -> [(score: Double, job: Job)] {
         var found: [(score: Double, job: Job)] = []
         func add(_ id: String, _ score: Double, _ job: Job) { if jobOn(id) { found.append((score, job)) } }
@@ -322,7 +335,9 @@ extension Store {
         if item.kind == .work, let p = rel0 { claim(p) }   // the note shows Agent In Progress while a helper has it
         agentBusy = true
         defer { agentBusy = false; for a in Set([agent, Agent.manager.id] + coursesFor(job)) { thinking.remove(a) }; if item.kind == .work { release(rel0) } }
-        for n in notes { try? Vault.snapshot(n.id) }   // so nothing a helper does is lost, and the review has the text from before
+        // so nothing a helper does is lost, and the review has the text from before (off the main thread: it reads every note)
+        let noteURLs = notes.map(\.id)
+        await Task.detached { for u in noteURLs { try? Vault.snapshot(u, root: root) } }.value
         let before = Set(notes.map { Vault.rel($0.id) }), started = Date().addingTimeInterval(-1)
         let prevStatus = item.kind == .work ? claims[rel0 ?? ""] : nil
 
@@ -350,8 +365,9 @@ extension Store {
         case .sorting(let files, _):
             // exact copies of files already in Resources/ are decided here, byte for byte: Claude never sees them
             var trashed: [String] = []
-            for (from, twin) in Vault.duplicates(of: files).sorted(by: { $0.key < $1.key }) {
-                if let bin = try? Vault.trashDuplicate(from) { moved.append([from, bin]); trashed.append("\((from as NSString).lastPathComponent) = \(twin)") }
+            let twins = await Task.detached { Vault.duplicates(of: files, in: root) }.value   // hashes files, so off the main thread
+            for (from, twin) in twins.sorted(by: { $0.key < $1.key }) {
+                if let bin = try? Vault.trashDuplicate(from, in: root) { moved.append([from, bin]); trashed.append("\((from as NSString).lastPathComponent) = \(twin)") }
             }
             let rest = files.filter { FileManager.default.fileExists(atPath: $0.path) }
             let dupNote = trashed.isEmpty ? nil : "The app has already moved these exact copies of filed files to .trash, so leave them out: " + trashed.joined(separator: "; ") + "."
@@ -362,14 +378,14 @@ extension Store {
             let plan = await Agent.planSorting(rest, advice: given.isEmpty ? nil : given, root: root)
             if plan.session == nil { ok = false; summary = plan.text; if plan.limited { pauseForLimit() } }
             else if plan.text.hasPrefix("NOTHING:") || (Vault.moves(in: plan.text).isEmpty && plan.text.prefix(240).localizedCaseInsensitiveContains("nothing")) { if trashed.isEmpty { nothing = true } else { summary = plan.text } }
-            else {
+            else if let planSession = plan.session {
                 planText = plan.text
                 update { $0.plan = plan.text }
                 var done: [String] = [], failed: [String] = []
                 for m in Vault.moves(in: plan.text) {
-                    do { try Vault.perform(m); done.append("\(m.from) → \(m.to)"); moved.append([m.from, m.to]) } catch { failed.append(error.localizedDescription) }
+                    do { try Vault.perform(m, in: root); done.append("\(m.from) → \(m.to)"); moved.append([m.from, m.to]) } catch { failed.append(error.localizedDescription) }
                 }
-                let r = await Agent.approveFiling(session: plan.session!, moved: done, root: root)
+                let r = await Agent.approveFiling(session: planSession, moved: done, root: root)
                 ok = r.session != nil; session = r.session
                 summary = (ok ? "Filed \(done.count) file\(done.count == 1 ? "" : "s")" : "Didn’t finish") + (failed.isEmpty ? "" : "; \(failed.count) not moved") + ". " + r.text
                 if r.limited { pauseForLimit() }
@@ -378,10 +394,13 @@ extension Store {
             }
         case .work(let n, let w, _, _):
             work = w
-            let text = (try? String(contentsOf: n.id, encoding: .utf8)) ?? ""
-            let extra = Vault.rawItems(text, "resources").prefix(2).map { raw in
-                String(Agent.pdfText(root.appending(path: Vault.unlink(raw.trimmingCharacters(in: CharacterSet(charactersIn: " \"'"))).components(separatedBy: "|")[0])).prefix(30_000))
-            }.joined()
+            let noteURL = n.id
+            let extra = await Task.detached {   // PDF and Office text extraction is slow, so off the main thread
+                let text = (try? String(contentsOf: noteURL, encoding: .utf8)) ?? ""
+                return Vault.rawItems(text, "resources").prefix(2).map { raw in
+                    String(Agent.pdfText(root.appending(path: Vault.unlink(raw.trimmingCharacters(in: CharacterSet(charactersIn: " \"'"))).components(separatedBy: "|")[0])).prefix(30_000))
+                }.joined()
+            }.value
             let team = Agent.teamLog(activity), r = await Agent.doWork(role: w.role, task: w.task, note: n.id, extra: extra + (team.isEmpty ? "" : "\n\n" + team), advice: advice, creating: w.creates, sections: w.sections, feedback: nil, session: nil, root: root)
             if r.session == nil { ok = false; summary = r.text; if r.limited { pauseForLimit() } }
             else if r.text.hasPrefix("NOTHING:") { nothing = true } else { summary = r.text; session = r.session }
@@ -422,7 +441,11 @@ extension Store {
         let currentRels = Set(notes.map { Vault.rel($0.id) })
         // a filing job edits existing notes (course, project, calendar ticks): the ones it names are its own, so undo puts them back; a note you edited meanwhile isn't named and is left alone
         let said = planText + summary
-        let edited: Set<String> = item.kind == .filing ? Set(Review.touched(since: started, root: root).filter { said.contains($0) || said.contains(((($0 as NSString).lastPathComponent) as NSString).deletingPathExtension) }) : []
+        var edited: Set<String> = []
+        if item.kind == .filing {
+            let changed = await Review.touchedInBackground(since: started, root: root)
+            edited = Set(changed.filter { said.contains($0) || said.contains(((($0 as NSString).lastPathComponent) as NSString).deletingPathExtension) })
+        }
         for rel in before.subtracting(currentRels) {
             let url = root.appending(path: rel)
             if let v = Vault.history(url).first { undo.restore.append(rel); undo.snapshots = (undo.snapshots ?? [:]).merging([rel: v.url.lastPathComponent]) { $1 } }
@@ -464,7 +487,7 @@ extension Store {
     /// The Manager's review, entirely on this Mac apart from the on-device model: stayed inside its scope, left Oscar's lines and the template alone, links open, numbers agree.
     func reviewJob(_ item: InboxItem, work: AgentWork?, started: Date, before: Set<String>, moved: [[String]], root: URL) async -> Review.Verdict {
         var v = Review.Verdict()
-        let touched = Review.touched(since: started, root: root)
+        let touched = await Review.touchedInBackground(since: started, root: root)
         let courseSet = Set(Vault.courses.keys)
         if item.kind == .filing {
             // the Sorter's own file says to tick Calendar Sync when it files something, so that one is allowed
@@ -550,10 +573,13 @@ extension Store {
         for rel in u.created {
             let src = root.appending(path: rel)
             try? fm.createDirectory(at: bin, withIntermediateDirectories: true)
-            try? fm.moveItem(at: src, to: bin.appending(path: src.lastPathComponent))
+            var dst = bin.appending(path: src.lastPathComponent)   // a note undone twice in a day mustn't fail on the name and stay put
+            if fm.fileExists(atPath: dst.path) { dst = bin.appending(path: UUID().uuidString.prefix(6) + " " + src.lastPathComponent) }
+            try? fm.moveItem(at: src, to: dst)
         }
         for m in u.moves where m.count == 2 {   // back to where it was
-            let from = root.appending(path: m[0]), to = root.appending(path: m[1])
+            // moves are recorded with the short folder names the Sorter writes ("Resources/TEM/…"); the file is where `Vault.real` puts it ("Files/Resources/TEM/…")
+            let from = root.appending(path: Vault.real(m[0], root: root)), to = root.appending(path: Vault.real(m[1], root: root))
             guard !fm.fileExists(atPath: from.path), fm.fileExists(atPath: to.path) else { continue }
             try? fm.createDirectory(at: from.deletingLastPathComponent(), withIntermediateDirectories: true)
             try? fm.moveItem(at: to, to: from)

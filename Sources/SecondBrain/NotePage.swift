@@ -171,6 +171,11 @@ struct MarkdownBlock: View {
     }
 }
 
+/// Decoded vault images, so scrolling back to a note doesn't read and decode them again. NSCache is thread-safe and empties itself under memory pressure.
+enum ImageCache {
+    nonisolated(unsafe) static let shared: NSCache<NSURL, NSImage> = { let c = NSCache<NSURL, NSImage>(); c.countLimit = 120; return c }()
+}
+
 /// An embedded image: a vault path or bare filename, or a web URL.
 struct VaultImage: View {
     let name: String; let width: CGFloat?
@@ -188,10 +193,20 @@ struct VaultImage: View {
         .frame(maxWidth: width ?? 640, alignment: .leading).clipShape(.rect(cornerRadius: 6)).accessibilityLabel(name)
         .task(id: name) {
             guard !name.hasPrefix("http") else { return }
-            let direct = Vault.root.appending(path: name)
-            let file = FileManager.default.fileExists(atPath: direct.path) ? direct
-                : FileManager.default.enumerator(at: Vault.root.appending(path: "Resources"), includingPropertiesForKeys: nil)?.lazy.compactMap { $0 as? URL }.first { $0.lastPathComponent == (name as NSString).lastPathComponent }
-            image = file.flatMap { NSImage(contentsOf: $0) }
+            let embed = name, root = Vault.root
+            // Finding a bare filename walks Resources, so it happens off the main thread. (It used to look in "Resources/",
+            // which the Items/Files/Apps layout moved to Files/Resources/, so bare-name embeds never showed.)
+            let file = await Task.detached { () -> URL? in
+                let direct = root.appending(path: Vault.real(embed, root: root))
+                if FileManager.default.fileExists(atPath: direct.path) { return direct }
+                let wanted = (embed as NSString).lastPathComponent
+                return FileManager.default.enumerator(at: root.appending(path: Vault.dir("Resources", root: root)), includingPropertiesForKeys: nil)?
+                    .lazy.compactMap { $0 as? URL }.first { $0.lastPathComponent == wanted }
+            }.value
+            guard let file else { image = nil; return }
+            if let hit = ImageCache.shared.object(forKey: file as NSURL) { image = hit; return }
+            image = NSImage(contentsOf: file)
+            if let image { ImageCache.shared.setObject(image, forKey: file as NSURL) }
         }
     }
 }
@@ -367,7 +382,9 @@ struct NotePage: View {
                     if let u = clean(fm["url"]), let link = URL(string: u) {
                         Button { NSWorkspace.shared.open(link) } label: { Label("Open source", systemImage: "arrow.up.forward.square") }.buttonStyle(.glassRow).font(.system(size: 12))
                     }
-                    if let z = fm["zotero"] { Button { NSWorkspace.shared.open(URL(string: "zotero://select/library/items/\(z)")!) } label: { Label("Open in Zotero", systemImage: "text.book.closed") }.buttonStyle(.glassRow).font(.system(size: 12)) }
+                    if let z = fm["zotero"], let zURL = URL(string: "zotero://select/library/items/\(z.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? z)") {
+                        Button { NSWorkspace.shared.open(zURL) } label: { Label("Open in Zotero", systemImage: "text.book.closed") }.buttonStyle(.glassRow).font(.system(size: 12))
+                    }
                     if details.isEmpty { Text("No details").font(.system(size: 12)).foregroundStyle(Color.ink2) }
                 }.padding(.horizontal, 16).padding(.bottom, 12)
             }.fixedSize(horizontal: false, vertical: true)
@@ -466,7 +483,7 @@ struct NotePage: View {
                             PropRow(icon: "circle.dotted", label: "Status") {
                                 let st = fm["status"] ?? ""
                                 Menu {
-                                    ForEach(Array(NSOrderedSet(array: TaskState.allCases.map(\.rawValue) + [fm["status"]].compactMap { $0 })) as! [String], id: \.self) { opt in
+                                    ForEach(TaskState.allCases.map(\.rawValue) + [fm["status"]].compactMap { $0 }.filter { TaskState(rawValue: $0) == nil }, id: \.self) { opt in
                                         Button(opt) { edit { Vault.setField($0, "status", to: opt) } }
                                     }
                                 } label: {
@@ -559,9 +576,8 @@ struct NotePage: View {
         else { MarkdownView(text: Vault.body(saved)).padding(.vertical, 8) }
     }
     func openInObsidian() {
-        var c = URLComponents(string: "obsidian://open")!
-        c.queryItems = [.init(name: "vault", value: Vault.name), .init(name: "file", value: url.path.replacingOccurrences(of: Vault.root.path + "/", with: "").replacingOccurrences(of: ".md", with: ""))]
-        NSWorkspace.shared.open(c.url!)
+        // vault-relative and without the extension (replacing every ".md" also cut it out of folder names)
+        NSWorkspace.shared.open(Vault.obsidianURL(file: (Vault.rel(url) as NSString).deletingPathExtension))
     }
     func load() {
         saved = (try? String(contentsOf: url, encoding: .utf8)) ?? ""; text = saved

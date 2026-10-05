@@ -6,10 +6,11 @@ import PDFKit
 enum Detect {
     static let codes = ["MSOA", "SM", "TEM"]
 
-    /// Instant: course code or name in the filename.
+    /// Instant: course code or name in the filename. Codes must stand alone ("SM-week2", "TEM_L03"):
+    /// a bare substring test filed "Assessment brief.pdf" under SM and "Systems.pdf" under TEM.
     static func fromName(_ url: URL) -> String? {
         let n = url.lastPathComponent.uppercased()
-        if let c = codes.first(where: { n.contains($0) }) { return c }
+        if let c = codes.first(where: { n.range(of: "(^|[^A-Z])\($0)($|[^A-Z])", options: .regularExpression) != nil }) { return c }
         for (full, code) in Vault.courses where n.contains(full.uppercased()) { return code }
         return n.contains("STRATEG") ? "SM" : nil
     }

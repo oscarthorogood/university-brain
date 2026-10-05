@@ -19,7 +19,7 @@ struct ZoteroPage: View {
     @Environment(Store.self) private var store
     @AppStorage("lastZoteroSync") private var last: Double = 0
     @AppStorage("lastZoteroResult") private var result = ""
-    @State private var connected = Zotero.Config.load() != nil
+    @State private var connected = Zotero.Config.connected
     @State private var key = ""
     @State private var problem = ""
     @State private var connecting = false

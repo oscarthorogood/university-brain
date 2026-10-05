@@ -79,8 +79,8 @@ struct MessagesInbox: View {
     private func last(_ id: String) -> Message? { store.chats[id]?.last { !$0.text.hasPrefix("→") } }
     /// Agents you have talked to come first, newest on top; the rest follow in roster order.
     private var order: [String] {
-        let all = Agent.all.map(\.id)
-        return all.filter { last($0) != nil }.sorted { last($0)!.time > last($1)!.time } + all.filter { last($0) == nil }
+        let latest = Agent.all.map { ($0.id, last($0.id)?.time) }   // each chat scanned once, not once per comparison
+        return latest.compactMap { id, t in t.map { (id, $0) } }.sorted { $0.1 > $1.1 }.map(\.0) + latest.filter { $0.1 == nil }.map(\.0)
     }
 
     var body: some View {

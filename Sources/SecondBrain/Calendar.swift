@@ -27,7 +27,8 @@ enum CalendarSync {
             f.timeZone = london; f.dateFormat = "yyyyMMdd"; return f.date(from: value).map { ($0, true) }
         }
         let utc = value.hasSuffix("Z")
-        let tz = key.components(separatedBy: "TZID=").last.map { String($0.split(separator: ";")[0]) }
+        // `.first`, not `[0]`: a feed line ending in a bare `TZID=` would otherwise crash the app
+        let tz = key.contains("TZID=") ? key.components(separatedBy: "TZID=").last?.split(separator: ";").first.map(String.init) : nil
         f.timeZone = utc ? .gmt : (tz.flatMap { TimeZone(identifier: $0) } ?? london)
         f.dateFormat = utc ? "yyyyMMdd'T'HHmmss'Z'" : "yyyyMMdd'T'HHmmss"
         return f.date(from: value).map { ($0, false) }
@@ -54,7 +55,8 @@ enum CalendarSync {
                 continue
             }
             guard cur != nil, let c = line.firstIndex(of: ":") else { continue }
-            let key = String(line[..<c]), val = String(line[line.index(after: c)...]), name = String(key.split(separator: ";")[0])
+            let key = String(line[..<c]), val = String(line[line.index(after: c)...])
+            guard let name = key.split(separator: ";").first.map(String.init) else { continue }   // a malformed line starting with ":" has no name
             if name == "EXDATE" { for v in val.split(separator: ",") { if let d = parseDate(key, String(v))?.0 { exdates.append(d) } } }
             else { cur?[name] = (key, val) }
         }
@@ -64,7 +66,7 @@ enum CalendarSync {
     static func expand(_ start: Date, rule: String, window: Range<Date>, cal: Calendar) -> [Date] {
         let r = Dictionary(rule.split(separator: ";").compactMap { p -> (String, String)? in
             let kv = p.split(separator: "=", maxSplits: 1); return kv.count == 2 ? (String(kv[0]), String(kv[1])) : nil }, uniquingKeysWith: { a, _ in a })
-        let interval = Int(r["INTERVAL"] ?? "") ?? 1, count = Int(r["COUNT"] ?? "") ?? .max
+        let interval = max(Int(r["INTERVAL"] ?? "") ?? 1, 1), count = Int(r["COUNT"] ?? "") ?? .max   // INTERVAL=0 would repeat the first date 2000 times
         let until = r["UNTIL"].flatMap { parseDate("", $0.count == 8 ? $0 + "T235959" : $0)?.0 } ?? window.upperBound
         let limit = min(until, window.upperBound)
         let codes = ["SU": 1, "MO": 2, "TU": 3, "WE": 4, "TH": 5, "FR": 6, "SA": 7]
@@ -73,12 +75,12 @@ enum CalendarSync {
         while n < count && step < 2000 {
             var cands: [Date]
             switch r["FREQ"] {
-            case "DAILY": cands = [cal.date(byAdding: .day, value: step * interval, to: start)!]
+            case "DAILY": cands = [cal.date(byAdding: .day, value: step * interval, to: start)].compactMap { $0 }
             case "WEEKLY":
-                let wk = cal.date(byAdding: .weekOfYear, value: step * interval, to: start)!
+                guard let wk = cal.date(byAdding: .weekOfYear, value: step * interval, to: start) else { return out }
                 let wd = cal.component(.weekday, from: wk)
                 cands = (days.isEmpty ? [wd] : days.sorted()).compactMap { cal.date(byAdding: .day, value: $0 - wd, to: wk) }.filter { $0 >= start }
-            case "MONTHLY": cands = [cal.date(byAdding: .month, value: step * interval, to: start)!]
+            case "MONTHLY": cands = [cal.date(byAdding: .month, value: step * interval, to: start)].compactMap { $0 }
             default: return [start]   // ponytail: YEARLY/other rules fall back to the first occurrence
             }
             if cands.allSatisfy({ $0 > limit }) { break }
@@ -135,7 +137,8 @@ enum CalendarSync {
     static func fetch(_ address: String) async -> String? {
         let a = address.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "webcal://", with: "https://")
         guard let url = URL(string: a), url.scheme?.hasPrefix("http") == true,
-              let (d, r) = try? await URLSession.shared.data(from: url), (r as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true,
+              let (d, r) = try? await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 30)),   // a feed that hangs mustn't hold up the Manager's tick
+              (r as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true,
               let ics = String(data: d, encoding: .utf8), ics.contains("BEGIN:VCALENDAR") else { return nil }
         return ics
     }

@@ -73,11 +73,11 @@ private struct FeedRow: View {
             Toggle("", isOn: $feed.enabled).labelsHidden()
             Button { let i = SyncConfig.colors.firstIndex(of: feed.color) ?? 0; feed.color = SyncConfig.colors[(i + 1) % SyncConfig.colors.count] } label: {
                 Circle().fill(Color(hex: feed.color)).frame(width: 13, height: 13).padding(3)
-            }.buttonStyle(.plain).help("Click to change the colour")
+            }.buttonStyle(.plain).help("Click to change the colour").accessibilityLabel("Change colour")
             TextField("", text: $feed.name, prompt: Text("Name")).labelsHidden().textFieldStyle(.roundedBorder).frame(width: 130)
             Text(URL(string: feed.url.replacingOccurrences(of: "webcal://", with: "https://"))?.host ?? "").foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             Spacer(minLength: 0)
-            Button(role: .destructive, action: remove) { Image(systemName: "minus.circle") }.buttonStyle(.borderless).help("Remove")
+            Button(role: .destructive, action: remove) { Image(systemName: "minus.circle") }.buttonStyle(.borderless).help("Remove").accessibilityLabel("Remove \(feed.name)")
         }
     }
 }
@@ -101,6 +101,7 @@ private struct AddCalendar: View {
                 Text("Colour").foregroundStyle(.secondary)
                 ForEach(SyncConfig.colors, id: \.self) { hex in
                     Button { color = hex } label: { Circle().fill(Color(hex: hex)).frame(width: 18, height: 18).overlay(Circle().stroke(Color.primary, lineWidth: color == hex ? 2 : 0)) }.buttonStyle(.plain)
+                        .accessibilityLabel("Colour \((SyncConfig.colors.firstIndex(of: hex) ?? 0) + 1)").accessibilityAddTraits(color == hex ? .isSelected : [])
                 }
             }
             HStack {

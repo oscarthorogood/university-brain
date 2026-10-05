@@ -369,10 +369,10 @@ struct MiniAgent: View {
     }
 
     var body: some View {
-        let busy = store.thinking.contains(id), asking = store.inboxReady(id) > 0
-        if hover || busy || asking {
+        let busy = store.thinking.contains(id)   // nothing waits for a tick any more, so the "asking" pose never shows here
+        if hover || busy {
             TimelineView(.animation(minimumInterval: Visibility.shared.active ? 1.0 / 24 : 1.0 / 6, paused: reduceMotion || !Visibility.shared.visible)) { tl in
-                Canvas { ctx, size in Self.draw(ctx, size, id: id, t: reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate + Double(abs(id.hashValue % 11)), hover: hover, busy: busy, asking: asking) }
+                Canvas { ctx, size in Self.draw(ctx, size, id: id, t: reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate + Double(abs(id.hashValue % 11)), hover: hover, busy: busy, asking: false) }
             }
         } else {
             IdleAgent(id: id)

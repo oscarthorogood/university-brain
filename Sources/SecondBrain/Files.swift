@@ -23,8 +23,8 @@ struct PDFViewer: NSViewRepresentable {
 
 struct FilePage: View {
     let url: URL
+    @State private var pages: Int?   // counted once per file, off the main thread (opening the PDF in `body` re-read it on every redraw)
     var body: some View {
-        let pages = PDFDocument(url: url)?.pageCount
         VStack(spacing: 0) {
             PageHeader(title: url.deletingPathExtension().lastPathComponent,
                        subtitle: [url.pathExtension.uppercased(), pages.map { "\($0) pages" }, url.deletingLastPathComponent().lastPathComponent].compactMap { $0 }.joined(separator: " · ")) {
@@ -35,5 +35,10 @@ struct FilePage: View {
             }
             Card { PDFViewer(url: url).clipShape(.rect(cornerRadius: DS.Radius.card)) }.padding([.horizontal, .bottom], 12)
         }.id(url)
+        .task(id: url) {
+            pages = nil
+            let file = url
+            pages = await Task.detached { PDFDocument(url: file)?.pageCount }.value
+        }
     }
 }
