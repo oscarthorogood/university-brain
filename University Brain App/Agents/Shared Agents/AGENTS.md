@@ -59,7 +59,7 @@ Note folders, grouped under three top-level folders: `Items/` (the work: lecture
 
 Support folders:
 
-- `Templates/Claude/` — the templates Claude fills, grouped like the vault: `Items/` (Lecture, Tutorial, Essay, Projects, Readings), `Files/` (Research, Summary, Past Paper, Mind Map, Weekly Summary draft, Reference, Resource, Onedrive) and `Apps/` (MCQ, Flashcards, Glossary, Podcast), with `Course Template.md` at the top. **These are the spec.** Notes conform to them exactly. `Templates/Human/` — templates Oscar fills by hand (Unsorted Notes). **Only templates belong in `Templates/`** (it is Obsidian's and Templater's template folder), apart from `Templates/Guides/`.
+- `Templates/Claude/` — the templates Claude fills, grouped like the vault: `Items/` (Lecture, Tutorial, Essay, Projects, Readings, Exam, Assignment), `Files/` (Research, Summary, Past Paper, Mind Map, Weekly Summary draft, Reference, Resource, Onedrive) and `Apps/` (MCQ, Flashcards, Glossary, Podcast), with `Course Template.md` at the top. **These are the spec.** Notes conform to them exactly. `Templates/Human/` — templates Oscar fills by hand (Unsorted Notes). **Only templates belong in `Templates/`** (it is Obsidian's and Templater's template folder), apart from `Templates/Guides/`.
 - `Templates/Guides/` — `Naming Conventions.md`, `TaskNotes Guide.md`
 - `Agents/` — four folders. `Shared Agents/` holds the files every agent uses: `AGENTS.md` (this file), `CLAUDE.md`, `VAULT-INDEX.md`, `memory.md` (decision log), `open-items.md` and `verify-vault.py`; bare file names in these documents mean that folder. Then two groups of agents, one folder each: `Course Agents/` (`MSOA/`, `Strategy/`, `TEM/`: one per course, holding that course's agent deliverables) and `Helper Agents/` (`Sorter/`, `Scribe/`, `Librarian/` with reading lists, reading notes and `Ellevenread/` text-to-speech files, `Planner/` with `Calendar Sync.md` (rewritten by University Brain's calendar sync, Settings → Sync) and the `Learn.md` snapshot, `Tutor/`, `Writer/`, `Researcher/`, `Analyst/`). The Manager sits outside both groups, in `Manager Agent/` (its instructions file only: it runs inside University Brain). Each agent folder starts with its own instructions file, `{Name} agent.md` (course agents: `{Course} course agent.md`). An agent's own deliverables go in its own folder. Not note folders.
 - There is no `Archive/` folder (checked 2026-09-30). `TaskNotes/` no longer exists (tasks were dropped 2026-10-03; `Items/Assignments/` replaces `TaskNotes/Tasks/`).
@@ -106,6 +106,10 @@ Copy verbatim, in this order, from the template in `Templates/Claude/{Items|File
 
 **Project** — `tags, base, course, status, due, resources, readings, related, references, onedrive, summary, sticker`
 
+**Exam** — `tags, base, course, status, due, resources, readings, related, summary, sticker` (`due` = the exam's date and time; `base` stays empty because Exams has no Bases view; the note is the plan and record of one sitting, while a Past Paper of `type: Exam` holds a paper's questions)
+
+**Assignment** (a standalone task in `Items/Assignments/`) — `status, priority, due, dateCreated, tags` (`tags: [task]`; no `course`, `base` or `sticker`)
+
 **MCQ, Flashcards, Past Paper, Summary, Mind Map, Glossary, Podcast** — `tags, base, Course, date, type, status, related`
 
 **Research** — `tags, base, course, date, question, status, related, summary` (lowercase `course`; `Research` has no `sticker`, `resources` or `type`)
@@ -128,6 +132,7 @@ Full detail in `Templates/Guides/Naming Conventions.md`. Summary:
 | Reading | `{Author} ({Year}) - {Title}` | `Cabral (2017) - Introduction to Industrial Organization` |
 | Essay | `{Course} - Essay - {Title}` | `Global Business - Essay - Market Entry` |
 | Project | `{Course} - Project - {Name}` | `Strategic Management - Project - Team Project` |
+| Exam | `{Course} - Exam - {Title}` | `Management Science and Operations Analytics - Exam - December Exam` |
 | MCQ | `{Course} - MCQ - {Topic}` | |
 | Flashcards | `{Course} - Flashcards - {Topic}` | |
 | Past Paper | `{Course} - Past Paper - {Topic}` | |

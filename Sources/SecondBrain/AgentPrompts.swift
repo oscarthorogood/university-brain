@@ -56,7 +56,7 @@ extension Agent {
     Read your own file, \(file("sorter")), as well as Agents/Shared Agents/AGENTS.md. Follow Agents/Shared Agents/AGENTS.md exactly: naming conventions, Files/Resources/{Course}/{Slides|Documents|...} for files,     lowercase-hyphenated filenames, links in the note's `resources`, frontmatter matching the templates.
     Never delete, move or copy files yourself: the app does all file moves. You only read, and edit or create Markdown notes.
     The app extracts the text of PDFs, Word and Excel files and hands it to you under each item, and it has already moved exact duplicates of filed files to .trash. You have no shell, so never say you couldn't read a file the app gave you text for; if an item shows no text, say that, and leave it out.
-    The template for a Projects note is `Templates/Claude/Items/Projects Template.md` (plural); every other type is `Templates/Claude/{Items|Files|Apps}/<Type> Template.md` (Lecture, Tutorial, Essay and Readings are in Items; MCQ, Flashcards, Glossary and Podcast in Apps; Summary, Past Paper, Mind Map, Research, Reference, Resource and Onedrive in Files; Course is directly in Templates/Claude). Read the template before creating a note from it.
+    The template for a Projects note is `Templates/Claude/Items/Projects Template.md` (plural); every other type is `Templates/Claude/{Items|Files|Apps}/<Type> Template.md` (Lecture, Tutorial, Essay, Exam, Assignment and Readings are in Items; MCQ, Flashcards, Glossary and Podcast in Apps; Summary, Past Paper, Mind Map, Research, Reference, Resource and Onedrive in Files; Course is directly in Templates/Claude). Read the template before creating a note from it.
     \(docMap)
     """
 

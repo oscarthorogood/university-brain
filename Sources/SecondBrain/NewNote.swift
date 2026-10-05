@@ -2,17 +2,17 @@ import SwiftUI
 
 /// New notes built from the vault's own templates (Templates/Claude), named by Templates/Guides/Naming Conventions.md.
 enum NoteKind: String, CaseIterable, Identifiable {
-    case lecture = "Lecture", tutorial = "Tutorial", essay = "Essay", project = "Project", reading = "Reading", mcq = "MCQ", flashcards = "Flashcards", pastPaper = "Past Paper", summary = "Summary", mindMap = "Mind Map", glossary = "Glossary", podcast = "Podcast", research = "Research", task = "Task"
+    case lecture = "Lecture", tutorial = "Tutorial", essay = "Essay", project = "Project", exam = "Exam", reading = "Reading", mcq = "MCQ", flashcards = "Flashcards", pastPaper = "Past Paper", summary = "Summary", mindMap = "Mind Map", glossary = "Glossary", podcast = "Podcast", research = "Research", task = "Task"
     var id: Self { self }
     /// The study type this is, when it is one of the seven that came out of Revision.
     var study: Study.Kind? { Study.kinds.first { $0.noun == rawValue } }
     var folder: String {
         if let study { return study.folder }
         return switch self { case .lecture: "Lectures"; case .tutorial: "Tutorials"; case .essay: "Essays"; case .project: "Projects"
-                      case .reading: "Readings"; case .research: "Research"; case .task: "TaskNotes/Tasks"; default: "" }
+                      case .exam: "Exams"; case .reading: "Readings"; case .research: "Research"; case .task: "TaskNotes/Tasks"; default: "" }
     }
     /// The Bases view that lists this kind of note: the `base` field has to point at it or the note is invisible in Obsidian.
-    var base: String? { self == .task ? nil : folder + ".base" }
+    var base: String? { self == .task || self == .exam ? nil : folder + ".base" }   // tasks and exams have no Bases view
     var numbered: Bool { self == .lecture || self == .tutorial }
     var needsCourse: Bool { self != .task }
     /// `date` for sessions, `due` for work that is handed in.
@@ -26,6 +26,7 @@ enum NoteKind: String, CaseIterable, Identifiable {
         case .lecture: return "\(course) L\(nn) - \(t)"
         case .tutorial: return "\(course) T\(nn) - \(t)"
         case .essay: return "\(course) - Essay - \(t)"
+        case .exam: return "\(course) - Exam - \(t)"
         case .project: return "\(course) - Project - \(t)"
         case .mcq, .flashcards, .pastPaper, .summary, .mindMap, .glossary, .podcast: return "\(course) - \(rawValue) - \(t)"
         case .research: return "\(course) - Research - \(t)"

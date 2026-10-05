@@ -26,6 +26,14 @@ If the course sets a formal essay/assignment number, include it: `{Course Name} 
 `{Course Name} - Project - {Project Name}` (coursework), or `{Project Name}` (personal/independent projects)
 Example: `Introduction to AI - Project - Chatbot Prototype`
 
+### 5b. Exam
+`{Course Name} - Exam - {Title}`
+Example: `Introduction to AI - Exam - December Exam`
+
+### 5c. Assignment (a standalone task)
+`{Verb} {object}`
+Example: `Register for the Edinburgh Award intro session`
+
 ### 6. Readings
 `{Author Surname} ({Year}) - {Short Title}`
 Example: `Russell (2020) - Rationality and Intelligence`

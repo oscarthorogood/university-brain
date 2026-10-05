@@ -63,7 +63,7 @@ extension Note {
         return t
     }
     var kind: String {
-        switch folder { case "TaskNotes/Tasks": "Task"; case "Lectures": "Lecture"; case "Tutorials": "Tutorial"; case "Readings": "Reading"; case "Essays": "Essay"; case "Projects": "Project"; default: folder }
+        switch folder { case "TaskNotes/Tasks": "Task"; case "Lectures": "Lecture"; case "Tutorials": "Tutorial"; case "Readings": "Reading"; case "Essays": "Essay"; case "Projects": "Project"; case "Exams": "Exam"; default: folder }
     }
 }
 enum Tab: String, CaseIterable {

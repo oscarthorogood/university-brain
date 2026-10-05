@@ -63,7 +63,7 @@ enum Sections {
     /// Still the template.
     static func isTemplate(_ heading: String, in text: String, template: String, legacy: [String] = Sections.legacy) -> Bool { !hasContent(heading, in: text, template: template, legacy: legacy) }
     static func template(forFolder folder: String, root: URL = Vault.root) -> String {
-        let name = ["Lectures": "Lecture", "Tutorials": "Tutorial", "Essays": "Essay", "Projects": "Projects", "Readings": "Readings", "Research": "Research"][folder] ?? Study.kind(folder)?.noun ?? folder
+        let name = ["Lectures": "Lecture", "Tutorials": "Tutorial", "Essays": "Essay", "Projects": "Projects", "Exams": "Exam", "Readings": "Readings", "Research": "Research"][folder] ?? Study.kind(folder)?.noun ?? folder
         return (try? String(contentsOf: Vault.template("\(name) Template", root: root), encoding: .utf8)) ?? ""
     }
 }

@@ -29,7 +29,7 @@ Note folders sit under `Items/` (work), `Files/` (Zotero, Resources, OneDrive, S
 | `Items/Exams/` | Exam notes | 0 | — |
 | `Items/Assignments/` | One per assignment or hand-in (replaced `TaskNotes/Tasks/`) | 0 | — |
 | `Files/Zotero/` | One note per Zotero library item (synced by University Brain) | — | — |
-| `Templates/Claude/` | The templates Claude fills — these define the schemas. Subfolders `Items/` (5), `Files/` (7 + the `Weekly Summary Template.md` draft, not yet wired in) and `Apps/` (4); `Course Template.md` sits at the top | 17 (+1 draft) | — |
+| `Templates/Claude/` | The templates Claude fills — these define the schemas. Subfolders `Items/` (7: Lecture, Tutorial, Essay, Projects, Readings, Exam, Assignment), `Files/` (7 + the `Weekly Summary Template.md` draft, not yet wired in) and `Apps/` (4); `Course Template.md` sits at the top | 19 (+1 draft) | — |
 | `Templates/Human/` | Templates Oscar fills by hand (Unsorted Notes) | 1 | — |
 | `Templates/Guides/` | Naming Conventions, TaskNotes Guide | 2 | — |
 | `Unsorted/` | Intake tray for raw captures — cleared daily by a routine | — | — |
