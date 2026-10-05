@@ -384,9 +384,15 @@ struct SecondBrainApp: App {
     func reloadInBackground() {
         reloadTask?.cancel()
         reloadTask = Task { [weak self] in
-            let loaded = await Task.detached(priority: .utility) { (notes: Vault.load(), unsorted: Vault.unsorted()) }.value
+            // the search index goes with it: opening a note asks for it, and building it there re-read every note on the main thread after each save
+            let loaded = await Task.detached(priority: .utility) { () -> (notes: [Note], unsorted: [URL], index: (bodies: [URL: String], backlinks: [String: [Note]])) in
+                let notes = Vault.load()
+                return (notes, Vault.unsorted(), Store.buildIndex(notes))
+            }.value
             guard !Task.isCancelled, let self else { return }
-            releaseStaleClaims(); notes = loaded.notes; unsorted = loaded.unsorted; computeNeeds(); revision += 1; scheduleAutopilot()
+            releaseStaleClaims(); notes = loaded.notes; unsorted = loaded.unsorted; revision += 1
+            bodyCache = (revision, loaded.index.bodies, loaded.index.backlinks)
+            computeNeeds(); scheduleAutopilot()
         }
     }
     func reload() { releaseStaleClaims(); notes = Vault.load(); unsorted = Vault.unsorted(); computeNeeds(); revision += 1; scheduleAutopilot() }

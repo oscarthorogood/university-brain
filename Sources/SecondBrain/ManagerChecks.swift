@@ -71,9 +71,9 @@ extension Store {
         if fixed > 0 || !issues.isEmpty, once("health:\(dayStamp)") {
             let msg = "Vault health: " + (fixed > 0 ? "fixed \(fixed) `base` field\(fixed == 1 ? "" : "s"); " : "") + (issues.isEmpty ? "nothing else to report." : "\(issues.count) thing\(issues.count == 1 ? "" : "s") to look at (\(issues.prefix(3).joined(separator: "; "))).")
             if fixed > 0 {
-                let undo = InboxItem.Undo(restore: fixedRels, snapshots: Dictionary(uniqueKeysWithValues: fixedRels.compactMap { rel in
+                let undo = InboxItem.Undo(restore: fixedRels, snapshots: Dictionary(fixedRels.compactMap { rel in
                     Vault.history(Vault.root.appending(path: rel)).first.map { (rel, $0.url.lastPathComponent) }
-                }))
+                }, uniquingKeysWith: { a, _ in a }))
                 var item = InboxItem(kind: .work, agent: Agent.manager.id, title: "Vault health: fixed \(fixed) base field\(fixed == 1 ? "" : "s")", state: .done, key: "health:\(dayStamp)")
                 item.undo = undo; item.verdict = "Automated fix"
                 inbox.append(item); saveInbox()
@@ -123,9 +123,9 @@ extension Store {
             }
         }
         if changed > 0 {
-            let undo = InboxItem.Undo(restore: driftRels, snapshots: Dictionary(uniqueKeysWithValues: driftRels.compactMap { rel in
+            let undo = InboxItem.Undo(restore: driftRels, snapshots: Dictionary(driftRels.compactMap { rel in
                 Vault.history(Vault.root.appending(path: rel)).first.map { (rel, $0.url.lastPathComponent) }
-            }))
+            }, uniquingKeysWith: { a, _ in a }))
             var item = InboxItem(kind: .work, agent: Agent.manager.id, title: "Calendar drift: corrected \(changed) note\(changed == 1 ? "" : "s")", state: .done, key: "drift:\(dayStamp)")
             item.undo = undo; item.verdict = "Automated fix"
             inbox.append(item); saveInbox()

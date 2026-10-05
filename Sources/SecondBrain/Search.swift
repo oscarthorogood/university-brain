@@ -3,9 +3,17 @@ import SwiftUI
 extension Store {
     struct Hit: Identifiable { let note: Note; let snippet: String?; var id: URL { note.id } }
 
-    /// Note bodies (no frontmatter) and who links to whom, read once per vault reload.
+    /// Note bodies (no frontmatter) and who links to whom, read once per vault reload. A reload started by the file watcher builds this in the background
+    /// along with the notes; only a first call after a synchronous reload still builds it here.
     func index() -> (bodies: [URL: String], backlinks: [String: [Note]]) {
         if let c = bodyCache, c.rev == revision { return (c.bodies, c.backlinks) }
+        let built = Self.buildIndex(notes)
+        bodyCache = (revision, built.bodies, built.backlinks)
+        return built
+    }
+
+    /// Reads every note, so it is safe to run off the main thread.
+    nonisolated static func buildIndex(_ notes: [Note]) -> (bodies: [URL: String], backlinks: [String: [Note]]) {
         var bodies: [URL: String] = [:], back: [String: Set<URL>] = [:]
         let titles = Set(notes.map(\.title))
         for n in notes {
@@ -16,9 +24,8 @@ extension Store {
                 if t != n.title, titles.contains(t) { back[t, default: []].insert(n.id) }
             }
         }
-        let byURL = Dictionary(uniqueKeysWithValues: notes.map { ($0.id, $0) })
+        let byURL = Dictionary(notes.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })   // the same file can be listed twice if two folders resolve to one directory
         let links = back.mapValues { $0.compactMap { byURL[$0] }.sorted { $0.title < $1.title } }
-        bodyCache = (revision, bodies, links)
         return (bodies, links)
     }
     func backlinks(to note: Note) -> [Note] { index().backlinks[note.title] ?? [] }
