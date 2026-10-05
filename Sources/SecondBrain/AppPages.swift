@@ -373,21 +373,9 @@ struct AppSubPage: View {
     let kind: AppKind
     var body: some View {
         let _ = store.revision
-        let note = store.notes.first { $0.id == url }
         let text = StudyCache.text(url)
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Button { store.goBack() } label: { Image(systemName: "chevron.left").font(.system(size: 15, weight: .medium)) }
-                    .buttonStyle(.glassIcon()).disabled(!store.canGoBack).help("Back (⌘[)").accessibilityLabel("Back")
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(note?.display ?? url.deletingPathExtension().lastPathComponent).font(.system(size: 20, weight: .semibold, design: .serif)).lineLimit(1)
-                    Text([kind.rawValue, note?.course, note?.when.map { $0.formatted(.dateTime.day().month(.abbreviated)) }].compactMap { $0 }.joined(separator: " · "))
-                        .font(.system(size: 12)).foregroundStyle(Color.ink2).lineLimit(1)
-                }.padding(.leading, 6)
-                Spacer(minLength: 12)
-                Button { store.editingApps.insert(url) } label: { Label("Edit note", systemImage: "square.and.pencil") }.buttonStyle(.glassAction(.header))
-                if let note { RoundButton(icon: "arrow.up.forward.app", label: "Open in Obsidian") { NSWorkspace.shared.open(Vault.obsidianURL(note)) } }
-            }.padding(.horizontal, 24).padding(.top, 18).padding(.bottom, 10)
+            AppNoteHeader(url: url, kindLabel: kind.rawValue)
             Group {
                 switch kind {
                 case .mcq:
@@ -405,8 +393,40 @@ struct AppSubPage: View {
             }
         }
     }
+    /// What a note shows when the page can't use it: never its Markdown (that is behind "Edit note"), but what is missing.
     func fallback(_ text: String) -> some View {
-        ScrollView { MarkdownView(text: text).padding(24).frame(maxWidth: 760, alignment: .leading).frame(maxWidth: .infinity) }
+        let blank = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || StudyParse.lines(text).allSatisfy { l in l.isEmpty || l.hasPrefix("#") || l.hasPrefix("[!") }
+        let (title, hint): (String, String) = switch kind {
+        case .mcq: ("No questions yet", "Add numbered questions with options A. to D. and an Answer: line.")
+        case .flashcards: ("No cards yet", "Add cards as a Front: line and a Back: line.")
+        case .glossary: ("No terms yet", "Add one term per line as - **Term** — definition.")
+        case .podcast: ("No audio linked yet", "Add an Audio: line with a link to the episode, then the transcript under its own heading.")
+        }
+        let shape: String = switch kind { case .mcq: "a quiz"; case .flashcards: "a deck"; case .glossary: "a glossary"; case .podcast: "an episode" }
+        let message = blank ? hint : "Its text can’t be shown as \(shape). Press Edit note to see it. " + hint
+        return EmptyAppNote(url: url, icon: kind.icon, title: blank ? title : "This note isn’t in the \(kind.rawValue) format", hint: message)
+    }
+}
+
+/// The top of an app's note page: back, the note's name and course, and Edit note (the only way to see the Markdown).
+struct AppNoteHeader: View {
+    @Environment(Store.self) private var store
+    let url: URL
+    let kindLabel: String
+    var body: some View {
+        let note = store.notes.first { $0.id == url }
+        HStack(spacing: 10) {
+            Button { store.goBack() } label: { Image(systemName: "chevron.left").font(.system(size: 15, weight: .medium)) }
+                .buttonStyle(.glassIcon()).disabled(!store.canGoBack).help("Back (⌘[)").accessibilityLabel("Back")
+            VStack(alignment: .leading, spacing: 1) {
+                Text(note?.display ?? url.deletingPathExtension().lastPathComponent).font(.system(size: 20, weight: .semibold, design: .serif)).lineLimit(1)
+                Text([kindLabel, note?.course, note?.when.map { $0.formatted(.dateTime.day().month(.abbreviated)) }].compactMap { $0 }.joined(separator: " · "))
+                    .font(.system(size: 12)).foregroundStyle(Color.ink2).lineLimit(1)
+            }.padding(.leading, 6)
+            Spacer(minLength: 12)
+            Button { store.editingApps.insert(url) } label: { Label("Edit note", systemImage: "square.and.pencil") }.buttonStyle(.glassAction(.header))
+            if let note { RoundButton(icon: "arrow.up.forward.app", label: "Open in Obsidian") { NSWorkspace.shared.open(Vault.obsidianURL(note)) } }
+        }.padding(.horizontal, 24).padding(.top, 18).padding(.bottom, 10)
     }
 }
 
