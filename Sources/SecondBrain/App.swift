@@ -623,17 +623,21 @@ enum SideNav {
     static let items: [Entry] = [.init(name: "Lectures", icon: "play.rectangle"), .init(name: "Tutorials", icon: "person.2"), .init(name: "Readings", icon: "book"),
                                  .init(name: "Essays", icon: "doc.text"), .init(name: "Projects", icon: "folder"), .init(name: "Exams", icon: "pencil.and.list.clipboard"),
                                  .init(name: "Tasks", icon: "checkmark.circle")]
-    static let files: [Entry] = [.init(name: "Resources", icon: "square.stack.3d.up"), .init(name: "OneDrive", icon: "cloud"), .init(name: "Zotero", icon: "text.book.closed")]
-    static let apps: [Entry] = Study.kinds.map { .init(name: $0.folder, icon: $0.icon) } + [.init(name: "Research", icon: "magnifyingglass")]
+    static let files: [Entry] = {
+        let documents: [Entry] = [Entry(name: "Resources", icon: "square.stack.3d.up"), Entry(name: "OneDrive", icon: "cloud"), Entry(name: "Zotero", icon: "text.book.closed")]
+        let study: [Entry] = Study.kinds.filter { Study.inFiles.contains($0.folder) }.map { Entry(name: $0.folder, icon: $0.icon) }
+        return documents + study + [Entry(name: "Research", icon: "magnifyingglass")]
+    }()
+    static let apps: [Entry] = Study.kinds.filter { !Study.inFiles.contains($0.folder) }.map { Entry(name: $0.folder, icon: $0.icon) }
     static let folders = items + files + apps
     /// Files and Apps pages show a browser instead of a plain list.
     static let grouped = Set((files + apps).map(\.name))
     static func isHidden(_ name: String, _ raw: String) -> Bool { raw.split(separator: ",").contains(Substring(name)) }
     /// Tasks is shown as "Assignments"; its id stays "Tasks" (folder and page names).
     static func label(_ name: String) -> String { name == "Tasks" ? "Assignments" : name }
-    /// Notes still to do in a folder; Files have none.
+    /// Notes still to do in a folder; the document folders (Resources, OneDrive, Zotero) have none.
     @MainActor static func openCount(_ name: String, _ store: Store) -> Int {
-        files.contains { $0.name == name } ? 0 : store.openCount(name == "Tasks" ? "TaskNotes/Tasks" : name)
+        ["Resources", "OneDrive", "Zotero"].contains(name) ? 0 : store.openCount(name == "Tasks" ? "TaskNotes/Tasks" : name)
     }
 }
 
