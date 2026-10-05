@@ -1297,7 +1297,7 @@ struct AgentPage: View {
             } second: {
                 VStack(spacing: 12) {
                     if code == Agent.manager.id { ManagerCard() } else { NeedsCard(code: code) }
-                    Card(title: "Try", trailing: "Won’t edit your notes") {
+                    Card(title: "Try", trailing: "Edits only if you ask") {
                         VStack(spacing: 6) {
                             ForEach(role.actions, id: \.self) { a in
                                 Button { store.ask(code, a) } label: {
