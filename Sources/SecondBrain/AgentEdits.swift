@@ -67,7 +67,8 @@ extension Store {
             chats[chat, default: []].append(Message(fromAgent: true, text: "→ \(from) can’t do this (\(why.prefix(120))) · **\(Agent.role(route.agent).name)** · \(route.reason)"))
             log(Agent.manager.id, "Passed “\(text.prefix(50))” on to \(Agent.role(route.agent).name): \(from) couldn’t (\(why.prefix(80)))")
             let general = route.agent == Agent.manager.id
-            let reply = await converse(route.agent, shown: text, prompt: text, tier: tier ?? route.tier, mirror: chat == route.agent ? nil : chat, echo: route.agent != chat && !general)
+            let reply = await converse(route.agent, shown: text, prompt: text, tier: tier ?? route.tier, mirror: chat == route.agent || chat == Agent.manager.id ? nil : chat, echo: route.agent != chat && !general)
+            if chat == Agent.manager.id, !general, reply.session != nil, reply.delegation == nil { chats[chat, default: []].append(Message(fromAgent: true, text: "→ **\(Agent.role(route.agent).name)** answered in their own chat")) }
             guard let next = reply.delegation else { return }
             if general { break }
             tried.insert(route.agent); why = next

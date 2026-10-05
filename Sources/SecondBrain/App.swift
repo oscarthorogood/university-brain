@@ -381,9 +381,10 @@ struct SecondBrainApp: App {
                         ? "\nDo only your stage; don't produce the final result. End with a `Handoff` section giving \(names[i + 1]) exactly what they need: sources actually read (note, PDF page range or URL), the facts, and any gaps."
                         : "\nYou are the last stage: produce the finished result the request asks for from the handed-over material. If something it needed is missing, say so plainly instead of inventing it."
                 }
-                let reply = await converse(r.agent, shown: team ? "\(text) (stage \(i + 1) of \(steps.count), from the Manager)" : text, prompt: prompt, tier: tier ?? r.tier, mirror: m)
+                let reply = await converse(r.agent, shown: team ? "\(text) (stage \(i + 1) of \(steps.count), from the Manager)" : text, prompt: prompt, tier: tier ?? r.tier, mirror: nil)   // the Manager only forwards: the agent answers in its own chat
                 if let why = reply.delegation { await passOn(text, tried: [r.agent], why: why, in: m, tier: tier); break }
                 if reply.session == nil { chats[m, default: []].append(Message(fromAgent: true, text: reply.stopped ? "Stopped." : "\(names[i]) couldn’t finish, so I stopped there.")); break }
+                if r.agent != m { chats[m, default: []].append(Message(fromAgent: true, text: "→ **\(names[i])** answered in their own chat")) }
                 if team, i == steps.count - 1, !done.isEmpty {   // a different agent checks the finished result against what was handed over
                     chats[m, default: []].append(Message(fromAgent: true, text: "→ **Checking** the result against what was handed over"))
                     let problems = await Agent.verify(result: reply.text, handoff: done.map(\.text).joined(separator: "\n\n"), root: Vault.root)
