@@ -62,9 +62,12 @@ enum Sections {
     }
     /// Still the template.
     static func isTemplate(_ heading: String, in text: String, template: String, legacy: [String] = Sections.legacy) -> Bool { !hasContent(heading, in: text, template: template, legacy: legacy) }
+    /// The template's name for a folder: "Lectures" → "Lecture" (the file is "Lecture Template.md").
+    static func templateName(forFolder folder: String) -> String {
+        ["Lectures": "Lecture", "Tutorials": "Tutorial", "Essays": "Essay", "Projects": "Projects", "Exams": "Exam", "Readings": "Readings", "Research": "Research"][folder] ?? Study.kind(folder)?.noun ?? folder
+    }
     static func template(forFolder folder: String, root: URL = Vault.root) -> String {
-        let name = ["Lectures": "Lecture", "Tutorials": "Tutorial", "Essays": "Essay", "Projects": "Projects", "Exams": "Exam", "Readings": "Readings", "Research": "Research"][folder] ?? Study.kind(folder)?.noun ?? folder
-        return (try? String(contentsOf: Vault.template("\(name) Template", root: root), encoding: .utf8)) ?? ""
+        (try? String(contentsOf: Vault.template("\(templateName(forFolder: folder)) Template", root: root), encoding: .utf8)) ?? ""
     }
 }
 
@@ -92,13 +95,16 @@ enum Review {
     }
 
     /// Structural checks on one edited note: nothing the helper wasn't given has changed.
-    static func checkEdit(rel: String, before: String, after: String, sections allowed: [String]?, template: String, legacy: [String] = Sections.legacy) -> Verdict {
+    /// `restructure`: the job is bringing the note to its template, so a frontmatter key may be respelled (`course` → `Course`) and an empty `base` filled, as long as
+    /// every value is kept; only the text below the frontmatter is held word for word.
+    static func checkEdit(rel: String, before: String, after: String, sections allowed: [String]?, template: String, legacy: [String] = Sections.legacy, restructure: Bool = false) -> Verdict {
         var v = Verdict()
         let b = Sections.parse(before), a = Sections.parse(after)
         let free: Set<String> = ["status", "summary", "readings", "references", "related", "tags"]   // the Agent In Progress mark flips status; the rest are fields a job may fill
         for (key, block) in b.front where !free.contains(key) {
-            guard let now = a.front.first(where: { $0.key == key }) else { v.problems.append("`\(key)` was removed from the frontmatter"); continue }
-            if now.block != block, ["course", "Course", "base", "date", "due", "Lecture No.", "Tutorial No."].contains(key) { v.problems.append("`\(key)` was changed") }
+            guard let now = a.front.first(where: { restructure ? $0.key.lowercased() == key.lowercased() : $0.key == key }) else { v.problems.append("`\(key)` was removed from the frontmatter"); continue }
+            let same = restructure ? now.block.dropFirst(now.key.count) == block.dropFirst(key.count) : now.block == block
+            if !same, !(restructure && TemplateApply.isEmpty(block)), ["course", "Course", "base", "date", "due", "Lecture No.", "Tutorial No."].contains(key) { v.problems.append("`\(key)` was changed") }
         }
         let oldHeads = b.sections.map(\.title).filter { !$0.isEmpty }, newHeads = Set(a.sections.map { Sections.normal($0.title) })
         for h in oldHeads where !newHeads.contains(Sections.normal(h)) { v.problems.append("the section “\(h)” was removed") }
@@ -110,8 +116,8 @@ enum Review {
             }
         }
         // Oscar's own lines (anything that isn't in the template) must still be there
-        let beforeLines = before.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
-        let afterLines = after.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+        let beforeLines = (restructure ? Vault.body(before) : before).components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+        let afterLines = (restructure ? Vault.body(after) : after).components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
         let templateLines = Set((template.components(separatedBy: "\n") + legacy).map { $0.trimmingCharacters(in: .whitespaces) })
 
         var lost = [String]()

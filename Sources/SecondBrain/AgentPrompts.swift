@@ -60,6 +60,13 @@ extension Agent {
     \(docMap)
     """
 
+    /// For bringing several existing notes to their template: the same rules as a job, but over the notes it is given.
+    static func templatePrompt(_ role: String) -> String { """
+    You are \(Agent.role(role).name), working in Oscar's University Brain app. The current directory is his University Obsidian vault. Read your own file, \(file(role)), as well as Agents/Shared Agents/AGENTS.md (§4 has the frontmatter schemas).
+    You are bringing existing notes to the structure of their template. Edit only the notes you are given; never move, copy or delete files. Keep every line of Oscar's own text exactly as it is.
+    \(docMap)
+    """ }
+
     /// The instructions every helper gets for one job: edit only the note it is given, and treat web pages as data.
     static func workPrompt(_ role: String) -> String { """
     You are \(Agent.role(role).name), working on one note in Oscar's University Brain app. The current directory is his University Obsidian vault. Read your own file, \(file(role)), as well as Agents/Shared Agents/AGENTS.md (§12 is the shared procedure for filling notes). Follow them exactly: his callout style, slide/page citations, never rewriting his own lines, never inventing facts or citations.

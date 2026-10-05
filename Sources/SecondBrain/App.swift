@@ -265,7 +265,7 @@ struct SecondBrainApp: App {
     var thinking: Set<String> = []
     /// What an agent has written so far of the answer it is still working on, for its chat to show growing.
     var streaming: [String: String] = [:]
-    @ObservationIgnored private var chatTasks: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored var chatTasks: [String: Task<Void, Never>] = [:]
     /// Stops the agent working on a chat reply: the process ends and the chat says so.
     func stopChat(_ code: String) { chatTasks[code]?.cancel() }
     @ObservationIgnored private var sessions: [String: String] = Store.savedChats.sessions
