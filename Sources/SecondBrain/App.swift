@@ -810,7 +810,7 @@ struct MainPanel: View {
             }
         case .folder(let f): ItemsPage(title: f, folders: [f == "Tasks" ? "TaskNotes/Tasks" : f]).id(f)
         case .inbox: InboxPage()
-        case .unsorted(let url): UnsortedPage(url: url)
+        case .unsorted(let url): if url.pathExtension == "md" { NotePage(url: url) } else { UnsortedPage(url: url) }
         case .search: SearchPage()
         case .sortNow: SortNowPage()
         case .agent(let c): AgentPage(code: c)
@@ -1052,80 +1052,28 @@ struct Chip: View {
     }
 }
 
+/// A file waiting in Unsorted that isn't a note (notes open in the normal note page): a preview with Open and Show in Finder.
+/// Filing is done by Sort Now and the Manager.
 struct UnsortedPage: View {
-    @Environment(Store.self) private var store
     let url: URL
-    @State private var detected: String?
-    @State private var detectedBy = ""
-    @State private var key: String?
-    @State private var finished = false
-    @State private var text = ""
-    @State private var saved = ""
-    @State private var selection: TextSelection?
     var risky: Bool { url.pathExtension == "txt" }
 
     var body: some View {
         VStack(spacing: 0) {
-            PageHeader(title: url.pathExtension == "md" ? "Quick Note" : Vault.label(url),
-                       subtitle: url.pathExtension == "md" ? "Waiting in Unsorted" : "\(url.pathExtension.uppercased()) · waiting in Unsorted") {
-                HStack(spacing: 0) {
-                    if url.pathExtension == "md" { QuickNote(url: url, text: $text, saved: $saved, selection: $selection).formatBar }
-                    Button { NSWorkspace.shared.open(url) } label: { Label("Open", systemImage: "arrow.up.forward.app") }
-                        .buttonStyle(.glassAction(.header))
-                        // Open sits over the 340pt side column, so the bar's right edge lines up with the note box:
-                        // column 340 + gap 12 − (header inset 28 − content inset 12) = 336.
-                        .frame(width: 336, alignment: .trailing)
-                }
+            PageHeader(title: Vault.label(url), subtitle: "\(url.pathExtension.uppercased()) · waiting in Unsorted") {
+                Button { NSWorkspace.shared.open(url) } label: { Label("Open", systemImage: "arrow.up.forward.app") }.buttonStyle(.glassAction(.header))
             }
-            SplitPane(fixed: .second, width: 340, stacked: (440, 440)) {
-                Card {
-                    if url.pathExtension == "md" {
-                        QuickNote(url: url, text: $text, saved: $saved, selection: $selection).id(url)
-                    } else if url.pathExtension.lowercased() == "pdf" {
-                        PDFViewer(url: url).id(url)
-                        Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }.buttonStyle(.glassRow).padding(16)
-                    } else {
-                        Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().scaledToFit().frame(width: 128, height: 128)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }.buttonStyle(.glassRow).padding(16)
-                    }
+            Card {
+                if risky { Label("Looks like credentials, so it won’t be filed. Move it out of the vault and rotate the key if it’s real.", systemImage: "exclamationmark.triangle").font(.system(size: 13)).foregroundStyle(Color.redFG).padding(16).frame(maxWidth: .infinity, alignment: .leading) }
+                if url.pathExtension.lowercased() == "pdf" {
+                    PDFViewer(url: url).id(url)
+                } else {
+                    Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().scaledToFit().frame(width: 128, height: 128)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-            } second: {
-                VStack(spacing: 12) {
-                    Card(title: "Detected") {
-                        Group {
-                            if risky { Label("Looks like credentials, so it won’t be filed. Move it out of the vault and rotate the key if it’s real.", systemImage: "exclamationmark.triangle").foregroundStyle(Color.redFG) }
-                            else if let d = detected { Label("\(d == "SM" ? "Strategy" : d) course file · \(detectedBy)", systemImage: "circle.fill").foregroundStyle(Color.course(d)) }
-                            else if detectedBy.isEmpty { Label("Checking…", systemImage: "hourglass").foregroundStyle(Color.ink2) }
-                            else { Label("No course detected", systemImage: "questionmark.circle").foregroundStyle(Color.ink2) }
-                        }.font(.system(size: 13)).padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                    }.frame(height: 110)
-                    Card(title: "Filing") { filing.padding(.horizontal, 16).padding(.bottom, 16).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading) }
-                }
+                Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }.buttonStyle(.glassRow).padding(16)
             }.padding([.horizontal, .bottom], 12)
         }
-        .task(id: url) {
-            key = nil; finished = false; detected = nil; detectedBy = ""; selection = nil
-            saved = url.pathExtension == "md" ? ((try? String(contentsOf: url, encoding: .utf8)) ?? "") : ""; text = saved
-            if let d = Detect.fromName(url) { detected = d; detectedBy = "from the filename" }
-            else { detected = await Detect.onDevice(url); detectedBy = "on-device" }
-        }
-    }
-
-    @ViewBuilder var filing: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let key { JobProgress(key: key, finished: finished) }
-            else {
-                Text(risky ? "This one stays put until you deal with it." : "The Sorter files it and the Manager checks the result. You can undo it afterwards. Or use Sort Now to file everything at once.")
-                    .font(.system(size: 13)).foregroundStyle(Color.ink2)
-                if !risky { Button { run() } label: { Label("File Now", systemImage: "sparkle") }.buttonStyle(.glassAction(.control, prominent: true)) }
-            }
-        }
-    }
-    func run() {
-        let k = "manual:file:" + UUID().uuidString
-        key = k; finished = false
-        Task { await store.manualJob(.sorting([url], key: k)); finished = true }
     }
 }
 

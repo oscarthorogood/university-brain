@@ -203,15 +203,41 @@ struct FileRow: View {
     }
 }
 
-/// Everything waiting in Unsorted, with the ways to add to it. Pressing an item opens it to file.
+/// Everything waiting in Unsorted, laid out like an Items page: one sortable table. A note opens in the note page, any other file in a preview.
 struct InboxPage: View {
     @Environment(Store.self) private var store
+    @State private var query = ""
+    @State private var key = "Date"
+    @State private var up = false   // newest first
+    static let columns = ["Title", "Course", "Date", "Type"]
+    static func width(_ c: String) -> CGFloat { ["Title": .infinity, "Course": 230, "Date": 110, "Type": 100][c]! }
+
+    struct Row { let url: URL; let title: String; let code: String?; let course: String; let added: Date?; let type: String }
+
+    func value(_ r: Row) -> String {
+        switch key {
+        case "Title": r.title.lowercased()
+        case "Course": r.course.lowercased()
+        case "Type": r.type
+        default: r.added.map { String(format: "%015.0f", $0.timeIntervalSince1970) } ?? "~"
+        }
+    }
+
     var body: some View {
-        let items = store.unsorted
+        let every = store.unsorted.map { url -> Row in
+            let code = Detect.fromName(url), ext = url.pathExtension
+            return Row(url: url, title: Vault.label(url), code: code,
+                       course: code.map { c in Vault.courses.first { $0.value == c }?.key ?? c } ?? "",
+                       added: (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate,
+                       type: ext == "md" ? "Note" : (ext.isEmpty ? "File" : ext.uppercased()))
+        }
+        let rows = every
+            .filter { query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) || $0.course.localizedCaseInsensitiveContains(query) || $0.type.localizedCaseInsensitiveContains(query) }
+            .sorted { up ? value($0) < value($1) : value($0) > value($1) }
         VStack(spacing: 0) {
-            PageHeader(title: "Unsorted", subtitle: items.isEmpty ? "All sorted" : "\(items.count) waiting") {
+            PageHeader(title: "Unsorted", subtitle: every.isEmpty ? "All sorted" : "\(every.count) waiting · \(every.filter { $0.type == "Note" }.count) notes") {
                 HStack(spacing: 10) {
-                    if !items.isEmpty { Button { store.page = .sortNow } label: { Label("Sort Now", systemImage: "sparkles") }.buttonStyle(.glassAction(.header)) }
+                    if !every.isEmpty { Button { store.page = .sortNow } label: { Label("Sort Now", systemImage: "sparkles") }.buttonStyle(.glassAction(.header)) }
                     RoundButton(icon: "square.and.pencil", label: "New note") { store.newNote() }
                     RoundButton(icon: "arrow.up.doc", label: "Add file") { store.addFile() }
                     RoundButton(icon: "link", label: "Add link") { store.addLink() }
@@ -220,26 +246,51 @@ struct InboxPage: View {
                 }
             }
             Card {
-                if items.isEmpty { Label("All sorted", systemImage: "checkmark.circle").font(.system(size: 13)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity, maxHeight: .infinity) }
+                if every.isEmpty { Label("All sorted", systemImage: "checkmark.circle").font(.system(size: 13)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity, maxHeight: .infinity) }
                 else {
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 0) {
-                            ForEach(items, id: \.self) { url in
-                                let ext = url.pathExtension
-                                Button { store.page = .unsorted(url) } label: {
-                                    HStack(spacing: 10) {
-                                        Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().frame(width: 20, height: 20)
-                                        Text(Vault.label(url)).lineLimit(1).truncationMode(.middle).foregroundStyle(ext == "txt" ? Color.redFG : Color.ink)
-                                        Spacer()
-                                        Text(ext == "md" ? "Note" : ext.uppercased()).font(.system(size: 11)).foregroundStyle(Color.ink2)
-                                    }.font(.system(size: 13)).padding(.horizontal, 16).padding(.vertical, 6).contentShape(.rect)
-                                }.buttonStyle(.glassRow).contextMenu { UnsortedMenu(url: url) }
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(Color.ink2)
+                        TextField("Filter", text: $query).textFieldStyle(.plain)
+                    }.font(.system(size: 13)).glassField().padding(.horizontal, 12).padding(.vertical, 10)
+                    if rows.isEmpty { Text("No matches").font(.system(size: 13)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity, maxHeight: .infinity) }
+                    else {
+                        HStack(spacing: 8) {
+                            Color.clear.frame(width: 22, height: 1)
+                            ForEach(Self.columns, id: \.self) { c in
+                                Button { if key == c { up.toggle() } else { key = c; up = true } } label: {
+                                    HStack(spacing: 3) { Text(c); if key == c { Image(systemName: up ? "chevron.up" : "chevron.down").font(.system(size: 8, weight: .bold)) } }
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }.buttonStyle(.plain).frame(maxWidth: Self.width(c), alignment: .leading)
                             }
-                        }
+                        }.font(.caption.weight(.semibold)).foregroundStyle(Color.ink2).padding(.horizontal, 14).padding(.vertical, 8)
+                        Rectangle().fill(Color.line.opacity(0.6)).frame(height: 1)
+                        ScrollView { LazyVStack(spacing: 0) { ForEach(rows, id: \.url) { UnsortedRow(row: $0) } } }
                     }
                 }
             }.padding([.horizontal, .bottom], 12)
         }
+    }
+}
+
+private struct UnsortedRow: View {
+    @Environment(Store.self) private var store
+    let row: InboxPage.Row
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(nsImage: NSWorkspace.shared.icon(forFile: row.url.path)).resizable().frame(width: 16, height: 16).frame(width: 22)
+            Button { store.page = .unsorted(row.url) } label: {
+                HStack(spacing: 8) {
+                    Text(row.title).lineLimit(1).truncationMode(.middle).foregroundStyle(row.url.pathExtension == "txt" ? Color.redFG : Color.ink).frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 5) {
+                        if row.code != nil { Circle().fill(Color.course(row.code)).frame(width: 7, height: 7) }
+                        Text(row.course.isEmpty ? "—" : row.course).lineLimit(1)
+                    }.frame(maxWidth: InboxPage.width("Course"), alignment: .leading)
+                    Text(row.added.map { $0.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)) } ?? "—").monospacedDigit().frame(maxWidth: InboxPage.width("Date"), alignment: .leading)
+                    Text(row.type).frame(maxWidth: InboxPage.width("Type"), alignment: .leading)
+                }.font(.system(size: 12)).contentShape(.rect)
+            }.buttonStyle(.plain)
+        }.padding(.horizontal, 14).padding(.vertical, 7).modifier(GlassRowHover())
+        .contextMenu { UnsortedMenu(url: row.url) }
     }
 }
 

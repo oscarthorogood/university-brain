@@ -460,7 +460,7 @@ struct NotePage: View {
         c.queryItems = [.init(name: "vault", value: Vault.name), .init(name: "file", value: url.path.replacingOccurrences(of: Vault.root.path + "/", with: "").replacingOccurrences(of: ".md", with: ""))]
         NSWorkspace.shared.open(c.url!)
     }
-    func load() { saved = (try? String(contentsOf: url, encoding: .utf8)) ?? ""; text = saved }
+    func load() { saved = (try? String(contentsOf: url, encoding: .utf8)) ?? ""; text = saved; if saved.isEmpty { editing = true } }   // a blank new note opens ready to type
     func save() {
         do { try Vault.write(text, to: url); saved = text; saveError = nil }
         catch { saveError = "Couldn’t save: \(error.localizedDescription)" }

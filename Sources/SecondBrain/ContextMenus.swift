@@ -23,7 +23,6 @@ struct UnsortedMenu: View {
     @Environment(Store.self) private var store
     let url: URL
     var body: some View {
-        if url.pathExtension != "txt" { Button("File Now…") { store.page = .unsorted(url) } }
         Button("Open") { NSWorkspace.shared.open(url) }
         Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
         Divider()
