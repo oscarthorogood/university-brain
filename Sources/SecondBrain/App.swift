@@ -571,7 +571,9 @@ struct Sidebar: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 1) {
                     NavRow(icon: "house", title: "Home", page: .overview)
-                    NavRow(icon: "tray", title: "Unsorted", page: .inbox, meta: store.unsorted.count, on: { switch store.page { case .inbox, .unsorted, .sortNow: true; default: false } }())
+                    if !SideNav.isHidden(SideNav.pinned, hidden) {
+                        NavRow(icon: "tray", title: "Unsorted", page: .inbox, meta: store.unsorted.count, on: { switch store.page { case .inbox, .folder("Unsorted"), .unsorted, .sortNow: true; default: false } }())
+                    }
                     NavRow(icon: "message", title: "Messages", page: .messages, on: { switch store.page { case .messages, .agent: true; default: false } }())
                     NavRow(icon: "number", title: "Tags", page: .tags)
 
@@ -585,7 +587,7 @@ struct Sidebar: View {
                             NavRow(icon: shape, title: c == "SM" ? "Strategy" : c, page: .course(c), iconTint: .course(c)).contextMenu { CourseMenu(code: c) }
                         }
                     }
-                    NavSection("Items") { entries(SideNav.items) }
+                    NavSection("Items") { entries(SideNav.items.filter { $0.name != SideNav.pinned }) }
                     NavSection("Files") { entries(SideNav.files) }
                     NavSection("Apps") { entries(SideNav.apps) }
                 }
@@ -622,7 +624,9 @@ struct NoticeButton: View {
 /// The three note groups the sidebar lists, and the folders in each. Page ids are the short folder names (see `Vault.places`).
 enum SideNav {
     struct Entry { let name: String; let icon: String }
-    static let items: [Entry] = [.init(name: "Lectures", icon: "play.rectangle"), .init(name: "Tutorials", icon: "person.2"), .init(name: "Readings", icon: "book"),
+    /// Unsorted is an Items page too, but it is pinned at the top of the sidebar instead of listed under Items.
+    static let pinned = "Unsorted"
+    static let items: [Entry] = [.init(name: "Unsorted", icon: "tray"), .init(name: "Lectures", icon: "play.rectangle"), .init(name: "Tutorials", icon: "person.2"), .init(name: "Readings", icon: "book"),
                                  .init(name: "Essays", icon: "doc.text"), .init(name: "Projects", icon: "folder"), .init(name: "Exams", icon: "pencil.and.list.clipboard"),
                                  .init(name: "Tasks", icon: "checkmark.circle")]
     static let files: [Entry] = {
@@ -639,7 +643,8 @@ enum SideNav {
     static func label(_ name: String) -> String { name == "Tasks" ? "Assignments" : name }
     /// Notes still to do in a folder; the document folders (Resources, OneDrive, Zotero) have none.
     @MainActor static func openCount(_ name: String, _ store: Store) -> Int {
-        ["Resources", "OneDrive", "Zotero"].contains(name) ? 0 : store.openCount(name == "Tasks" ? "TaskNotes/Tasks" : name)
+        if name == pinned { return store.unsorted.count }
+        return ["Resources", "OneDrive", "Zotero"].contains(name) ? 0 : store.openCount(name == "Tasks" ? "TaskNotes/Tasks" : name)
     }
 }
 
@@ -728,7 +733,9 @@ struct SidebarRail: View {
             ScrollView {
                 VStack(spacing: 2) {
                     RailItem(icon: "house", label: "Home", on: store.page == .overview) { store.page = .overview }
-                    RailItem(icon: "tray", label: "Unsorted", badge: store.unsorted.count, on: { switch store.page { case .inbox, .unsorted, .sortNow: true; default: false } }()) { store.page = .inbox }
+                    if !SideNav.isHidden(SideNav.pinned, hidden) {
+                        RailItem(icon: "tray", label: "Unsorted", badge: store.unsorted.count, on: { switch store.page { case .inbox, .folder("Unsorted"), .unsorted, .sortNow: true; default: false } }()) { store.page = .inbox }
+                    }
                     RailItem(icon: "message", label: "Messages", on: { switch store.page { case .messages, .agent: true; default: false } }()) { store.page = .messages }
                     RailItem(icon: "number", label: "Tags", on: store.page == .tags) { store.page = .tags }
                     RailItem(icon: "chart.bar", label: "Week", on: store.page == .week) { store.page = .week }
@@ -739,7 +746,7 @@ struct SidebarRail: View {
                         RailItem(icon: shape, label: c == "SM" ? "Strategy" : c, tint: .course(c), on: store.page == .course(c)) { store.page = .course(c) }
                     }
                     Divider().padding(.vertical, 6).padding(.horizontal, 12)
-                    group("Items", icon: "tray.full", SideNav.items)
+                    group("Items", icon: "tray.full", SideNav.items.filter { $0.name != SideNav.pinned })
                     group("Files", icon: "doc.on.doc", SideNav.files)
                     group("Apps", icon: "square.grid.2x2", SideNav.apps)
                 }
@@ -838,6 +845,7 @@ struct MainPanel: View {
     }
     @ViewBuilder var page: some View {
         switch store.page {
+        case .inbox, .folder("Unsorted"): ItemsPage(title: "Unsorted", folders: ["Unsorted"], inbox: true).id("Unsorted")
         case .overview: OverviewPage()
         case .week: WeekPage()
         case .month: MonthPage()
@@ -852,7 +860,6 @@ struct MainPanel: View {
             default: NoteBrowserPage(title: f, folders: [f]).id(f)
             }
         case .folder(let f): ItemsPage(title: f, folders: [f == "Tasks" ? "TaskNotes/Tasks" : f]).id(f)
-        case .inbox: InboxPage()
         case .unsorted(let url): if url.pathExtension == "md" { NotePage(url: url).id(url) } else { UnsortedPage(url: url) }
         case .search: SearchPage()
         case .sortNow: SortNowPage()

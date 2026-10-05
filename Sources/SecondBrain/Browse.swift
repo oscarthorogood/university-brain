@@ -232,95 +232,19 @@ struct FileRow: View {
     }
 }
 
-/// Everything waiting in Unsorted, laid out like an Items page: gallery, grid or a sortable table. A note opens in the note page, any other file in a preview.
-struct InboxPage: View {
-    @Environment(Store.self) private var store
-    @AppStorage("viewMode") private var viewMode = ViewMode.gallery
-    @State private var query = ""
-    @State private var key = "Date"
-    @State private var up = false   // newest first
-    static let columns = ["Title", "Course", "Date", "Type"]
-    static func width(_ c: String) -> CGFloat { ["Title": .infinity, "Course": 230, "Date": 110, "Type": 100][c]! }
-
-    struct Row { let url: URL; let title: String; let code: String?; let course: String; let added: Date?; let type: String }
-
-    func value(_ r: Row) -> String {
-        switch key {
-        case "Title": r.title.lowercased()
-        case "Course": r.course.lowercased()
-        case "Type": r.type
-        default: r.added.map { String(format: "%015.0f", $0.timeIntervalSince1970) } ?? "~"
+extension Store {
+    /// Everything in Unsorted as items, so Unsorted can be an Items page like Lectures. A file is an item whose course is what the Sorter
+    /// would read from its name, whose date is when it was added, and whose status is its kind (Note, PDF…).
+    var unsortedItems: [Note] {
+        unsorted.map { url in
+            let ext = url.pathExtension
+            let code = Detect.fromName(url)
+            return Note(id: url, folder: "Unsorted", title: Vault.label(url),
+                        status: ext == "md" ? "Note" : (ext.isEmpty ? "File" : ext.uppercased()),
+                        course: code, when: (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate,
+                        path: Vault.rel(url).replacingOccurrences(of: ".md", with: ""),
+                        courseName: code.flatMap { c in Vault.courses.first { $0.value == c }?.key } ?? "")
         }
-    }
-
-    var body: some View {
-        let every = store.unsorted.map { url -> Row in
-            let code = Detect.fromName(url), ext = url.pathExtension
-            return Row(url: url, title: Vault.label(url), code: code,
-                       course: code.map { c in Vault.courses.first { $0.value == c }?.key ?? c } ?? "",
-                       added: (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate,
-                       type: ext == "md" ? "Note" : (ext.isEmpty ? "File" : ext.uppercased()))
-        }
-        let rows = every
-            .filter { query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) || $0.course.localizedCaseInsensitiveContains(query) || $0.type.localizedCaseInsensitiveContains(query) }
-            .sorted { up ? value($0) < value($1) : value($0) > value($1) }
-        VStack(spacing: 0) {
-            PageHeader(title: "Unsorted", subtitle: every.isEmpty ? "All sorted" : "\(every.count) waiting · \(every.filter { $0.type == "Note" }.count) notes", compact: true) {
-                HStack(spacing: 10) {
-                    if !every.isEmpty { Button { store.page = .sortNow } label: { Label("Sort Now", systemImage: "sparkles") }.buttonStyle(.glassAction(.header)) }
-                    PageToolbar(title: "Unsorted", finder: Vault.root.appending(path: "Unsorted"), mode: $viewMode, query: $query,
-                                sortKeys: Self.columns, sortKey: $key, ascending: $up) {
-                        Button("Add File…") { store.addFile() }
-                        Button("Add Link…") { store.addLink() }
-                        Button("Voice Memo…") { store.voiceMemo = true }
-                    }
-                }
-            }
-            if every.isEmpty { Label("All sorted", systemImage: "checkmark.circle").font(.system(size: 13)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity, maxHeight: .infinity) }
-            else if rows.isEmpty { Text("No matches").font(.system(size: 13)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity, maxHeight: .infinity) }
-            else if viewMode != .list {
-                NoteGallery(items: rows.map { r in
-                    GalleryItem(id: r.url, title: r.title, subtitle: [r.type, r.course.isEmpty ? nil : r.course].compactMap { $0 }.joined(separator: " · "),
-                                code: r.code, open: { store.page = .unsorted(r.url) }, menu: AnyView(UnsortedMenu(url: r.url)))
-                }, compact: viewMode == .grid)
-            } else {
-                Card {
-                    HStack(spacing: 8) {
-                        Color.clear.frame(width: 22, height: 1)
-                        ForEach(Self.columns, id: \.self) { c in
-                            Button { if key == c { up.toggle() } else { key = c; up = true } } label: {
-                                HStack(spacing: 3) { Text(c); if key == c { Image(systemName: up ? "chevron.up" : "chevron.down").font(.system(size: 8, weight: .bold)) } }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }.buttonStyle(.plain).frame(maxWidth: Self.width(c), alignment: .leading)
-                        }
-                    }.font(.caption.weight(.semibold)).foregroundStyle(Color.ink2).padding(.horizontal, 14).padding(.vertical, 8)
-                    Rectangle().fill(Color.line.opacity(0.6)).frame(height: 1)
-                    ScrollView { LazyVStack(spacing: 0) { ForEach(rows, id: \.url) { UnsortedRow(row: $0) } } }
-                }.padding([.horizontal, .bottom], 12)
-            }
-        }
-    }
-}
-
-private struct UnsortedRow: View {
-    @Environment(Store.self) private var store
-    let row: InboxPage.Row
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: row.url.path)).resizable().frame(width: 16, height: 16).frame(width: 22)
-            Button { store.page = .unsorted(row.url) } label: {
-                HStack(spacing: 8) {
-                    Text(row.title).lineLimit(1).truncationMode(.middle).foregroundStyle(row.url.pathExtension == "txt" ? Color.redFG : Color.ink).frame(maxWidth: .infinity, alignment: .leading)
-                    HStack(spacing: 5) {
-                        if row.code != nil { Circle().fill(Color.course(row.code)).frame(width: 7, height: 7) }
-                        Text(row.course.isEmpty ? "—" : row.course).lineLimit(1)
-                    }.frame(maxWidth: InboxPage.width("Course"), alignment: .leading)
-                    Text(row.added.map { $0.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)) } ?? "—").monospacedDigit().frame(maxWidth: InboxPage.width("Date"), alignment: .leading)
-                    Text(row.type).frame(maxWidth: InboxPage.width("Type"), alignment: .leading)
-                }.font(.system(size: 12)).contentShape(.rect)
-            }.buttonStyle(.plain)
-        }.padding(.horizontal, 14).padding(.vertical, 7).modifier(GlassRowHover())
-        .contextMenu { UnsortedMenu(url: row.url) }
     }
 }
 
@@ -328,6 +252,8 @@ private struct UnsortedRow: View {
 struct ItemsPage: View {
     @Environment(Store.self) private var store
     let title: String; let folders: [String]
+    /// Unsorted is an Items page too, listing everything in the intake folder; it sits at the top of the sidebar instead of under Items.
+    var inbox = false
     @AppStorage("viewMode") private var viewMode = ViewMode.gallery
     @State private var showAll = false
     @State private var course: String?   // nil = every course
@@ -335,53 +261,66 @@ struct ItemsPage: View {
     @State private var key = "Date"
     @State private var up = true
     static let columns = ["Title", "Course", "Date", "Status"]
-    static func width(_ c: String) -> CGFloat { ["Title": .infinity, "Course": 230, "Date": 110, "Status": 100][c]! }
+    var columns: [String] { inbox ? ["Title", "Course", "Date", "Type"] : Self.columns }
+    static func width(_ c: String) -> CGFloat { ["Title": .infinity, "Course": 230, "Date": 110, "Status": 100, "Type": 100][c]! }
 
     func value(_ r: (note: Note, course: String)) -> String {
         switch key {
         case "Title": r.note.display.lowercased()
         case "Course": r.course.lowercased()
-        case "Status": r.note.status
+        case "Status", "Type": r.note.status
         default: r.note.when.map { String(format: "%015.0f", $0.timeIntervalSince1970) } ?? "~"
         }
     }
 
     var body: some View {
         let known = FileBrowserPage(root: "Resources").courses, current = Set(Vault.courses.keys)
-        let every = store.notes.filter { folders.contains($0.folder) }.map { (note: $0, course: NoteBrowserPage.course($0, known: known)) }
+        let source: [Note] = inbox ? store.unsortedItems : store.notes.filter { folders.contains($0.folder) }
+        let every = source.map { (note: $0, course: NoteBrowserPage.course($0, known: known)) }
         let rows = every
-            .filter { (showAll || current.contains($0.course)) && (course == nil || $0.course == course) && (query.isEmpty || $0.note.display.localizedCaseInsensitiveContains(query) || $0.course.localizedCaseInsensitiveContains(query)) }
+            .filter { (showAll || inbox || current.contains($0.course)) && (course == nil || $0.course == course) && (query.isEmpty || $0.note.display.localizedCaseInsensitiveContains(query) || $0.course.localizedCaseInsensitiveContains(query)) }
             .sorted { up ? value($0) < value($1) : value($0) > value($1) }
         // The course filter: every course the notes belong to, or this semester's three (as on Home).
-        let courseOptions: [(String, String)] = showAll
+        let courseOptions: [(String, String)] = showAll || inbox
             ? Set(every.map(\.course)).sorted().map { ($0, $0) }
             : ["MSOA", "SM", "TEM"].compactMap { code in Vault.courses.first { $0.value == code }.map { ($0.key, code) } }
         VStack(spacing: 0) {
             PageHeader(title: SideNav.label(title), subtitle: "\(rows.count) notes · \(rows.filter { !$0.note.done && !$0.note.status.isEmpty }.count) not done", compact: true) {
-                PageToolbar(title: title, finder: Vault.root.appending(path: Vault.dir(folders[0])), seasonal: true, mode: $viewMode, query: $query,
-                            sortKeys: Self.columns, sortKey: $key, ascending: $up) {
-                    Picker("Courses", selection: Binding(get: { showAll }, set: { showAll = $0; course = nil })) {
-                        Text("This semester").tag(false); Text("All courses").tag(true)
-                    }.pickerStyle(.inline)
-                    Picker("Course", selection: $course) {
-                        Text("All").tag(String?.none)
-                        ForEach(courseOptions, id: \.0) { Text($0.1).tag(String?.some($0.0)) }
-                    }.pickerStyle(.inline)
+                HStack(spacing: 10) {
+                    if inbox, !every.isEmpty { Button { store.page = .sortNow } label: { Label("Sort Now", systemImage: "sparkles") }.buttonStyle(.glassAction(.header)) }
+                    PageToolbar(title: title, finder: Vault.root.appending(path: Vault.dir(folders[0])), seasonal: !inbox, mode: $viewMode, query: $query,
+                                sortKeys: columns, sortKey: $key, ascending: $up) {
+                        if inbox {
+                            Button("Add File…") { store.addFile() }
+                            Button("Add Link…") { store.addLink() }
+                            Button("Voice Memo…") { store.voiceMemo = true }
+                            Divider()
+                        } else {
+                            Picker("Courses", selection: Binding(get: { showAll }, set: { showAll = $0; course = nil })) {
+                                Text("This semester").tag(false); Text("All courses").tag(true)
+                            }.pickerStyle(.inline)
+                        }
+                        Picker("Course", selection: $course) {
+                            Text("All").tag(String?.none)
+                            ForEach(courseOptions, id: \.0) { Text($0.1).tag(String?.some($0.0)) }
+                        }.pickerStyle(.inline)
+                    }
                 }
             }
-            if rows.isEmpty { Text("No notes").font(.system(size: 13)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity, maxHeight: .infinity) }
+            if rows.isEmpty { Text(!inbox ? "No notes" : every.isEmpty ? "All sorted" : "No matches").font(.system(size: 13)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity, maxHeight: .infinity) }
             else if viewMode != .list {
                 NoteGallery(items: rows.map { r in
                     GalleryItem(id: r.note.id, title: r.note.display,
-                                subtitle: r.note.when.map { $0.formatted(.dateTime.day().month(.abbreviated)) } ?? "",
+                                subtitle: inbox ? [r.note.status, r.course].joined(separator: " · ") : (r.note.when.map { $0.formatted(.dateTime.day().month(.abbreviated)) } ?? ""),
                                 code: r.note.course, done: r.note.done,
-                                open: { store.page = .note(r.note.id) }, menu: AnyView(NoteMenu(note: r.note)))
+                                open: { store.page = inbox ? .unsorted(r.note.id) : .note(r.note.id) },
+                                menu: inbox ? AnyView(UnsortedMenu(url: r.note.id)) : AnyView(NoteMenu(note: r.note)))
                 }, compact: viewMode == .grid)
             } else {
                 Card {
                     HStack(spacing: 8) {
                         Color.clear.frame(width: 22, height: 1)
-                        ForEach(Self.columns, id: \.self) { c in
+                        ForEach(columns, id: \.self) { c in
                             Button { if key == c { up.toggle() } else { key = c; up = true } } label: {
                                 HStack(spacing: 3) { Text(c); if key == c { Image(systemName: up ? "chevron.up" : "chevron.down").font(.system(size: 8, weight: .bold)) } }
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -389,7 +328,7 @@ struct ItemsPage: View {
                         }
                     }.font(.caption.weight(.semibold)).foregroundStyle(Color.ink2).padding(.horizontal, 14).padding(.vertical, 8)
                     Rectangle().fill(Color.line.opacity(0.6)).frame(height: 1)
-                    ScrollView { LazyVStack(spacing: 0) { ForEach(rows, id: \.note.id) { ItemRow(note: $0.note, course: $0.course) } } }
+                    ScrollView { LazyVStack(spacing: 0) { ForEach(rows, id: \.note.id) { ItemRow(note: $0.note, course: $0.course, inbox: inbox) } } }
                 }.padding([.horizontal, .bottom], 12)
             }
         }
@@ -400,18 +339,21 @@ struct ItemsPage: View {
 private struct ItemRow: View {
     @Environment(Store.self) private var store
     let note: Note; let course: String
+    var inbox = false
     var body: some View {
         HStack(spacing: 8) {
-            StatusButton(note: note).frame(width: 22)
-            Button { store.page = .note(note.id) } label: {
+            if inbox { Image(nsImage: NSWorkspace.shared.icon(forFile: note.id.path)).resizable().frame(width: 16, height: 16).frame(width: 22) }
+            else { StatusButton(note: note).frame(width: 22) }
+            Button { store.page = inbox ? .unsorted(note.id) : .note(note.id) } label: {
                 HStack(spacing: 8) {
-                    Text(note.display).lineLimit(1).truncationMode(.middle).foregroundStyle(note.done ? Color.ink2 : Color.ink).frame(maxWidth: .infinity, alignment: .leading)
+                    Text(note.display).lineLimit(1).truncationMode(.middle)
+                        .foregroundStyle(inbox && note.id.pathExtension == "txt" ? Color.redFG : note.done ? Color.ink2 : Color.ink).frame(maxWidth: .infinity, alignment: .leading)
                     HStack(spacing: 5) { Circle().fill(Color.course(note.course)).frame(width: 7, height: 7); Text(course).lineLimit(1) }.frame(maxWidth: ItemsPage.width("Course"), alignment: .leading)
                     Text(note.when.map { $0.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)) } ?? "—").monospacedDigit().frame(maxWidth: ItemsPage.width("Date"), alignment: .leading)
-                    Text(note.status.isEmpty ? "—" : note.status).frame(maxWidth: ItemsPage.width("Status"), alignment: .leading)
+                    Text(note.status.isEmpty ? "—" : note.status).frame(maxWidth: ItemsPage.width(inbox ? "Type" : "Status"), alignment: .leading)
                 }.font(.system(size: 12)).contentShape(.rect)
             }.buttonStyle(.plain)
         }.padding(.horizontal, 14).padding(.vertical, 7).modifier(GlassRowHover())
-        .contextMenu { NoteMenu(note: note) }
+        .contextMenu { if inbox { UnsortedMenu(url: note.id) } else { NoteMenu(note: note) } }
     }
 }
