@@ -56,7 +56,7 @@ courses = sorted(f[:-3] for f in os.listdir('Courses') if f.endswith('.md'))
 titles = {}
 counts = {}
 for folder, (tname, base) in FOLDERS.items():
-    tpath = f'Templates/Claude/{tname} Template.md'
+    tpath = next((p for g in ('', 'Items/', 'Files/', 'Apps/') if os.path.exists(p := f'Templates/Claude/{g}{tname} Template.md')), f'Templates/Claude/{tname} Template.md')   # grouped by Items/Files/Apps; flat copies still count
     tk = keys_of(fm_of(open(tpath, encoding='utf-8').read()))
     d = LOC.get(folder, folder)
     entries = os.listdir(d)

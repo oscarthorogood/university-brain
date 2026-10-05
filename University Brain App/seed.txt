@@ -1,0 +1,13 @@
+Agents/Shared Agents/memory.md
+Agents/Shared Agents/open-items.md
+Agents/Course Agents/MSOA/Course briefing.md
+Agents/Course Agents/Strategy/Course briefing.md
+Agents/Course Agents/TEM/Course briefing.md
+Agents/Helper Agents/Planner/Calendar Sync.md
+Agents/Helper Agents/Planner/Learn.md
+Agents/Course Agents/MSOA/Management Science and Operations Analytics - Exam - December Exam.md
+Agents/Helper Agents/Librarian/week-2-reading-notes.md
+Agents/Helper Agents/Librarian/week-2-reading-script-20min.md
+Agents/Helper Agents/Librarian/Ellevenread/Exploring Strategy  Chapters 2 - 4.md
+Agents/Helper Agents/Librarian/next-week-reading-list.md
+Agents/Helper Agents/Librarian/Strategic Management - Podcast - Week 3 Strategy Formulation.md

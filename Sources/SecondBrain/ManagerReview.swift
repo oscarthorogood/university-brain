@@ -58,7 +58,7 @@ enum Sections {
     static func isTemplate(_ heading: String, in text: String, template: String) -> Bool { !hasContent(heading, in: text, template: template) }
     static func template(forFolder folder: String, root: URL = Vault.root) -> String {
         let name = ["Lectures": "Lecture", "Tutorials": "Tutorial", "Essays": "Essay", "Projects": "Projects", "Readings": "Readings", "Research": "Research"][folder] ?? Study.kind(folder)?.noun ?? folder
-        return (try? String(contentsOf: root.appending(path: "Templates/Claude/\(name) Template.md"), encoding: .utf8)) ?? ""
+        return (try? String(contentsOf: Vault.template("\(name) Template", root: root), encoding: .utf8)) ?? ""
     }
 }
 

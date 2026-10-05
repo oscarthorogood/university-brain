@@ -21,7 +21,9 @@ The arrow icon next to Settings, at the top left of the window, checks GitHub fo
 The `University Brain App/` folder in this repo holds the vault's `Templates/` and `Agents/` files. `bundle.sh` packs it into the app, and the first time each new version runs it copies the folder into the vault (`~/Documents/University`, or the folder chosen in Settings), so the templates and the agents' instructions always match the installed version.
 
 - It **overwrites**: a shipped file that differs from the vault's is replaced, and the old text is kept in the vault's `.history/` (the Activity Log notes how many files were updated).
-- Files the folder doesn't contain are never touched or deleted. So the folder holds only the shared rules, templates and agent instructions, never your own data: `memory.md`, `open-items.md`, each course's `Course briefing.md`, `Calendar Sync.md`, `Learn.md` and the agents' work products stay out of it, or an update would reset them.
+- Files the folder doesn't contain are never touched or deleted.
+- `University Brain App/seed.txt` lists files that are only a starting copy: `memory.md`, `open-items.md`, the course briefings, `Calendar Sync.md`, `Learn.md` and the agents' work notes. They are installed when the vault doesn't have them yet and never overwritten. Delete a line from `seed.txt` to make that file overwrite on every update. (`seed.txt` itself isn't copied.)
+- Templates are grouped in `Templates/Claude/Items/`, `Files/` and `Apps/` (`Course Template.md` is directly in `Templates/Claude/`). When an update ships a template in one of those folders, an old loose copy in `Templates/Claude/` moves to the vault's `.trash/`.
 - The agent files (`<Name> agent.md`) are shipped, so anything an agent wrote into its own file is replaced on an update (the old text stays in `.history/`).
 - Edits made to the repo's folder go out like any other app change: merging into `main` cuts a release.
 - The copy is skipped if the vault folder doesn't exist yet, and tried again on the next launch.

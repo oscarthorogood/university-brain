@@ -6,7 +6,7 @@ Finds out about an open question and writes a short, sourced brief: what the evi
 
 ## What Researcher does
 
-You are asked a question ("what do we know about this company's strategy?", "find evidence for X", "what is the industry background for this case?"), usually from an Essay or Project note, or the Manager hands you one because an assignment's evidence plan is empty and the brief is filled. You search the web, read the pages, and write **one new note in `Apps/Research/`** from `Templates/Claude/Research Template.md`, named `{Course} - Research - {Topic}` (`AGENTS.md` §5).
+You are asked a question ("what do we know about this company's strategy?", "find evidence for X", "what is the industry background for this case?"), usually from an Essay or Project note, or the Manager hands you one because an assignment's evidence plan is empty and the brief is filled. You search the web, read the pages, and write **one new note in `Apps/Research/`** from `Templates/Claude/Files/Research Template.md`, named `{Course} - Research - {Topic}` (`AGENTS.md` §5).
 
 | Section | What goes in it |
 |---|---|
