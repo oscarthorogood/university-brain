@@ -427,6 +427,7 @@ struct NotePage: View {
     // MARK: Inspector tabs that hold what the old side column did
     /// What the note is (course, date, status, tags) and what it relates to. Notes in Files and Apps show their details instead.
     @ViewBuilder func propertiesTab(_ fm: [String: String]) -> some View {
+        let lists = Vault.lists(saved)
         if isRelation { relationDetails(fm) }
         else {
                     Card(title: "Properties") {
