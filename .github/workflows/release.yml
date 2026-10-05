@@ -1,6 +1,6 @@
 # Builds the app, packs a DMG and publishes it as a GitHub Release. Three ways to start it:
 #   - merge into main: the patch number goes up by one (v1.0.3 → v1.0.4). Only changes to the app itself count
-#     (Sources, Package.swift, Icon, bundle.sh, make-dmg.sh), so a README edit doesn't make a release;
+#     (Sources, University Brain App, Package.swift, Icon, bundle.sh, make-dmg.sh), so a README edit doesn't make a release;
 #   - Actions → Release → Run workflow, with a version like 1.2.0 (for a minor or major bump);
 #   - push a tag like v1.2.0.
 # The app's updater reads the latest release, so publishing is all an update needs.
@@ -12,6 +12,7 @@ on:
     tags: ["v*"]   # paths below don't apply to tag pushes
     paths:
       - "Sources/**"
+      - "University Brain App/**"
       - "Package.swift"
       - "Icon/**"
       - "bundle.sh"

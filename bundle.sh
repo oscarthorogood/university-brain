@@ -11,6 +11,13 @@ APP=build/SecondBrain.app
 mkdir -p "$APP/Contents/MacOS"
 cp .build/release/SecondBrain "$APP/Contents/MacOS/SecondBrain"
 mkdir -p "$APP/Contents/Resources"
+# Templates and Agents: the app copies them into the vault the first time each new version runs (AppFiles.swift)
+rm -rf "$APP/Contents/Resources/University Brain App"
+if [ -d "University Brain App" ]; then
+  ditto "University Brain App" "$APP/Contents/Resources/University Brain App"
+else
+  echo "warning: no 'University Brain App' folder here, so this build installs no Templates or Agents" >&2
+fi
 # Liquid Glass icon: Icon/SecondBrain.icon (layers drawn by Icon/icon.swift) compiled by Xcode's actool
 rm -rf build/icon && mkdir -p build/icon
 xcrun actool Icon/SecondBrain.icon --compile build/icon --platform macosx --minimum-deployment-target 26.0 --app-icon SecondBrain --output-partial-info-plist build/icon/partial.plist >/dev/null

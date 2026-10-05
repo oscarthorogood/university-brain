@@ -350,7 +350,11 @@ struct SecondBrainApp: App {
     @ObservationIgnored private var watcher: VaultWatcher?
     var needs: [String: [Need]] = [:]
     var activity: [Activity] = Activity.load()
-    init() { rewatch(); computeNeeds(); scheduleAutopilot(after: 8) }
+    init() {
+        // a new app version brings its Templates and Agents files into the vault (see AppFiles.swift)
+        if let n = AppFiles.installIfNeeded()?.count, n > 0 { log("manager", "Updated \(n) Templates and Agents file\(n == 1 ? "" : "s") in the vault to version \(AppFiles.version.split(separator: "+")[0]).") }
+        rewatch(); computeNeeds(); scheduleAutopilot(after: 8)
+    }
     func rewatch() {
         watcher = VaultWatcher(path: Vault.root.path) { [weak self] in MainActor.assumeIsolated { self?.reload() } }
     }
@@ -1157,6 +1161,7 @@ enum Check {
         precondition((try? Vault.perform(.init(from: "Unsorted/x.pdf", to: "Resources/TEM/Slides/lecture-02.pdf"), in: box)) == nil, "never overwrites")
         precondition((try? Vault.perform(.init(from: "Unsorted/x.pdf", to: "../escape.pdf"), in: box)) == nil, "never leaves the vault")
         print("filing ok: copy verified, original in .trash, no overwrite, no escape")
+        AppFiles.check()
         CalendarSync.check()
         Zotero.check()
         CalendarSync.checkNotes()
