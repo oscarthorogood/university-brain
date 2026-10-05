@@ -1,10 +1,14 @@
 import SwiftUI
 import PDFKit
 
-/// PDFs open inside the app; anything else goes to its own app.
+/// Notes and PDFs open inside the app; anything else goes to its own app.
 extension Store {
     func openFile(_ url: URL) {
-        if url.pathExtension.lowercased() == "pdf" { page = .file(url) } else { NSWorkspace.shared.open(url) }
+        switch url.pathExtension.lowercased() {
+        case "pdf": page = .file(url)
+        case "md": page = .note(url)
+        default: NSWorkspace.shared.open(url)
+        }
     }
 }
 

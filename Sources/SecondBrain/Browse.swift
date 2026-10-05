@@ -111,27 +111,49 @@ struct NavToggle: View {
 
 /// An in-app browser for Resources/ or OneDrive/: a course's files grouped by type.
 struct FileBrowserPage: View {
+    @Environment(Store.self) private var store
     let root: String
+    /// Also list notes and files that sit directly in the folder (not in a course folder), under the course they belong to.
+    /// Summaries, Past Papers, Mind Maps and Research are filled with notes like that.
+    var loose = false
     struct Item: Identifiable { let url: URL; let type: String; let size: Int; var id: URL { url } }
 
     var base: URL { Vault.root.appending(path: Vault.dir(root)) }
-    var courses: [String] {
+    /// The course folders inside this folder.
+    var folders: [String] {
         ((try? FileManager.default.contentsOfDirectory(at: base, includingPropertiesForKeys: [.isDirectoryKey])) ?? [])
             .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true && !$0.lastPathComponent.hasPrefix(".") }
             .map(\.lastPathComponent).sorted()
     }
+    var looseFiles: [URL] {
+        guard loose else { return [] }
+        return ((try? FileManager.default.contentsOfDirectory(at: base, includingPropertiesForKeys: [.isRegularFileKey])) ?? [])
+            .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true && !$0.lastPathComponent.hasPrefix(".") && !$0.lastPathComponent.hasPrefix("Icon") }
+    }
+    /// A loose note belongs to the course in its `course` property, or whose name starts its title; anything else goes under General.
+    func course(of url: URL) -> String {
+        guard let n = store.notes.first(where: { $0.id == url }) else { return "General" }
+        return NoteBrowserPage.course(n, known: FileBrowserPage(root: "Resources").courses)
+    }
+    var courses: [String] { Array(Set(folders).union(looseFiles.map { course(of: $0) })).sorted() }
+
     func files(_ course: String) -> [Item] {
         let dir = base.appending(path: course)
         let keys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey]
         let all = FileManager.default.enumerator(at: dir, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles])?.compactMap { $0 as? URL } ?? []
-        return all.compactMap { u in
+        let inFolder: [Item] = all.compactMap { u in
             guard let v = try? u.resourceValues(forKeys: Set(keys)), v.isRegularFile == true, !u.lastPathComponent.hasPrefix("Icon") else { return nil }
             let rel = u.resolvingSymlinksInPath().path.replacingOccurrences(of: dir.resolvingSymlinksInPath().path + "/", with: "").components(separatedBy: "/")
             return Item(url: u, type: rel.count > 1 ? rel[0] : "Files", size: v.fileSize ?? 0)
         }
+        let strays: [Item] = looseFiles.filter { self.course(of: $0) == course }.map {
+            Item(url: $0, type: $0.pathExtension.lowercased() == "md" ? "Notes" : "Files", size: (try? $0.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0)
+        }
+        return inFolder + strays
     }
 
     var body: some View {
+        let _ = store.revision          // look again when files change on disk
         CourseBrowser(title: root, courses: courses, noun: "files", finder: base) { course, query in
             let items = files(course).filter { query.isEmpty || $0.url.lastPathComponent.localizedCaseInsensitiveContains(query) }
             return Dictionary(grouping: items, by: \.type).sorted { $0.key < $1.key }.map { type, group in
@@ -191,15 +213,22 @@ struct FileRow: View {
     @Environment(Store.self) private var store
     let item: FileBrowserPage.Item
     var body: some View {
+        let note = store.notes.first { $0.id == item.url }
         Button { store.openFile(item.url) } label: {
             HStack(spacing: 10) {
-                Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path)).resizable().frame(width: 20, height: 20)
-                Text(item.url.lastPathComponent).lineLimit(1).truncationMode(.middle)
+                Group {
+                    if let note { Image(systemName: note.done ? "checkmark.circle" : "doc.text").foregroundStyle(Color.ink2) }
+                    else { Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path)).resizable() }
+                }.frame(width: 20, height: 20)
+                Text(note?.display ?? item.url.lastPathComponent).lineLimit(1).truncationMode(.middle)
                 Spacer()
-                Text(ByteCountFormatter.string(fromByteCount: Int64(item.size), countStyle: .file)).font(.system(size: 11)).foregroundStyle(Color.ink2)
+                Text(note.map(\.status) ?? ByteCountFormatter.string(fromByteCount: Int64(item.size), countStyle: .file)).font(.system(size: 11)).foregroundStyle(Color.ink2)
             }.font(.system(size: 13)).padding(.horizontal, 16).padding(.vertical, 6).contentShape(.rect)
         }.buttonStyle(.glassRow)
-        .contextMenu { Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([item.url]) } }
+        .contextMenu {
+            if let note { NoteMenu(note: note) }
+            else { Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([item.url]) } }
+        }
     }
 }
 

@@ -630,7 +630,7 @@ enum SideNav {
     }()
     static let apps: [Entry] = Study.kinds.filter { !Study.inFiles.contains($0.folder) }.map { Entry(name: $0.folder, icon: $0.icon) }
     static let folders = items + files + apps
-    /// Files and Apps pages show a browser instead of a plain list.
+    /// Files and Apps pages show a browser instead of a plain list. Every Files page browses its folder on disk; Apps pages list their notes.
     static let grouped = Set((files + apps).map(\.name))
     static func isHidden(_ name: String, _ raw: String) -> Bool { raw.split(separator: ",").contains(Substring(name)) }
     /// Tasks is shown as "Assignments"; its id stays "Tasks" (folder and page names).
@@ -844,7 +844,8 @@ struct MainPanel: View {
         case .folder(let f) where SideNav.grouped.contains(f):
             switch f {
             case "Zotero": ZoteroPage()
-            case "Resources", "OneDrive": FileBrowserPage(root: f).id(f)
+            case _ where SideNav.files.contains(where: { $0.name == f }):
+                FileBrowserPage(root: f, loose: !["Resources", "OneDrive"].contains(f)).id(f)
             default: NoteBrowserPage(title: f, folders: [f]).id(f)
             }
         case .folder(let f): ItemsPage(title: f, folders: [f == "Tasks" ? "TaskNotes/Tasks" : f]).id(f)
