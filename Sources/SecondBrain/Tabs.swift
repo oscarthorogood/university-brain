@@ -87,14 +87,15 @@ struct WindowTabBar: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 4)
-            .frame(width: 240, height: 38)
+            .frame(width: 240, height: 36)
             .glassEffect(.regular, in: .capsule)
             .padding(.leading, 12).padding(.trailing, 6)
             Rectangle().fill(Color.line.opacity(0.8)).frame(width: 1, height: 28)
             HStack(spacing: 0) { TabBar(); Spacer(minLength: 0) }.padding(.leading, 5).padding(.trailing, 12)
         }
-        .frame(height: 44)
+        .frame(height: 36)
         .background(TrafficLights())
+        .padding(.top, 12)        // the same room above the pill as at its left edge
     }
 }
 

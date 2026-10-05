@@ -459,7 +459,7 @@ struct ContentView: View {
         .containerBackground(.ultraThinMaterial, for: .window)
     }
     var shell: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 12) {
             WindowTabBar()
             HStack(spacing: 12) {
                 // One glass pane that resizes; the full sidebar and the icon rail cross-fade inside it.
@@ -1309,7 +1309,7 @@ struct TrafficLights: NSViewRepresentable {
                 for (i, type) in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].enumerated() {
                     guard let b = w.standardWindowButton(type), let bar = b.superview else { continue }
                     let size = b.frame.size
-                    let y = bar.isFlipped ? 20 - size.height / 2 : bar.bounds.height - 20 - size.height / 2
+                    let y = bar.isFlipped ? 28 - size.height / 2 : bar.bounds.height - 28 - size.height / 2
                     b.setFrameOrigin(NSPoint(x: 34 - size.width / 2 + CGFloat(i) * 20, y: y))
                 }
             }
