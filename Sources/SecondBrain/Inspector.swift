@@ -33,15 +33,20 @@ enum InspectorTab: String, CaseIterable {
 
 /// What can be read out of a note's text.
 enum NoteParts {
-    struct Heading: Identifiable { let id: String; let level: Int; let title: String }
+    struct Heading: Identifiable { let id: Int; let level: Int; let title: String }   // id: the heading's line in the body
     struct TaskItem: Identifiable { let id: Int; let heading: String; let text: String; let done: Bool }   // id: line number in the whole file
     struct Attachment: Identifiable { let id: String; let title: String; let target: String; let icon: String; let web: Bool }
 
-    /// Headings, with the id MarkdownView gives the block they live in (so the reader can scroll to them).
+    /// Headings of the note body, each with its line number (what the editor scrolls to).
     static func headings(_ text: String) -> [Heading] {
-        MD.parse(Vault.body(text).components(separatedBy: "\n")).enumerated().compactMap { i, b in
-            if case .heading(let n, let t) = b { return Heading(id: "h\(i)", level: n, title: t.replacingOccurrences(of: "*", with: "")) } else { return nil }
+        var out: [Heading] = [], fenced = false
+        for (i, raw) in NoteText.body(text).components(separatedBy: "\n").enumerated() {
+            if raw.trimmingCharacters(in: .whitespaces).hasPrefix("```") { fenced.toggle(); continue }
+            if !fenced, let m = raw.wholeMatch(of: /(#{1,6})\s+(.*)/) {
+                out.append(Heading(id: i, level: m.1.count, title: String(m.2).replacingOccurrences(of: "*", with: "")))
+            }
         }
+        return out
     }
 
     /// Checklist lines (`- [ ] …`), each with the heading it sits under.
@@ -62,7 +67,7 @@ enum NoteParts {
 
     /// Embedded images and files, links to files, and web links.
     static func attachments(_ text: String) -> [Attachment] {
-        let body = Vault.body(text)
+        let body = NoteText.body(text)
         var out: [Attachment] = [], seen = Set<String>()
         func add(_ title: String, _ target: String, web: Bool) {
             guard seen.insert(target).inserted else { return }
@@ -89,6 +94,8 @@ extension Store {
         let direct = Vault.root.appending(path: Vault.real(target))
         if FileManager.default.fileExists(atPath: direct.path) { openFile(direct); return }
         let name = (target as NSString).lastPathComponent
+        let inbox = Vault.root.appending(path: "Unsorted/" + name)
+        if FileManager.default.fileExists(atPath: inbox.path) { openFile(inbox); return }
         let found = FileManager.default.enumerator(at: Vault.root.appending(path: Vault.dir("Resources")), includingPropertiesForKeys: nil)?
             .lazy.compactMap { $0 as? URL }.first { $0.lastPathComponent == name }
         if let found { openFile(found) }
@@ -127,13 +134,13 @@ struct NoteInspector<Props: View, FilesView: View, LinksView: View, AgentView: V
     let subtitle: String
     var tint: Color? = nil
     let text: String                                  // the note as saved, frontmatter included
-    let jump: (String) -> Void                        // scroll the reader to a block id
+    let jump: (Int) -> Void                           // scroll the editor to a line of the body
     let edit: ((String) -> String) -> Void            // apply a change to the note's text and save it
     @ViewBuilder var properties: Props
     @ViewBuilder var files: FilesView
     @ViewBuilder var links: LinksView
     @ViewBuilder var agent: AgentView
-    @State private var current: String?
+    @State private var current: Int?
     @State private var hideDone = false
 
     var body: some View {
@@ -273,24 +280,20 @@ struct NoteInspector<Props: View, FilesView: View, LinksView: View, AgentView: V
 /// Find in this note: a field, the number of matches, arrows to step through them, and the matching lines.
 private struct FindPane: View {
     let text: String
-    let jump: (String) -> Void
+    let jump: (Int) -> Void
     @State private var query = ""
     @State private var matchCase = false
     @State private var index = 0
 
-    struct Hit: Identifiable { let id: Int; let snippet: String; let block: String }
+    struct Hit: Identifiable { let id: Int; let snippet: String }   // id: the line in the body
 
-    /// Matching lines of the note's body, each with the heading block above it to scroll to.
+    /// Matching lines of the note's body.
     var hits: [Hit] {
         guard !query.isEmpty else { return [] }
-        let hs = NoteParts.headings(text)
-        var out: [Hit] = [], ordinal = 0, fenced = false
-        for (i, raw) in Vault.body(text).components(separatedBy: "\n").enumerated() {
+        var out: [Hit] = []
+        for (i, raw) in NoteText.body(text).components(separatedBy: "\n").enumerated() {
             let line = raw.trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("```") { fenced.toggle(); continue }
-            if !fenced, line.wholeMatch(of: /#{1,6}\s+.*/) != nil { ordinal += 1 }
-            let hit = matchCase ? line.contains(query) : line.localizedCaseInsensitiveContains(query)
-            if hit { out.append(Hit(id: i, snippet: String(line.prefix(90)), block: ordinal > 0 && !hs.isEmpty ? hs[min(ordinal, hs.count) - 1].id : "h0")) }
+            if matchCase ? line.contains(query) : line.localizedCaseInsensitiveContains(query) { out.append(Hit(id: i, snippet: String(line.prefix(90)))) }
         }
         return out
     }
@@ -298,7 +301,7 @@ private struct FindPane: View {
     func step(_ delta: Int, _ list: [Hit]) {
         guard !list.isEmpty else { return }
         index = (index + delta + list.count) % list.count
-        jump(list[index].block)
+        jump(list[index].id)
     }
 
     var body: some View {
@@ -324,7 +327,7 @@ private struct FindPane: View {
             ScrollView {
                 VStack(spacing: 1) {
                     ForEach(Array(list.enumerated()), id: \.element.id) { n, h in
-                        Button { index = n; jump(h.block) } label: {
+                        Button { index = n; jump(h.id) } label: {
                             Text(h.snippet).font(.system(size: 12)).lineLimit(2).multilineTextAlignment(.leading)
                                 .padding(.horizontal, 10).padding(.vertical, 6).frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
                         }.buttonStyle(SideRowStyle(selected: n == index))
@@ -332,6 +335,6 @@ private struct FindPane: View {
                 }
             }.scrollIndicators(.hidden)
         }
-        .onChange(of: query) { index = 0; if let first = hits.first { jump(first.block) } }
+        .onChange(of: query) { index = 0; if let first = hits.first { jump(first.id) } }
     }
 }

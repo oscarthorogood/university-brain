@@ -249,6 +249,8 @@ struct NotePage: View {
     @State private var newTag = ""
     @State private var newLink = ""
     @State private var showOutline = false
+    @State private var editor = EditorController()
+    @State private var pending: Task<Void, Never>?
     @AppStorage("noteInspector") private var showInspector = true
     @State private var jump: String?
 
@@ -282,36 +284,40 @@ struct NotePage: View {
             VStack(spacing: 0) {
                 noteToolbar
                 Card {
-                    if editing {
+                    if isStudy && editing {
+                        // Quizzes, flashcards and the like read as what they are; Edit shows their Markdown beside the result.
                         HStack(spacing: 0) {
                             NoteEditor(url: url, text: $text, saved: $saved)
                             Divider()
                             ScrollView { MarkdownView(text: Vault.body(text)).padding(22) }
                         }
-                    }
-                    else {
-                        ScrollViewReader { proxy in
-                            ScrollView {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text(title).font(.system(size: 30, weight: .bold)).lineLimit(3)
-                                    Text(subtitle).font(.system(size: 13)).foregroundStyle(Color.ink2).lineLimit(1)
-                                    Rectangle().fill(Color.line.opacity(0.6)).frame(height: 1).padding(.vertical, 6)
-                                    readView
+                    } else {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(title).font(.system(size: 30, weight: .bold)).lineLimit(3)
+                                Text(subtitle).font(.system(size: 13)).foregroundStyle(Color.ink2).lineLimit(1)
+                                Rectangle().fill(Color.line.opacity(0.6)).frame(height: 1).padding(.vertical, 6)
+                                if isStudy { readView }
+                                else {
+                                    MarkdownEditor(text: Binding(get: { NoteText.body(text) }, set: { text = NoteText.front(text) + $0 }), controller: editor)
+                                        .overlay(alignment: .topLeading) {
+                                            if NoteText.body(text).isEmpty { Text("Start writing…").font(.system(size: 15)).foregroundStyle(Color.ink2.opacity(0.6)).padding(.top, 4).allowsHitTesting(false) }
+                                        }
                                 }
-                                .frame(maxWidth: 760, alignment: .leading).padding(.horizontal, 40).padding(.vertical, 30).frame(maxWidth: .infinity)
                             }
-                            .onChange(of: jump) { if let j = jump { withAnimation(.smooth) { proxy.scrollTo(j, anchor: .top) }; jump = nil } }
+                            .frame(maxWidth: 760, alignment: .leading).padding(.horizontal, 40).padding(.top, 30).padding(.bottom, 90).frame(maxWidth: .infinity)
                         }
                     }
                     if let saveError { Text(saveError).font(.caption).foregroundStyle(Color.redFG).padding(10) }
                 }
+                .overlay(alignment: .bottom) { if !isStudy { EditorToolbar(editor: editor).padding(.bottom, 16) } }
                 .padding([.horizontal, .bottom], 12)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .modifier(GlassPane())
             if showInspector {
                 NoteInspector(title: title, subtitle: subtitle, tint: note?.course == nil ? nil : Color.course(note?.course), text: saved,
-                              jump: { jump = $0 }, edit: { change in edit(change) }) {
+                              jump: { editor.reveal(line: $0) }, edit: { change in edit(change) }) {
                     propertiesTab(fm)
                 } files: {
                     filesTab(lists)
@@ -326,6 +332,12 @@ struct NotePage: View {
         }
         .sheet(item: $work) { AgentWorkSheet(work: $0, note: url).environment(store) }
         .task(id: url) { load() }
+        .onChange(of: text) {
+            guard text != saved else { return }
+            pending?.cancel()
+            pending = Task { try? await Task.sleep(for: .milliseconds(700)); if !Task.isCancelled { autosave() } }
+        }
+        .onDisappear { pending?.cancel(); autosave() }
         .onChange(of: store.revision) { if text == saved { load() } }   // live reload unless mid-edit
     }
 
@@ -406,14 +418,14 @@ struct NotePage: View {
                         Label(note.state.label, systemImage: note.state.icon)
                     }.buttonStyle(.glassAction(.header)).help("Press to go to: \(note.state.next.label)")
                 }
-                Pills(options: [(false, "Read"), (true, "Edit")], selection: $editing)
-                RoundButton(icon: "waveform.circle", label: "Dictate: speak and it types into the note") {
-                    editing = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { Dictation.start() }
-                }
-                if editing {
-                    Button("Save") { save() }.keyboardShortcut("s").disabled(text == saved)
-                        .buttonStyle(.glassAction(.header, prominent: true))
+                if isStudy {
+                    Pills(options: [(false, "Read"), (true, "Edit")], selection: $editing)
+                    if editing {
+                        Button("Save") { save() }.keyboardShortcut("s").disabled(text == saved)
+                            .buttonStyle(.glassAction(.header, prominent: true))
+                    }
+                } else {
+                    Text(text == saved ? "Saved" : "Saving…").font(.system(size: 12)).foregroundStyle(Color.ink2)
                 }
                 RoundButton(icon: "clock.arrow.circlepath", label: "Version history") { showHistory = true }
                     .popover(isPresented: $showHistory) { history }
@@ -472,7 +484,7 @@ struct NotePage: View {
                                         }
                                 }
                             }
-                        }.padding(.horizontal, 16).padding(.bottom, 14).disabled(text != saved)
+                        }.padding(.horizontal, 16).padding(.bottom, 14)
                     }.fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -540,19 +552,31 @@ struct NotePage: View {
         c.queryItems = [.init(name: "vault", value: Vault.name), .init(name: "file", value: url.path.replacingOccurrences(of: Vault.root.path + "/", with: "").replacingOccurrences(of: ".md", with: ""))]
         NSWorkspace.shared.open(c.url!)
     }
-    func load() { saved = (try? String(contentsOf: url, encoding: .utf8)) ?? ""; text = saved; if saved.isEmpty { editing = true } }   // a blank new note opens ready to type
+    func load() {
+        saved = (try? String(contentsOf: url, encoding: .utf8)) ?? ""; text = saved
+        if saved.isEmpty { editing = true; editor.focusSoon() }   // a blank new note opens ready to type
+    }
     func save() {
         do { try Vault.write(text, to: url); saved = text; saveError = nil }
         catch { saveError = "Couldn’t save: \(error.localizedDescription)" }
     }
-    /// Applies a frontmatter change to the saved note straight away (history keeps the old text). Disabled while the editor has unsaved changes.
+    /// Applies a change (a property, a ticked task) to the note straight away, keeping whatever has been typed. History keeps the old text.
     func edit(_ change: (String) -> String) {
-        guard text == saved else { return }
-        let new = change(saved)
-        guard new != saved else { return }
+        let new = change(text)
+        guard new != text else { return }
         do { try Vault.write(new, to: url); saved = new; text = new; saveError = nil; store.reload() }
         catch { saveError = "Couldn’t save: \(error.localizedDescription)" }
     }
+    /// Saves what has been typed. Version history keeps one version every five minutes, not one per pause.
+    func autosave() {
+        guard text != saved else { return }
+        do {
+            if (Vault.history(url).first?.date ?? .distantPast) < Date.now.addingTimeInterval(-300) { try Vault.snapshot(url) }
+            try text.write(to: url, atomically: true, encoding: .utf8)
+            saved = text; saveError = nil
+        } catch { saveError = "Couldn’t save: \(error.localizedDescription)" }
+    }
+    var isStudy: Bool { note.flatMap { Study.kind($0.folder) } != nil }
     @ViewBuilder func dateControl(_ fm: [String: String]) -> some View {
         let key = fm["due"] != nil ? "due" : "date", raw = fm[key] ?? "", withTime = raw.contains("T")
         if let when = note?.when {

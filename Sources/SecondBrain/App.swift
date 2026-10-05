@@ -845,12 +845,12 @@ struct MainPanel: View {
             }
         case .folder(let f): ItemsPage(title: f, folders: [f == "Tasks" ? "TaskNotes/Tasks" : f]).id(f)
         case .inbox: InboxPage()
-        case .unsorted(let url): if url.pathExtension == "md" { NotePage(url: url) } else { UnsortedPage(url: url) }
+        case .unsorted(let url): if url.pathExtension == "md" { NotePage(url: url).id(url) } else { UnsortedPage(url: url) }
         case .search: SearchPage()
         case .sortNow: SortNowPage()
         case .agent(let c): AgentPage(code: c)
         case .messages: MessagesPage()
-        case .note(let url): NotePage(url: url)
+        case .note(let url): NotePage(url: url).id(url)
         case .file(let url): FilePage(url: url)
         case .tags: TagsPage()
         case .newTab: NewTabPage()
