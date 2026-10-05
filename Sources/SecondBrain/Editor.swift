@@ -286,6 +286,7 @@ struct MarkdownEditor: NSViewRepresentable {
     static let headingRX = rx(#"^(#{1,6})[ \t]+"#)
     static let ruleRX = rx(#"^\s*(-{3,}|\*{3,}|_{3,})\s*$"#)
     static let quoteRX = rx(#"^(\s*>[ \t]?)+"#)
+    private static let calloutRX = rx(#"^\s*>[ \t]?(\[![A-Za-z]+\][+-]?)"#)
     static let checkRX = rx(#"^(\s*)([-*+])[ \t](\[[ xX]\])[ \t]"#)
     static let bulletRX = rx(#"^(\s*)([-*+])[ \t]"#)
     static let numberRX = rx(#"^(\s*)(\d+[.)])[ \t]"#)
@@ -330,15 +331,20 @@ struct MarkdownEditor: NSViewRepresentable {
         if let h = headingRX.firstMatch(in: t, range: all) {
             let sizes: [CGFloat] = [30, 24, 20, 17, 16, 15]
             s.addAttribute(.font, value: font(sizes[h.range(at: 1).length - 1], .bold), range: r)
-            s.addAttribute(.foregroundColor, value: faint, range: at(h.range))
+            s.addAttributes([.foregroundColor: faint, .font: font(12)], range: at(h.range))
             return
         }
         if ruleRX.firstMatch(in: t, range: all) != nil { s.addAttribute(.foregroundColor, value: faint, range: r); return }
         if trimmed.hasPrefix("|") { s.addAttribute(.font, value: font(13, mono: true), range: r); return }
 
         if let q = quoteRX.firstMatch(in: t, range: all) {
-            s.addAttributes([.foregroundColor: ink2, .paragraphStyle: paragraph(first: 10, head: 10)], range: r)
+            s.addAttribute(.paragraphStyle, value: paragraph(first: 12, head: 12), range: r)
             s.addAttribute(.foregroundColor, value: faint, range: at(q.range))
+            if let c = calloutRX.firstMatch(in: t, range: all) {      // > [!info] Title
+                let tag = c.range(at: 1)
+                s.addAttribute(.foregroundColor, value: accent, range: at(tag))
+                trait(.boldFontMask, at(NSRange(location: NSMaxRange(tag), length: all.length - NSMaxRange(tag))), s)
+            }
         } else if let c = checkRX.firstMatch(in: t, range: all) {
             let indent = CGFloat(c.range(at: 1).length) * 7
             s.addAttribute(.paragraphStyle, value: paragraph(first: indent, head: indent + 24), range: r)

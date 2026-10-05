@@ -310,7 +310,16 @@ struct NotePage: View {
                     }
                     if let saveError { Text(saveError).font(.caption).foregroundStyle(Color.redFG).padding(10) }
                 }
-                .overlay(alignment: .bottom) { if !isStudy { EditorToolbar(editor: editor).padding(.bottom, 16) } }
+                .overlay(alignment: .bottom) {
+                    if !isStudy {
+                        ZStack(alignment: .bottom) {
+                            LinearGradient(colors: [Color.card.opacity(0), Color.card.opacity(0.92)], startPoint: .top, endPoint: .bottom)
+                                .frame(height: 96).allowsHitTesting(false)
+                                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: DS.Radius.card, bottomTrailingRadius: DS.Radius.card))
+                            EditorToolbar(editor: editor).padding(.bottom, 16)
+                        }
+                    }
+                }
                 .padding([.horizontal, .bottom], 12)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
