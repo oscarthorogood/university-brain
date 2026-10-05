@@ -60,6 +60,10 @@ extension Vault {
             .sorted { $0.date > $1.date }
     }
 
+    /// Snapshot file names; made once because a job snapshots every note. Never changed after it is made, so safe on any thread.
+    nonisolated(unsafe) private static let stampFormatter: DateFormatter = {
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_GB_POSIX"); f.dateFormat = "yyyyMMdd-HHmmss-SSS"; return f
+    }()
     /// Keeps the note's current text in `.history/` (unless it equals the newest snapshot), then prunes to the last 50.
     static func snapshot(_ note: URL, root: URL = Vault.root) throws {
         guard note.standardizedFileURL.path.hasPrefix(root.standardizedFileURL.path + "/"),   // never snapshot outside the vault
@@ -67,8 +71,7 @@ extension Vault {
         let fm = FileManager.default, dir = historyDir(note, root: root), last = history(note, root: root).first
         guard last.flatMap({ try? String(contentsOf: $0.url, encoding: .utf8) }) != old else { return }
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
-        let f = DateFormatter(); f.locale = Locale(identifier: "en_GB_POSIX"); f.dateFormat = "yyyyMMdd-HHmmss-SSS"
-        try old.write(to: dir.appending(path: f.string(from: .now) + ".md"), atomically: true, encoding: .utf8)
+        try old.write(to: dir.appending(path: stampFormatter.string(from: .now) + ".md"), atomically: true, encoding: .utf8)
         for v in history(note, root: root).dropFirst(50) { try? fm.removeItem(at: v.url) }
     }
 

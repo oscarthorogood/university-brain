@@ -76,9 +76,10 @@ struct ManagerSettings: View {
                 }
             }.padding(.top, 8)
             LabeledContent("Agents:") {
+                let usage = store.usageByAgent()   // once, not once per row (each call reads a week of counters)
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(Agent.roles + Agent.courseRoles) { r in
-                        let u = store.usageByAgent().first { $0.agent == r.id }
+                        let u = usage.first { $0.agent == r.id }
                         Toggle(r.name + (u.map { "  ·  \($0.today) of \(store.dailyCap(r.id)) today, \($0.week) this week" } ?? ""), isOn: Binding(get: { store.agentOn(r.id) }, set: { store.setAgentOn(r.id, $0) }))
                     }
                     Text("A helper that fails the Manager’s review three times in a row is paused for a day.").font(.caption).foregroundStyle(.secondary).padding(.top, 4)

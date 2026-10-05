@@ -7,7 +7,8 @@ struct TagsPage: View {
     @State private var picked: String?
     @State private var query = ""
     var body: some View {
-        let tags = index.keys.filter { query.isEmpty || $0.localizedCaseInsensitiveContains(query) }.sorted { (index[$0]!.count, $1) > (index[$1]!.count, $0) }
+        let count = { (t: String) in index[t]?.count ?? 0 }
+        let tags = index.keys.filter { query.isEmpty || $0.localizedCaseInsensitiveContains(query) }.sorted { (count($0), $1) > (count($1), $0) }
         VStack(spacing: 0) {
             PageHeader(title: "Tags", subtitle: "\(index.count) tags across \(Set(index.values.flatMap { $0.map(\.id) }).count) notes") {
                 HStack(spacing: 6) { Image(systemName: "magnifyingglass").foregroundStyle(Color.ink2); TextField("Filter tags", text: $query).textFieldStyle(.plain).frame(width: 160) }
@@ -19,7 +20,7 @@ struct TagsPage: View {
                         LazyVStack(spacing: 0) {
                             ForEach(tags, id: \.self) { t in
                                 Button { picked = t } label: {
-                                    HStack { Text("#" + t).lineLimit(1); Spacer(); Text("\(index[t]!.count)").foregroundStyle(Color.ink2).monospacedDigit() }
+                                    HStack { Text("#" + t).lineLimit(1); Spacer(); Text("\(count(t))").foregroundStyle(Color.ink2).monospacedDigit() }
                                         .font(.system(size: 13, weight: picked == t ? .semibold : .regular)).padding(.horizontal, 16).padding(.vertical, 7).contentShape(.rect)
                                 }.buttonStyle(.glass(radius: DS.Radius.row, selected: picked == t))
                             }

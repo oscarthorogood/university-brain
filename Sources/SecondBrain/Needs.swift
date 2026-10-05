@@ -224,14 +224,23 @@ struct SayBubble: View {
     @Environment(Store.self) private var store
     @State private var index = 0
     @State private var typing = true
+    /// The line on show; nil only when there is nothing to say (`index % 0` would crash).
+    private var line: Say? { lines.isEmpty ? nil : lines[index % lines.count] }
+    private func activate() {
+        guard let l = line else { return }
+        if let role = l.askRole, let prompt = l.askPrompt { open(.agent(role)); store.ask(role, prompt); if let k = l.gotIt { store.gotIt(k) } }
+        else if let go = l.go { open(go) }
+    }
     var body: some View {
+        if let line { bubble(line) }
+    }
+    private func bubble(_ line: Say) -> some View {
         HStack(spacing: 0) {
             ZStack {
                 if typing && !reduceMotion { TypingDots().transition(.opacity) }
                 else {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(lines[index % lines.count].text).font(.system(size: 11)).multilineTextAlignment(.leading).lineLimit(4)
-                        let line = lines[index % lines.count]
+                        Text(line.text).font(.system(size: 11)).multilineTextAlignment(.leading).lineLimit(4)
                         if let key = line.gotIt {
                             Button { store.gotIt(key) } label: { Text("Got it").font(.system(size: 10, weight: .semibold)) }
                                 .buttonStyle(.glassAction(.chip)).accessibilityLabel("Got it")
@@ -244,14 +253,14 @@ struct SayBubble: View {
             .frame(minWidth: 44, minHeight: 32, alignment: .leading)
             .glassEffect(.regular, in: BubbleShape(tail: tail, radius: DS.Radius.row, tailAt: tail == .bottom ? (align == .trailing ? 0.86 : 0.14) : nil))
             .contentShape(Rectangle())
-            .onTapGesture {
-                let l = lines[index % lines.count]
-                if let role = l.askRole, let prompt = l.askPrompt { open(.agent(role)); store.ask(role, prompt); if let k = l.gotIt { store.gotIt(k) } }
-                else if let go = l.go { open(go) }
-            }
+            .onTapGesture(perform: activate)
         }
         .frame(maxWidth: .infinity, alignment: align)
-        .accessibilityElement(children: .ignore).accessibilityLabel(lines[index % lines.count].text)
+        // VoiceOver: one element that reads the line and does what a click does; "Got it" stays reachable as a named action
+        .accessibilityElement(children: .ignore).accessibilityLabel(line.text)
+        .accessibilityAddTraits(line.go != nil || line.askPrompt != nil ? .isButton : [])
+        .accessibilityAction { activate() }
+        .accessibilityActions { if let k = line.gotIt { Button("Got it") { store.gotIt(k) } } }
         .task(id: lines) {
             index = 0
             if reduceMotion { typing = false; return }

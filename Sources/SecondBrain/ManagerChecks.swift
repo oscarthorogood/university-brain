@@ -182,7 +182,7 @@ extension Store {
         guard jobOn("weekahead"), Calendar.current.component(.weekday, from: .now) == 2, Calendar.current.component(.hour, from: .now) >= 7 else { return }
         let key = "week:" + Date.now.formatted(.iso8601.year().weekOfYear())
         guard once(key) else { return }
-        let start = today, end = Calendar.current.date(byAdding: .day, value: 7, to: start)!
+        let start = today, end = start.addingTimeInterval(7 * 86400)
         for (code, name) in Vault.courses.map({ ($0.value, Agent.role($0.value).name) }).sorted(by: { $0.0 < $1.0 }) {
             let mine = notes.filter { $0.course == code && !$0.done && ($0.when.map { $0 >= start && $0 < end } ?? false) }
             func list(_ folders: Set<String>) -> String { mine.filter { folders.contains($0.folder) }.sorted { $0.when! < $1.when! }.map { "\($0.display) (\($0.when!.formatted(.dateTime.weekday(.abbreviated).hour().minute())))" }.joined(separator: ", ") }
@@ -197,7 +197,8 @@ extension Store {
 
     /// Each course agent keeps a short briefing of where its course is, once a day, so a consult can read that instead of the whole course. Haiku; one a tick.
     func maintainBriefings(hasJobs: Bool) async {
-        guard budgetLeft(deep: false) else { return }
+        // a manual job may have started while this tick awaited; taking agentBusy here would clear it under that job when the briefing ends
+        guard !agentBusy, budgetLeft(deep: false) else { return }
         for code in Agent.courseRoles.map(\.id) where agentOn(code) {
             let key = "briefing-\(code)-\(dayStamp)"
             guard !handled.contains(key) else { continue }

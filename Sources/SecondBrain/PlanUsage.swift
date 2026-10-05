@@ -38,7 +38,10 @@ enum PlanUsage {
     }
     static var summary: String {
         guard let s = current else { return "Claude usage: not read yet. Press to check." }
-        func part(_ n: String, _ w: Window?) -> String? { s.used(w).map { "\(Int(($0 * 100).rounded()))% of the \(n) (resets in \(left(until: w!.resets)))" } }
+        func part(_ n: String, _ w: Window?) -> String? {
+            guard let w, let used = s.used(w) else { return nil }
+            return "\(Int((used * 100).rounded()))% of the \(n) (resets in \(left(until: w.resets)))"
+        }
         return "Claude plan: " + [part("5-hour window", s.five), part("week", s.week)].compactMap { $0 }.joined(separator: " · ") + ". Press to refresh."
     }
 }

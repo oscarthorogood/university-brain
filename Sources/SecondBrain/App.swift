@@ -201,18 +201,16 @@ struct SecondBrainApp: App {
         UserDefaults.standard.set(recentAgents, forKey: "recentAgents")
     }
     var filter: String? = nil        // course filter on overview
-    var tab: Tab = .assignments
     var error: String?
 
     var query = ""
     var quickOpen = false
-    var hoveredAgent: String?
     // Autopilot: agents look for work and prepare it in the inbox (see ManagerScan.swift)
     var inbox: [InboxItem] = InboxItem.load()
     var autopilotOn = UserDefaults.standard.object(forKey: "autopilotOn") as? Bool ?? true
-    var autoAgents = Set(UserDefaults.standard.stringArray(forKey: "autoAgents") ?? [])   // agents allowed to act without a tick
     @ObservationIgnored var handled = Set(UserDefaults.standard.stringArray(forKey: "autopilotHandled") ?? [])
     @ObservationIgnored var agentBusy = false
+    @ObservationIgnored var tickRunning = false   // one autopilot tick at a time (a tick can outlive the timer that started it)
     @ObservationIgnored var manualClaims = Set<String>()   // notes an open "plan this" sheet has marked Agent In Progress
     @ObservationIgnored var autopilotTimer: Task<Void, Never>?
     var newStructured = false
@@ -330,6 +328,7 @@ struct SecondBrainApp: App {
         alert.window.initialFirstResponder = field
         guard alert.runModal() == .alertFirstButtonReturn,
               let url = URL(string: field.stringValue.trimmingCharacters(in: .whitespaces)), let host = url.host else { return }
+        guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { self.error = "Only web links (http or https) can be added."; return }
         let stamp = Date.now.formatted(.iso8601.year().month().day()) + " " + Date.now.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)).replacingOccurrences(of: ":", with: "")
         let file = Vault.root.appending(path: "Unsorted/Link - \(host) - \(stamp).md")
         do { try "\(url.absoluteString)\n".write(to: file, atomically: true, encoding: .utf8) } catch { self.error = error.localizedDescription }
@@ -473,29 +472,6 @@ enum Portrait {
         let img = NSImage(data: Data(svg.utf8)) ?? NSImage()
         img.isTemplate = true
         return Image(nsImage: img)
-    }
-}
-
-struct Daisy: View {
-    var body: some View {
-        ZStack {
-            ForEach(0..<12, id: \.self) { i in
-                Ellipse().frame(width: 18, height: 48).offset(y: -26).rotationEffect(.degrees(Double(i) * 30))
-            }
-            Circle().frame(width: 22)
-        }.foregroundStyle(.white).frame(width: 120, height: 120)
-    }
-}
-struct Daisies: View {
-    @Environment(\.colorScheme) private var scheme
-    var body: some View {
-        GeometryReader { g in
-            ZStack {
-                Daisy().scaleEffect(1.9).position(x: 40, y: 30)
-                Daisy().scaleEffect(1.6).position(x: g.size.width - 30, y: g.size.height - 20)
-                Daisy().scaleEffect(1.2).position(x: g.size.width * 0.55, y: -10)
-            }.opacity(scheme == .dark ? 0.06 : 0.9)
-        }.allowsHitTesting(false)
     }
 }
 
@@ -740,25 +716,6 @@ struct RailItem: View {
     }
 }
 
-/// Same look as a sidebar row, but runs an action instead of switching page.
-struct ActionRow: View {
-    let icon: String; var iconTint: Color = .ink; let title: String; let meta: String; let action: () -> Void
-    @State private var hover = false
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: icon).frame(width: 18).foregroundStyle(iconTint)
-                Text(title).lineLimit(1).truncationMode(.tail)
-                Spacer()
-                if !meta.isEmpty { Text(meta).font(.system(size: 11)).foregroundStyle(Color.ink2) }
-            }
-            .font(.system(size: 14)).padding(.horizontal, 10).frame(height: 30)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.glassRow)
-    }
-}
-
 struct Heading: View {
     let text: String; var trailing = ""
     init(_ text: String, trailing: String = "") { self.text = text; self.trailing = trailing }
@@ -896,7 +853,6 @@ struct Card<Content: View>: View {
 struct NoteRow: View {
     @Environment(Store.self) private var store
     let note: Note; var badge = false; var timeColumn = false
-    @State private var hover = false
     var body: some View {
         HStack(spacing: 12) {
             if timeColumn {
@@ -1005,31 +961,6 @@ struct RoundButton: View {
         Button(action: action) { Image(systemName: icon).font(.system(size: 15)) }
             .buttonStyle(.glassIcon())
             .help(label).accessibilityLabel(label)
-    }
-}
-
-struct FolderCard: View {
-    let text: String
-    var body: some View {
-        let shape = UnevenRoundedRectangle(topLeadingRadius: 6, bottomLeadingRadius: 18, bottomTrailingRadius: 18, topTrailingRadius: 18)
-        Text(text).font(.system(size: 12)).lineLimit(2).multilineTextAlignment(.leading)
-            .frame(width: 80, height: 46, alignment: .bottomLeading).padding(10)
-            .background(Color.card, in: shape)
-            .overlay(shape.strokeBorder(Color.line))
-            .overlay(alignment: .topTrailing) { Text("#").font(.system(size: 12)).foregroundStyle(Color.ink2).padding(8) }
-            .shadow(color: .black.opacity(0.05), radius: 6, y: 3)
-    }
-}
-
-struct DotGrid: View {
-    var body: some View {
-        Canvas { ctx, size in
-            for x in stride(from: 9.0, to: size.width, by: 18) {
-                for y in stride(from: 9.0, to: size.height, by: 18) {
-                    ctx.fill(Path(ellipseIn: CGRect(x: x - 1.2, y: y - 1.2, width: 2.4, height: 2.4)), with: .color(.line))
-                }
-            }
-        }
     }
 }
 

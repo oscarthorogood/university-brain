@@ -28,6 +28,9 @@ struct TasksBoard: View {
                                 .frame(maxWidth: .infinity, alignment: .leading).padding(10)
                                 .background(Color.ink.opacity(0.05), in: .rect(cornerRadius: DS.Radius.row))
                                 .contentShape(.rect).onTapGesture { store.page = .note(n.id) }
+                                .accessibilityElement(children: .combine).accessibilityAddTraits(.isButton)
+                                .accessibilityAction { store.page = .note(n.id) }
+                                .accessibilityAction(named: "Move to \(TaskState(rawValue: col)?.next.rawValue ?? "Not started")") { store.cycle(n) }
                                 .draggable(n.id.absoluteString)
                             }
                         }.padding(.horizontal, 8).padding(.bottom, 10)

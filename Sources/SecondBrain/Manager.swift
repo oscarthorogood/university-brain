@@ -224,10 +224,3 @@ struct ManagerCard: View {
         }.fixedSize(horizontal: false, vertical: true)
     }
 }
-
-extension Store {
-    /// All work an agent is given is handed out by the Manager. This records who got what, at which effort, and why.
-    func assign(_ agent: String, _ what: String, why: String) {
-        log(Agent.manager.id, "Assigned to \(Agent.role(agent).name) (\(Manager.workTier(agent).rawValue)): \(what) — \(why)")
-    }
-}

@@ -90,5 +90,6 @@ struct NoticeCard: View {
             .glassEffect(.regular.tint(notice.tint.opacity(0.07)), in: .rect(cornerRadius: 14))
         }
         .buttonStyle(.pressScale).onHover { hover = $0 }.accessibilityLabel("\(notice.source): \(notice.title). \(notice.body)")
+        .accessibilityAction(named: "Dismiss", dismiss)   // the ✕ only appears on hover, so keyboard and VoiceOver users need this
     }
 }

@@ -110,14 +110,14 @@ enum Vault {
         s.replacingOccurrences(of: "[[", with: "").replacingOccurrences(of: "]]", with: "")
     }
 
+    /// Called for every note on every load, so the formatters are made once. A configured DateFormatter is safe to read from any thread;
+    /// these are never changed after they are made.
+    nonisolated(unsafe) private static let dateFormatters: [DateFormatter] = ["yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd"].map { format in
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_GB_POSIX"); f.dateFormat = format; return f
+    }
     static func parseDate(_ s: String?) -> Date? {
         guard let s else { return nil }
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_GB_POSIX")
-        for format in ["yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd"] {
-            f.dateFormat = format
-            if let d = f.date(from: s) { return d }
-        }
+        for f in dateFormatters { if let d = f.date(from: s) { return d } }
         return nil
     }
 
@@ -138,10 +138,13 @@ enum Vault {
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
-    static func obsidianURL(_ note: Note) -> URL {
-        var c = URLComponents(string: "obsidian://open")!
-        c.queryItems = [URLQueryItem(name: "vault", value: name), URLQueryItem(name: "file", value: note.path)]
-        return c.url!
+    static func obsidianURL(_ note: Note) -> URL { obsidianURL(file: note.path) }
+    /// `file` is vault-relative, without `.md`.
+    static func obsidianURL(file: String) -> URL {
+        var c = URLComponents()
+        c.scheme = "obsidian"; c.host = "open"
+        c.queryItems = [URLQueryItem(name: "vault", value: name), URLQueryItem(name: "file", value: file)]
+        return c.url ?? URL(fileURLWithPath: root.path)   // a scheme, host and query always make a URL; the fallback only keeps this total
     }
 }
 

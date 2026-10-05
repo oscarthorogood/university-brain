@@ -80,6 +80,10 @@ enum Review {
         }
         return out
     }
+    /// `touched`, off the main thread: it walks the whole vault.
+    static func touchedInBackground(since: Date, root: URL) async -> [String] {
+        await Task.detached { touched(since: since, root: root) }.value
+    }
 
     /// Structural checks on one edited note: nothing the helper wasn't given has changed.
     static func checkEdit(rel: String, before: String, after: String, sections allowed: [String]?, template: String) -> Verdict {
@@ -149,6 +153,8 @@ enum Review {
         return v
     }
 
+    /// Errors that mean the check couldn't run, not that the link is dead.
+    private static let offline: Set<URLError.Code> = [.cancelled, .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .internationalRoamingOff]
     /// Links in `text` that don't open (up to ten are tried).
     static func deadLinks(in text: String) async -> [String] {
         let urls = Array(Set(text.matches(of: /https?:\/\/[^\s)\]>"|]+/).map { String($0.0).trimmingCharacters(in: CharacterSet(charactersIn: ".,;")) })).prefix(10)
@@ -158,15 +164,23 @@ enum Review {
                 g.addTask {
                     guard let url = URL(string: u) else { return nil }
                     var r = URLRequest(url: url, timeoutInterval: 8); r.httpMethod = "GET"; r.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
-                    if let (_, resp) = try? await URLSession.shared.data(for: r), let code = (resp as? HTTPURLResponse)?.statusCode {
+                    do {
+                        let (_, resp) = try await URLSession.shared.data(for: r)
+                        guard let code = (resp as? HTTPURLResponse)?.statusCode else { return nil }
                         // 403 and 429 are sites refusing a program, not a dead page
                         return code >= 400 && code != 403 && code != 429 ? "\(u) (\(code))" : nil
+                    } catch let e as URLError where Self.offline.contains(e.code) {
+                        return nil   // this Mac is offline or the check was cancelled: that says nothing about the link
+                    } catch is CancellationError {
+                        return nil
+                    } catch {
+                        return "\(u) (no answer)"
                     }
-                    return "\(u) (no answer)"
                 }
             }
             for await d in g { if let d { dead.append(d) } }
         }
+        if Task.isCancelled { return [] }   // a cancelled check proves nothing, so it can't fail a job
         return dead.isEmpty ? [] : ["link\(dead.count == 1 ? "" : "s") that don't open: " + dead.prefix(3).joined(separator: ", ")]
     }
 

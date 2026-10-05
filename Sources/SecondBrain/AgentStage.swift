@@ -61,11 +61,11 @@ struct AgentStage: View {
                 if chat { HStack(spacing: 8) {
                     TextField("Ask \(role.name)…", text: $draft, axis: .vertical).textFieldStyle(.plain).lineLimit(1...3).onSubmit(send)
                     Menu {
-                        Button { override = nil } label: { Label("Automatic effort", systemImage: override == nil ? "checkmark" : "") }
-                        Button { override = .quick } label: { Label("Keep it quick", systemImage: override == .quick ? "checkmark" : "") }
-                        Button { override = .deep } label: { Label("Think harder", systemImage: override == .deep ? "checkmark" : "") }
-                    } label: { Image(systemName: override == nil ? "speedometer" : "speedometer").foregroundStyle(override == nil ? Color.ink2 : Color.ink).symbolVariant(override == nil ? .none : .fill) }
-                        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize().help(override == nil ? "Effort: automatic" : override == .quick ? "Effort: quick, next message only" : "Effort: deep, next message only")
+                        Toggle("Automatic effort", isOn: Binding(get: { override == nil }, set: { if $0 { override = nil } }))
+                        Toggle("Keep it quick", isOn: Binding(get: { override == .quick }, set: { override = $0 ? .quick : nil }))
+                        Toggle("Think harder", isOn: Binding(get: { override == .deep }, set: { override = $0 ? .deep : nil }))
+                    } label: { Image(systemName: "speedometer").foregroundStyle(override == nil ? Color.ink2 : Color.ink).symbolVariant(override == nil ? .none : .fill) }
+                        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize().help(effortHelp).accessibilityLabel(effortHelp)
                     Button(action: send) { Image(systemName: "arrow.up").font(.system(size: 13, weight: .semibold)) }
                         .buttonStyle(.glassIcon(DS.Height.compact, prominent: true)).disabled(busy || draft.isEmpty)
                         .opacity(busy || draft.isEmpty ? 0.4 : 1).accessibilityLabel("Send")
@@ -80,6 +80,7 @@ struct AgentStage: View {
     }
 
     private var busy: Bool { store.thinking.contains(id) }
+    private var effortHelp: String { override == nil ? "Effort: automatic" : override == .quick ? "Effort: quick, next message only" : "Effort: deep, next message only" }
 
     private func send() {
         guard !busy, !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }

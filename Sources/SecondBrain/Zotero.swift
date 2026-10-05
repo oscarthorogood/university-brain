@@ -13,20 +13,34 @@ enum Zotero {
     static let marker = "second-brain", mineHeading = "## My notes"
 
     // MARK: Settings and state
-    /// The API key is private, so it lives in Application Support (owner-only), never in the vault.
-    struct Config: Codable {
+    /// The API key is private, so it lives in the Keychain. The file in Application Support (owner-only) holds only the library's user id,
+    /// so its presence says "connected" without reading the Keychain on every tick.
+    struct Config {
         var key: String, user: String
         static let file = URL.applicationSupportDirectory.appending(path: "SecondBrain/zotero.json")
+        static let account = "zotero-api-key"
+        private struct Saved: Codable { var user: String; var key: String? }   // `key` is only in files written before it moved to the Keychain
+        struct KeychainRefused: LocalizedError { var errorDescription: String? { "Couldn’t store the key in your Keychain, so Zotero isn’t connected." } }
+
+        static var testing: Bool { ProcessInfo.processInfo.environment["ZOTERO_API_BASE"] != nil }   // Zotero's local API (read-only)
+        static var connected: Bool { testing || FileManager.default.fileExists(atPath: file.path) }
         static func load() -> Config? {
-            if ProcessInfo.processInfo.environment["ZOTERO_API_BASE"] != nil { return Config(key: "local", user: "0") }   // testing against Zotero's local API (read-only)
-            return (try? Data(contentsOf: file)).flatMap { try? JSONDecoder().decode(Config.self, from: $0) }
+            if testing { return Config(key: "local", user: "0") }
+            guard let d = try? Data(contentsOf: file), let saved = try? JSONDecoder().decode(Saved.self, from: d) else { return nil }
+            if let old = saved.key, !old.isEmpty {   // saved by an older version: move the key into the Keychain and out of the file
+                let c = Config(key: old, user: saved.user)
+                try? c.save()
+                return c
+            }
+            return Keychain.read(account).map { Config(key: $0, user: saved.user) }
         }
-        func save() {
-            try? FileManager.default.createDirectory(at: Self.file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? JSONEncoder().encode(self).write(to: Self.file, options: [.atomic])
+        func save() throws {
+            guard Keychain.save(key, for: Self.account) else { throw KeychainRefused() }
+            try FileManager.default.createDirectory(at: Self.file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try JSONEncoder().encode(Saved(user: user, key: nil)).write(to: Self.file, options: [.atomic])
             try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: Self.file.path)
         }
-        static func forget() { try? FileManager.default.removeItem(at: file) }
+        static func forget() { try? FileManager.default.removeItem(at: file); Keychain.delete(account) }
     }
 
     /// What was last in sync, so a change on either side can be told apart. Lives beside the notes it describes; no secrets in it.
@@ -105,15 +119,16 @@ enum Zotero {
         /// A call on the user's library. 304 and 412 come back for the caller to act on; anything else ≥ 400 throws.
         func call(_ method: String, _ path: String, query: [(String, String)] = [], body: Data? = nil,
                   type: String = "application/json", headers: [String: String] = [:]) async throws -> (Data, HTTPURLResponse) {
-            var comps = URLComponents(string: Self.base + "/users/\(cfg.user)" + path)!
+            guard var comps = URLComponents(string: Self.base + "/users/\(cfg.user)" + path) else { throw URLError(.badURL) }
             if !query.isEmpty { comps.queryItems = query.map { URLQueryItem(name: $0, value: $1) } }
-            var req = URLRequest(url: comps.url!); req.httpMethod = method; req.httpBody = body
+            guard let url = comps.url else { throw URLError(.badURL) }
+            var req = URLRequest(url: url, timeoutInterval: 30); req.httpMethod = method; req.httpBody = body
             req.setValue(cfg.key, forHTTPHeaderField: "Zotero-API-Key"); req.setValue("3", forHTTPHeaderField: "Zotero-API-Version")
             if body != nil { req.setValue(type, forHTTPHeaderField: "Content-Type") }
             for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
             for attempt in 0..<2 {
                 let (data, resp) = try await URLSession.shared.data(for: req)
-                let r = resp as! HTTPURLResponse
+                guard let r = resp as? HTTPURLResponse else { throw URLError(.badServerResponse) }
                 if r.statusCode == 429, attempt == 0 {
                     try await Task.sleep(for: .seconds(min(Double(r.value(forHTTPHeaderField: "Retry-After") ?? "") ?? 5, 30))); continue
                 }
@@ -165,7 +180,8 @@ enum Zotero {
             guard let u = slot.url.flatMap(URL.init), let ct = slot.contentType, let prefix = slot.prefix, let suffix = slot.suffix, let up = slot.uploadKey else { throw Failure(code: 502, message: "no upload slot") }
             var req = URLRequest(url: u); req.httpMethod = "POST"; req.setValue(ct, forHTTPHeaderField: "Content-Type")   // the file store, not Zotero: no key sent
             let (_, resp) = try await URLSession.shared.upload(for: req, from: Data(prefix.utf8) + data + Data(suffix.utf8))
-            guard (resp as! HTTPURLResponse).statusCode < 300 else { throw Failure(code: (resp as! HTTPURLResponse).statusCode, message: "upload failed") }
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            guard (200..<300).contains(code) else { throw Failure(code: code, message: "upload failed") }
             _ = try await call("POST", "/items/\(key)/file", body: Self.form([("upload", up)]), type: urlencoded, headers: ["If-None-Match": "*"])
         }
     }
@@ -174,9 +190,11 @@ enum Zotero {
     static func connect(_ key: String) async throws -> Config {
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty, key.allSatisfy({ $0.isLetter || $0.isNumber }) else { throw Failure(code: 400, message: "That doesn’t look like an API key.") }
-        var req = URLRequest(url: URL(string: API.base + "/keys/\(key)")!); req.setValue("3", forHTTPHeaderField: "Zotero-API-Version")
+        guard let keyURL = URL(string: API.base + "/keys/\(key)") else { throw URLError(.badURL) }
+        var req = URLRequest(url: keyURL, timeoutInterval: 30); req.setValue("3", forHTTPHeaderField: "Zotero-API-Version")
         let (d, resp) = try await URLSession.shared.data(for: req)
-        guard (resp as! HTTPURLResponse).statusCode == 200 else { throw Failure(code: (resp as! HTTPURLResponse).statusCode, message: "Zotero didn’t accept that key.") }
+        let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        guard code == 200 else { throw Failure(code: code, message: "Zotero didn’t accept that key.") }
         struct Info: Decodable { struct Access: Decodable { struct Lib: Decodable { let library: Bool?, write: Bool? }; let user: Lib? }; let userID: Int; let access: Access }
         let info = try JSONDecoder().decode(Info.self, from: d)
         guard info.access.user?.library == true, info.access.user?.write == true else { throw Failure(code: 400, message: "That key can’t edit your library. Make a new one with “Allow library access” and “Allow write access” ticked.") }
@@ -379,7 +397,8 @@ enum Zotero {
         var body = ["# \(title)", "", "[Open in Zotero](zotero://select/library/items/\(it.key))" + pdfs.map { " · [[\($0)]]" }.joined()]
         if let a = d.abstractNote, !a.isEmpty { body += ["", "## Abstract", "", a] }
         if !others.isEmpty { body += ["", "## Zotero notes", "", others.map { md($0.data.note ?? "") }.joined(separator: "\n\n---\n\n")] }
-        if !links.isEmpty { body += ["", "## Links", ""] + links.map { "- [\($0.data.title ?? $0.data.url!)](\($0.data.url!))" } }
+        let linked = links.compactMap { l in l.data.url.map { (title: l.data.title ?? $0, url: $0) } }
+        if !linked.isEmpty { body += ["", "## Links", ""] + linked.map { "- [\($0.title)](\($0.url))" } }
         body += ["", mineHeading] + (mine.isEmpty ? [] : ["", mine])
         return "---\n" + head.joined(separator: "\n") + "\n---\n" + body.joined(separator: "\n") + "\n"
     }

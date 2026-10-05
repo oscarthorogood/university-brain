@@ -1,9 +1,17 @@
 import Foundation
 import PDFKit
 
-/// Runs a course agent through the Claude Code CLI (uses the signed-in Claude subscription — no API key).
-final class TimeoutFlag: @unchecked Sendable { var hit = false }
+/// Set by the timeout on one queue and read by the reader on another, so it is locked.
+final class TimeoutFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _hit = false
+    var hit: Bool {
+        get { lock.withLock { _hit } }
+        set { lock.withLock { _hit = newValue } }
+    }
+}
 
+/// Runs a course agent through the Claude Code CLI (uses the signed-in Claude subscription — no API key).
 enum Agent {
     static let cli: String = ["/opt/homebrew/bin/claude", "/usr/local/bin/claude",
                               FileManager.default.homeDirectoryForCurrentUser.appending(path: ".local/bin/claude").path]
@@ -265,7 +273,7 @@ enum Agent {
         } else {
             prompt = """
             \(task) The note is `\(rel)`.\(extra)
-            \(advice.map { "The \(" course agent") advises:\n\($0)\n" } ?? "")
+            \(advice.map { "The course agent advises:\n\($0)\n" } ?? "")
             Do the work now, \(where_).\(sections.map { " You may change only these sections (and `summary`, `readings`, `references` in the frontmatter if the job needs them): \($0.joined(separator: ", ")). Leave every other line exactly as it is." } ?? "")
             If there is nothing you can do without inventing content, reply with a single line starting `NOTHING:` and the reason, and change nothing. Otherwise reply with one short line per change you made.
             """
