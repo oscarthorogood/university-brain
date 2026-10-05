@@ -12,7 +12,7 @@ extension AgentWork {
     }
     /// Planner: a revision plan when a written exam has a date.
     static func examPlan(course: String, day: String) -> AgentWork {
-        AgentWork(role: "planner", label: "Plan the exam revision", task: "A written exam for \(course) is on \(day). Create one new note in Apps/Summaries/ named `\(course) - Summary - Exam Plan`, from Templates/Claude/Summary Template.md, with `type: Summary` and `date: \(day)`. Fill the assessment details from Calendar Sync, the course note and the Learn snapshot (cite each), and the topic checklist with one row per examinable topic, listing the course's lectures and tutorials as the source notes and leaving confidence blank. Never invent the exam's format or length: leave blank what the files don't say.", creates: "Summaries", heading: "Exam revision plan")
+        AgentWork(role: "planner", label: "Plan the exam revision", task: "A written exam for \(course) is on \(day). Create one new note in Files/Summaries/ named `\(course) - Summary - Exam Plan`, from Templates/Claude/Summary Template.md, with `type: Summary` and `date: \(day)`. Fill the assessment details from Calendar Sync, the course note and the Learn snapshot (cite each), and the topic checklist with one row per examinable topic, listing the course's lectures and tutorials as the source notes and leaving confidence blank. Never invent the exam's format or length: leave blank what the files don't say.", creates: "Summaries", heading: "Exam revision plan")
     }
 }
 

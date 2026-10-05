@@ -153,7 +153,7 @@ struct RelationsCard: View {
     let onLink: (String) -> Void
     var body: some View {
         let all = store.relations(of: note)
-        Card(title: "Related", trailing: all.isEmpty ? "" : "\(all.count)") {
+        Card(title: "Files", trailing: all.isEmpty ? "" : "\(all.count)") {
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
                     if all.isEmpty { Text("Nothing in your study folders, Research, Zotero, Resources or OneDrive relates to this yet.").font(.system(size: 12)).foregroundStyle(Color.ink2).padding(10) }

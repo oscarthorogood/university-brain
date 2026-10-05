@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Revision was split into these note types, each with its own folder in Apps/, template, page and preview.
+/// Revision was split into these note types, each with its own folder in Apps/ or Files/, template, page and preview.
 enum Study {
     struct Kind { let folder: String; let noun: String; let icon: String }
     static let kinds: [Kind] = [
@@ -13,6 +13,8 @@ enum Study {
         .init(folder: "Podcast", noun: "Podcast", icon: "waveform"),
     ]
     static let folders = kinds.map(\.folder)
+    /// These three live under Files/ with the documents they sum up; the others stay in Apps/. (Research is the fourth folder under Files/.)
+    static let inFiles: Set<String> = ["Summaries", "Past Papers", "Mind Maps"]
     static func isStudy(_ folder: String) -> Bool { folders.contains(folder) }
     static func kind(_ folder: String) -> Kind? { kinds.first { $0.folder == folder } }
 }

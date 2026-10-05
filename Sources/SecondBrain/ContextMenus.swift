@@ -7,6 +7,7 @@ struct NoteMenu: View {
     let note: Note
     var body: some View {
         Button("Open") { store.page = .note(note.id) }
+        Button("Open in New Tab") { store.newTab(.note(note.id)) }
         Button("Open in Obsidian") { NSWorkspace.shared.open(Vault.obsidianURL(note)) }
         Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([note.id]) }
         Divider()
@@ -23,7 +24,6 @@ struct UnsortedMenu: View {
     @Environment(Store.self) private var store
     let url: URL
     var body: some View {
-        if url.pathExtension != "txt" { Button("File Now…") { store.page = .unsorted(url) } }
         Button("Open") { NSWorkspace.shared.open(url) }
         Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
         Divider()

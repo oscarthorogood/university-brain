@@ -30,15 +30,15 @@ enum Vault {
     static var exists: Bool { FileManager.default.fileExists(atPath: root.appending(path: "Lectures").path) }
     /// The vault groups its folders under Items/ (what you do), Files/ (documents and references) and Apps/ (study tools and research).
     /// The app still calls them by their short names ("Lectures", "Zotero"…); `dir` is where one really is.
-    /// A vault laid out the old way (everything loose, or Relations/ instead of Files/ and Apps/) keeps working, which the self-checks rely on.
+    /// A vault laid out the old way (everything loose, Relations/ instead of Files/ and Apps/, or Summaries, Past Papers, Mind Maps and Research still in Apps/) keeps working, which the self-checks rely on.
     static let places: [String: String] = ["Lectures": "Items/Lectures", "Tutorials": "Items/Tutorials", "Readings": "Items/Readings", "Essays": "Items/Essays",
                          "Projects": "Items/Projects", "Exams": "Items/Exams", "TaskNotes/Tasks": "Items/Assignments",
-                         "Research": "Apps/Research", "Zotero": "Files/Zotero",
+                         "Research": "Files/Research", "Zotero": "Files/Zotero",
                          "Resources": "Files/Resources", "OneDrive": "Files/OneDrive"]
-        .merging(Study.folders.map { ($0, "Apps/" + $0) }) { a, _ in a }
+        .merging(Study.folders.map { ($0, (Study.inFiles.contains($0) ? "Files/" : "Apps/") + $0) }) { a, _ in a }
     static func dir(_ folder: String, root: URL = Vault.root) -> String {
         guard let p = places[folder] else { return folder }
-        for candidate in [p, "Relations/" + folder] where FileManager.default.fileExists(atPath: root.appending(path: candidate).path) { return candidate }
+        for candidate in [p, "Apps/" + folder, "Relations/" + folder] where FileManager.default.fileExists(atPath: root.appending(path: candidate).path) { return candidate }
         return folder
     }
     /// A vault path written with the short folder name ("Resources/TEM/x.pdf", as in note links) → the real one.
@@ -48,7 +48,8 @@ enum Vault {
     }
     /// The short folder name for a real folder path ("Items/Lectures" → "Lectures").
     static func logical(_ folder: String) -> String {
-        places.first { $0.value == folder }?.key ?? (folder.hasPrefix("Relations/") ? String(folder.dropFirst(10)) : folder)
+        places.first { $0.value == folder }?.key
+            ?? (folder.hasPrefix("Relations/") ? String(folder.dropFirst(10)) : folder.hasPrefix("Apps/") ? String(folder.dropFirst(5)) : folder)
     }
     static let folders = ["Courses", "Lectures", "Tutorials", "Readings", "Essays", "Projects"] + Study.folders + ["Research", "Exams", "TaskNotes/Tasks"]
     static let courses = ["Management Science and Operations Analytics": "MSOA",
