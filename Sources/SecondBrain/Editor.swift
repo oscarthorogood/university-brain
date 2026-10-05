@@ -254,7 +254,7 @@ struct MarkdownEditor: NSViewRepresentable {
         return CGSize(width: w, height: max(h + 140, 360))
     }
 
-    @MainActor final class Coordinator: NSObject, NSTextViewDelegate, NSLayoutManagerDelegate {
+    @MainActor final class Coordinator: NSObject, NSTextViewDelegate, @preconcurrency NSLayoutManagerDelegate {
         var parent: MarkdownEditor
         init(_ parent: MarkdownEditor) { self.parent = parent }
 
