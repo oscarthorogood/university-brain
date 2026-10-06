@@ -95,12 +95,32 @@ struct WindowTabBar: View {
             .glassEffect(.regular, in: .capsule)
             .padding(.leading, 12).padding(.trailing, 6)
             Rectangle().fill(Color.line.opacity(0.8)).frame(width: 1, height: 28)
-            HStack(spacing: 0) { TabBar(); Spacer(minLength: 0) }.padding(.leading, 5).padding(.trailing, 12)
+            HStack(spacing: 0) { TabBar(); Spacer(minLength: 0) }.padding(.leading, 5).padding(.trailing, 6)
+            // Search: a glass pill the same size as the one on the left, at the right end of the tab strip.
+            SearchPill()
+                .frame(width: 240, height: 36)
+                .glassEffect(.regular, in: .capsule)
+                .padding(.trailing, 12)
         }
         .frame(height: 36)
         .background(TrafficLights())
         .task { Updater.shared.startChecking() }
         .padding(.top, 12)        // the same room above the pill as at its left edge
+    }
+}
+
+/// The search box in the top strip. Typing opens the Search page; the page lists the results.
+private struct SearchPill: View {
+    @Environment(Store.self) private var store
+    var body: some View {
+        @Bindable var store = store
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").font(.system(size: 13)).foregroundStyle(Color.ink2)
+            TextField("Search", text: $store.query).textFieldStyle(.plain).font(.system(size: 13))
+                .onSubmit { if !store.query.isEmpty { store.page = .search } }
+                .onChange(of: store.query) { _, q in if !q.isEmpty { store.page = .search } }
+        }
+        .padding(.horizontal, 14)
     }
 }
 
