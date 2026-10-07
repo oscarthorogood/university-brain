@@ -47,6 +47,9 @@ extension Store {
         if jobOn("slides"), due("slides", every: 3600) { missingSlides() }
         if jobOn("quality"), due("quality", every: 86400) { qualitySweep() }
         if jobOn("status"), due("status", every: 86400) { statusHygiene() }
+        if jobOn("index"), due("index", every: 6 * 3600) { vaultIndex() }
+        if jobOn("docs"), due("docs", every: 86400) { await docsDrift() }
+        if jobOn("verifier"), due("verifier", every: 86400) { await runVerifier() }
     }
 
     static let expectedBase: [String: String] = ["Courses": "Courses.base", "Lectures": "Lectures.base", "Tutorials": "Tutorials.base", "Readings": "Readings.base", "Essays": "Essays.base",
@@ -85,26 +88,157 @@ extension Store {
         if fixed > 0 { reload() }
     }
 
-    /// 16. Wikilinks and `resources` files that point at nothing.
+    /// Puts a fix the Manager made on its own in the Activity Log with an Undo: the notes it changed (as they were) and any it created.
+    private func recordFix(title: String, key: String, message: String, changed: [String], created: [String] = []) {
+        let undo = InboxItem.Undo(restore: changed, created: created, snapshots: Dictionary(changed.compactMap { rel in
+            Vault.history(Vault.root.appending(path: rel)).first.map { (rel, $0.url.lastPathComponent) }
+        }, uniquingKeysWith: { a, _ in a }))
+        var item = InboxItem(kind: .work, agent: Agent.manager.id, title: title, state: .done, key: key)
+        item.undo = undo; item.verdict = "Automated fix"
+        inbox.append(item); saveInbox()
+        log(Agent.manager.id, message, undo: item.id)
+    }
+    /// A note you touched in the last five minutes is left alone.
+    private static func quiet(_ url: URL) -> Bool {
+        ((try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast) < .now.addingTimeInterval(-300)
+    }
+    /// A link's name with the differences that don't matter taken out (case, spaces, punctuation, `L3` against `L03`), to find the note a mistyped link meant.
+    static func linkKey(_ s: String) -> String {
+        let padded = s.replacing(/\b([LT])(\d)\b/) { "\($0.1)0\($0.2)" }
+        return String(padded.lowercased().filter { $0.isLetter || $0.isNumber })
+    }
+    /// "Strategic Management L17 - Topic": the shape of a link to a lecture or tutorial that has no note yet.
+    struct ClassLink { let link: String; let course: String; let kind: NoteKind; let number: Int; let topic: String }
+    static func classLink(_ t: String) -> ClassLink? {
+        guard let m = t.wholeMatch(of: /(.+) ([LT])(\d{1,3}) - (.+)/), Vault.courses.keys.contains(String(m.1)), let n = Int(m.3) else { return nil }
+        return ClassLink(link: t, course: String(m.1), kind: m.2 == "L" ? .lecture : .tutorial, number: n, topic: String(m.4))
+    }
+
+    /// 16. Wikilinks and `resources` files that point at nothing. A mistyped link that can only mean one note is corrected, and the next lecture or tutorial in a
+    /// course that something already links to is created from its template (three a day at most); both can be undone. The rest is reported.
     func brokenLinks(texts: [URL: String]? = nil) {
         let have = Set(notes.map { $0.title.lowercased() })
         let fileExt: Set<String> = ["pdf", "ppt", "pptx", "png", "jpg", "jpeg", "xlsx", "xls", "docx", "doc", "csv", "zip", "mp4", "mp3", "base", "txt", "json", "html"]
-        var dead: [String] = [], missingFiles: [String] = []
+        var byKey: [String: [String]] = [:]
+        for n in notes { byKey[Self.linkKey(n.title), default: []].append(n.title) }
+        var dead: [(note: Note, target: String)] = [], missingFiles: [String] = []
         for n in notes {
             guard let text = texts?[n.id] ?? (try? String(contentsOf: n.id, encoding: .utf8)) else { continue }
             for m in text.matches(of: /\[\[([^\]|#]+)/) {
                 let t = String(m.1).trimmingCharacters(in: .whitespaces)
                 if t.isEmpty || t.contains("/") || fileExt.contains((t as NSString).pathExtension.lowercased()) || have.contains(t.lowercased()) { continue }
-                dead.append("\(n.title) → [[\(t)]]")
+                dead.append((n, t))
             }
             for raw in Vault.rawItems(text, "resources") {
                 let path = Vault.unlink(raw.trimmingCharacters(in: CharacterSet(charactersIn: " \"'"))).components(separatedBy: "|")[0]
                 if fileExt.contains((path as NSString).pathExtension.lowercased()), !FileManager.default.fileExists(atPath: Vault.root.appending(path: Vault.real(path)).path) { missingFiles.append("\(n.title): \(path)") }
             }
         }
-        if (!dead.isEmpty || !missingFiles.isEmpty), once("links:\(dayStamp)") {
-            log(Agent.manager.id, "Links check: \(dead.count) link\(dead.count == 1 ? "" : "s") to notes that don't exist" + (dead.isEmpty ? "" : " (e.g. \(dead[0]))") + "; \(missingFiles.count) attached file\(missingFiles.count == 1 ? "" : "s") missing" + (missingFiles.isEmpty ? "" : " (e.g. \(missingFiles[0]))") + ".")
+        var fixes: [URL: [(wrong: String, right: String)]] = [:], future: [ClassLink] = [], left: [String] = [], seen = Set<String>()
+        for (n, t) in dead {
+            if let hit = byKey[Self.linkKey(t)], hit.count == 1 { fixes[n.id, default: []].append((t, hit[0])); continue }
+            if let c = Self.classLink(t) { if seen.insert(t).inserted { future.append(c) }; continue }
+            left.append("\(n.title) → [[\(t)]]")
         }
+        // a mistyped link goes to the one note it can only mean
+        var changed: [String] = [], mended = 0
+        for (id, list) in fixes {
+            guard Self.quiet(id), var text = try? String(contentsOf: id, encoding: .utf8) else { continue }
+            var did = 0
+            for (wrong, right) in list {
+                for tail in ["]]", "|", "#"] where text.contains("[[" + wrong + tail) {
+                    text = text.replacingOccurrences(of: "[[" + wrong + tail, with: "[[" + right + tail); did += 1
+                }
+            }
+            if did > 0, (try? Vault.write(text, to: id)) != nil { changed.append(Vault.rel(id)); mended += did }
+        }
+        // the next class in a course, when a link already names it
+        var made: [String] = [], next: [String: Int] = [:]
+        for c in future.sorted(by: { $0.number < $1.number }) where made.count < 3 {
+            let key = c.course + "|" + c.kind.rawValue
+            var top = 0
+            if let known = next[key] { top = known } else {
+                let mine = notes.filter { $0.folder == c.kind.folder && $0.courseName == c.course }
+                var highest = 0
+                for n in mine { if let m = n.title.firstMatch(of: /\b[LT](\d{2,3}) - /), let v = Int(m.1) { highest = max(highest, v) } }
+                top = highest + 1
+            }
+            next[key] = top
+            guard c.number == top, Self.linkKey(c.kind.title(course: c.course, number: c.number, topic: c.topic)) == Self.linkKey(c.link),
+                  let url = try? Vault.create(c.kind, course: c.course, number: c.number, topic: c.topic, date: nil) else { continue }
+            made.append(Vault.rel(url)); next[key] = top + 1
+        }
+        if mended > 0 || !made.isEmpty {
+            var parts: [String] = []
+            if mended > 0 { parts.append("corrected \(mended) mistyped link\(mended == 1 ? "" : "s")") }
+            if let first = made.first { parts.append("created \(made.count) note\(made.count == 1 ? "" : "s") that something already linked to (\((first as NSString).lastPathComponent))") }
+            let what = parts.joined(separator: " and ")
+            recordFix(title: "Links: " + what, key: "linkfix:\(dayStamp)", message: "Links check: \(what).", changed: changed, created: made)
+            reload()
+        }
+        let waiting = future.count - made.count
+        if (!left.isEmpty || waiting > 0 || !missingFiles.isEmpty), once("links:\(dayStamp)") {
+            log(Agent.manager.id, "Links check: \(left.count) link\(left.count == 1 ? "" : "s") to notes that don't exist" + (left.isEmpty ? "" : " (e.g. \(left[0]))") + "; \(waiting) to later classes with no note yet; \(missingFiles.count) attached file\(missingFiles.count == 1 ? "" : "s") missing" + (missingFiles.isEmpty ? "" : " (e.g. \(missingFiles[0]))") + ".")
+        }
+    }
+
+    /// 23. The counts in VAULT-INDEX.md follow the folders: only its Count column and "Counts verified" date are rewritten.
+    func vaultIndex() {
+        let url = Vault.root.appending(path: "Agents/Shared Agents/VAULT-INDEX.md")
+        guard Self.quiet(url), let text = try? String(contentsOf: url, encoding: .utf8) else { return }
+        var changes = 0
+        let lines = text.components(separatedBy: "\n").map { line -> String in
+            guard let m = line.wholeMatch(of: /\| `([^`]+)\/` \| (.*) \| (\d+) \| (.*)/), !m.1.hasPrefix("Templates"),
+                  let names = try? FileManager.default.contentsOfDirectory(atPath: Vault.root.appending(path: String(m.1)).path) else { return line }
+            let n = names.filter { $0.hasSuffix(".md") && !$0.hasPrefix(".") }.count
+            guard String(n) != String(m.3) else { return line }
+            changes += 1
+            return "| `\(m.1)/` | \(m.2) | \(n) | \(m.4)"
+        }
+        guard changes > 0 else { return }
+        let stamped = lines.joined(separator: "\n").replacing(/Counts verified \d{4}-\d{2}-\d{2}/) { _ in "Counts verified \(dayStamp)" }
+        guard (try? Vault.write(stamped, to: url)) != nil else { return }
+        recordFix(title: "Vault index: updated \(changes) count\(changes == 1 ? "" : "s")", key: "index:\(dayStamp)", message: "Vault index: updated \(changes) folder count\(changes == 1 ? "" : "s") in VAULT-INDEX.md to match the folders.", changed: [Vault.rel(url)])
+    }
+
+    /// 24. Paths the agents' instructions name that aren't in the vault (a folder that was dropped, a guide that was renamed). Reported, never edited:
+    /// those files are the agents' own rules, so you decide whether to fix the text or restore the folder.
+    func docsDrift() async {
+        let root = Vault.root
+        let missing: [String] = await Task.detached(priority: .utility) {
+            var out: [String] = []
+            for rel in ["Agents/Shared Agents/AGENTS.md", "Agents/Shared Agents/CLAUDE.md", "Agents/Shared Agents/VAULT-INDEX.md"] {
+                guard let text = try? String(contentsOf: root.appending(path: rel), encoding: .utf8) else { continue }
+                for m in text.matches(of: /`((?:Agents|Items|Files|Apps|Courses|Templates|Unsorted|TaskNotes|\.claudian)\/[^`\n{}|*<>]*)`/) {
+                    let path = String(m.1)
+                    if !FileManager.default.fileExists(atPath: root.appending(path: path).path), !out.contains(path) { out.append(path) }
+                }
+            }
+            return out
+        }.value
+        if !missing.isEmpty, once("docs:\(dayStamp)") {
+            log(Agent.manager.id, "Docs check: AGENTS.md, CLAUDE.md or the index name \(missing.count) path\(missing.count == 1 ? "" : "s") that aren't in the vault (\(missing.prefix(3).joined(separator: ", "))). Fix the instructions or restore the folder.")
+        }
+    }
+
+    /// 25. Runs the vault's own verifier (Agents/Shared Agents/verify-vault.py, read-only) and says so when it finds a rule broken.
+    func runVerifier() async {
+        let root = Vault.root, script = root.appending(path: "Agents/Shared Agents/verify-vault.py")
+        // macOS's /usr/bin/python3 opens an install prompt when the developer tools are missing, so only a Python that is really there is used
+        guard FileManager.default.fileExists(atPath: script.path),
+              let python = ["/opt/homebrew/bin/python3", "/usr/local/bin/python3", "/Library/Developer/CommandLineTools/usr/bin/python3"].first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else { return }
+        let result: (status: Int32, fails: [String])? = await Task.detached(priority: .utility) { () -> (status: Int32, fails: [String])? in
+            let p = Process(), pipe = Pipe()
+            p.executableURL = URL(fileURLWithPath: python); p.arguments = [script.path, root.path]
+            p.standardOutput = pipe; p.standardError = Pipe()
+            guard (try? p.run()) != nil else { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()   // read before waiting, so a full pipe can't stall it
+            p.waitUntilExit()
+            let lines = (String(data: data, encoding: .utf8) ?? "").split(separator: "\n").map(String.init).filter { $0.contains("FAIL") && !$0.contains("0 FAIL") }
+            return (p.terminationStatus, lines)
+        }.value
+        guard let result, result.status != 0, once("verify:\(dayStamp)") else { return }
+        log(Agent.manager.id, "Vault verifier: \(max(result.fails.count, 1)) rule\(result.fails.count == 1 ? "" : "s") broken" + (result.fails.isEmpty ? "." : " (e.g. \(result.fails[0].trimmingCharacters(in: .whitespaces).prefix(140))).") + " Run verify-vault.py for the full list.")
     }
 
     /// 17. A class's time on the calendar differs from its note: the note is corrected.

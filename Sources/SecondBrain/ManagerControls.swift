@@ -13,6 +13,7 @@ extension Store {
         ("vaulthealth", "Vault health", "Checks"), ("links", "Broken links", "Checks"), ("calendardrift", "Calendar drift", "Checks"),
         ("deadlines", "Deadline consistency", "Checks"), ("atrisk", "At-risk deadlines", "Checks"), ("slides", "Missing slides", "Checks"),
         ("quality", "Quality sweep", "Checks"), ("status", "Status hygiene", "Checks"),
+        ("index", "Vault index counts", "Checks"), ("docs", "Docs naming missing paths", "Checks"), ("verifier", "Vault verifier", "Checks"),
     ]
     private var d: UserDefaults { .standard }
 

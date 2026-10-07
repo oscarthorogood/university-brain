@@ -243,6 +243,17 @@ enum Zotero {
 
     /// Sends what changed in the folder, then reads what changed in Zotero.
     static func sync() async -> (text: String, changed: Bool) {
+        // Run apart from whatever asked: the Manager's scan is cancelled and restarted when the vault changes, and a sync that shared its task died half way with "cancelled".
+        // A failure is tried once more shortly after, since a dropped connection is usually back by then.
+        var r = await Task.detached { await syncOnce() }.value
+        if r.text.hasPrefix("Zotero sync failed") {
+            try? await Task.sleep(for: .seconds(20))
+            r = await Task.detached { await syncOnce() }.value
+        }
+        return r
+    }
+
+    private static func syncOnce() async -> (text: String, changed: Bool) {
         guard let cfg = Config.load() else { return ("Not connected to Zotero.", false) }
         let api = API(cfg: cfg)
         var st = State.load(), r = Report()
