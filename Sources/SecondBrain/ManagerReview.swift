@@ -166,10 +166,11 @@ enum Review {
     }
 
     /// Errors that mean the check couldn't run, not that the link is dead.
-    private static let offline: Set<URLError.Code> = [.cancelled, .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .internationalRoamingOff]
-    /// Links in `text` that don't open (up to ten are tried).
-    static func deadLinks(in text: String) async -> [String] {
-        let urls = Array(Set(text.matches(of: /https?:\/\/[^\s)\]>"|]+/).map { String($0.0).trimmingCharacters(in: CharacterSet(charactersIn: ".,;")) })).prefix(10)
+    private static let offline: Set<URLError.Code> = [.cancelled, .timedOut, .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .internationalRoamingOff]
+    /// Links in `text` that don't open (up to ten are tried). Links that were already in `before` are not the helper's, so they are not checked.
+    static func deadLinks(in text: String, before: String = "") async -> [String] {
+        let found = Set(text.matches(of: /https?:\/\/[^\s)\]>"|]+/).map { String($0.0).trimmingCharacters(in: CharacterSet(charactersIn: ".,;")) })
+        let urls = Array(found.filter { !before.contains($0) }.sorted().prefix(10))
         var dead: [String] = []
         await withTaskGroup(of: String?.self) { g in
             for u in urls {
@@ -179,8 +180,8 @@ enum Review {
                     do {
                         let (_, resp) = try await URLSession.shared.data(for: r)
                         guard let code = (resp as? HTTPURLResponse)?.statusCode else { return nil }
-                        // 403 and 429 are sites refusing a program, not a dead page
-                        return code >= 400 && code != 403 && code != 429 ? "\(u) (\(code))" : nil
+                        // only "not found" and "gone" mean the page is dead: 401, 403 and 429 are sites refusing a program, and a 5xx is a site having a bad moment
+                        return code == 404 || code == 410 ? "\(u) (\(code))" : nil
                     } catch let e as URLError where Self.offline.contains(e.code) {
                         return nil   // this Mac is offline or the check was cancelled: that says nothing about the link
                     } catch is CancellationError {
@@ -194,6 +195,12 @@ enum Review {
         }
         if Task.isCancelled { return [] }   // a cancelled check proves nothing, so it can't fail a job
         return dead.isEmpty ? [] : ["link\(dead.count == 1 ? "" : "s") that don't open: " + dead.prefix(3).joined(separator: ", ")]
+    }
+
+    /// The helper's own reply says its Write or Edit was refused and nothing was changed: that is a job that did not happen, not one that is done.
+    static func refused(_ reply: String) -> Bool {
+        reply.firstMatch(of: /(?i)(refus|permission|denied|blocked)/) != nil && reply.firstMatch(of: /(?i)\b(write|edit)/) != nil
+            && reply.firstMatch(of: /(?i)(nothing|unchanged|no changes?|not (been )?(changed|written|edited|updated)|didn.t (change|write|edit)|could not|couldn.t|can.t)/) != nil
     }
 
     /// The Analyst's answers, one per question, from the `**Answer:**` lines in the note.

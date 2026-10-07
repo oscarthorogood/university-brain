@@ -117,7 +117,12 @@ enum Vault {
         let f = DateFormatter(); f.locale = Locale(identifier: "en_GB_POSIX"); f.dateFormat = format; return f
     }
     /// Week 1 of Semester 1, which the week numbers count from (the app's one hard-coded term date; see PLAN.md).
-    static var semesterOneStart: Date { parseDate("2026-09-21") ?? .now }
+    /// Where each semester starts. Semester 2's start is a guess (mid-January); correct it here.
+    static let semesters = [(name: "Semester 1", start: "2026-09-21"), (name: "Semester 2", start: "2027-01-18")]
+    /// The semester it is now: the last one that has begun.
+    static var currentSemesterIndex: Int { semesters.lastIndex { (parseDate($0.start) ?? .distantFuture) <= Calendar.current.startOfDay(for: .now) } ?? 0 }
+    /// Week numbers count from here.
+    static var currentSemesterStart: Date { parseDate(semesters[currentSemesterIndex].start) ?? .now }
     static func parseDate(_ s: String?) -> Date? {
         guard let s else { return nil }
         for f in dateFormatters { if let d = f.date(from: s) { return d } }

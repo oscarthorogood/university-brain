@@ -6,9 +6,13 @@ extension Store {
     @discardableResult func syncZotero() async -> (text: String, changed: Bool) {
         guard !zoteroSyncing else { return ("Already syncing.", false) }
         zoteroSyncing = true; defer { zoteroSyncing = false }
-        let r = await Zotero.sync()
-        UserDefaults.standard.set(Date.now.timeIntervalSince1970, forKey: "lastZoteroSync")   // a number, because the page reads it with @AppStorage
+        let wasFailing = (UserDefaults.standard.string(forKey: "lastZoteroResult") ?? "").hasPrefix("Zotero sync failed")
+        var r = await Zotero.sync()
+        let failed = r.text.hasPrefix("Zotero sync failed")
+        // a failed sync is tried again in about two minutes, not fifteen, and the log hears about it once, not on every try
+        UserDefaults.standard.set(Date.now.timeIntervalSince1970 - (failed ? 13 * 60 : 0), forKey: "lastZoteroSync")   // a number, because the page reads it with @AppStorage
         UserDefaults.standard.set(r.text, forKey: "lastZoteroResult")
+        if failed && wasFailing { r.changed = false }
         reload()
         return r
     }

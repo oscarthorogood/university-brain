@@ -9,10 +9,11 @@ extension Store {
         ("outline", "Essay or project with no outline", "Jobs"), ("solutions", "Worked solutions for tutorials", "Jobs"), ("writeup", "Classes to write up", "Jobs"),
         ("source", "Readings with no source", "Jobs"), ("readingnotes", "Readings a lecture needs", "Jobs"), ("examplan", "Exam revision plan", "Jobs"),
         ("revisionset", "MCQ sets", "Jobs"), ("citation", "Citations to confirm", "Jobs"), ("checkanswers", "Check your tutorial answers", "Jobs"),
-        ("weekahead", "Week ahead per course", "Jobs"), ("learn", "Learn from your edits", "Jobs"),
+        ("weekahead", "Week ahead per course", "Jobs"), ("learn", "Learn from your edits", "Jobs"), ("docsfix", "Fix docs that name missing paths", "Jobs"),
         ("vaulthealth", "Vault health", "Checks"), ("links", "Broken links", "Checks"), ("calendardrift", "Calendar drift", "Checks"),
         ("deadlines", "Deadline consistency", "Checks"), ("atrisk", "At-risk deadlines", "Checks"), ("slides", "Missing slides", "Checks"),
         ("quality", "Quality sweep", "Checks"), ("status", "Status hygiene", "Checks"),
+        ("index", "Vault index counts", "Checks"), ("docs", "Docs naming missing paths", "Checks"), ("verifier", "Vault verifier", "Checks"),
     ]
     private var d: UserDefaults { .standard }
 

@@ -270,6 +270,8 @@ enum Agent {
     static func stopBackgroundRuns() { live.stop(buttonsToo: false) }
     /// The same, and the jobs you started yourself as well. Chats are left alone (each has its own Stop).
     static func stopJobs() { live.stop(buttonsToo: true) }
+    /// Every run there is, chats too: for quitting the app.
+    nonisolated static func stopAllRuns() { live.stopEverything() }
 
     /// `canEdit` allows edits anywhere; `writes` allows edits only to those files or folders (`Folder/**`); `web` adds web search for finding sources.
     /// `onText` hears the answer as it is written (about ten times a second at most), for a chat to show it growing.
@@ -320,7 +322,7 @@ enum Agent {
                 let began = Date(), timedOut = TimeoutFlag()
                 DispatchQueue.global().asyncAfter(deadline: .now() + limit) {
                     guard p.isRunning else { return }
-                    timedOut.hit = true; p.terminate()
+                    timedOut.hit = true; killDescendants(of: p.processIdentifier); p.terminate()
                     DispatchQueue.global().asyncAfter(deadline: .now() + 5) { if p.isRunning { kill(p.processIdentifier, SIGKILL) } }
                 }
                 // Read as it comes, so a large reply can't fill the pipe and stall the process, and so the answer can be shown while it is written.
@@ -383,7 +385,21 @@ final class ProcessHandle: @unchecked Sendable {
     var isCancelled: Bool { lock.withLock { cancelled } }
     /// Called once the process has started; if a stop already came, it ends at once.
     func set(_ p: Process) { lock.withLock { process = p; if cancelled { p.terminate() } } }
-    func cancel() { lock.withLock { cancelled = true; process?.terminate() } }
+    func cancel() { lock.withLock { cancelled = true; if let p = process, p.isRunning { killDescendants(of: p.processIdentifier); p.terminate() } } }
+}
+
+/// Ends everything a process started. An MCP server or tool that inherited Claude's output pipe would otherwise keep the pipe open after Claude itself
+/// is gone, and the reader would wait for the end of the output for ever (and the Manager with it).
+private func killDescendants(of pid: Int32) {
+    let ps = Process(), out = Pipe()
+    ps.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep"); ps.arguments = ["-P", String(pid)]
+    ps.standardOutput = out; ps.standardError = FileHandle.nullDevice
+    guard (try? ps.run()) != nil else { return }
+    let data = out.fileHandleForReading.readDataToEndOfFile(); ps.waitUntilExit()
+    for line in String(decoding: data, as: UTF8.self).split(separator: "\n") {
+        guard let child = Int32(line) else { continue }
+        killDescendants(of: child); kill(child, SIGKILL)
+    }
 }
 
 /// The processes that are running now, and whether new ones from the Manager (or from a button) are being refused for a moment after a stop.
@@ -401,6 +417,10 @@ final class LiveRuns: @unchecked Sendable {
             return handles.values.filter { $0.background || (buttonsToo && $0.button) }.map { $0.handle }
         }
         for v in victims { v.cancel() }
+    }
+    func stopEverything() {
+        let all = lock.withLock { handles.values.map { $0.handle } }
+        for h in all { h.cancel() }
     }
     func blocked(background: Bool, button: Bool) -> Bool {
         lock.withLock { let now = Date(); return (background && now < refuseBackground) || (button && now < refuseButton) }

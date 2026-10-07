@@ -566,13 +566,21 @@ struct MarkdownEditor: NSViewRepresentable {
             }
             if fenced { s.addAttributes([.font: font(13, mono: true), .foregroundColor: ink], range: r); continue }
 
-            if trimmed.hasPrefix("|") {                          // a table: monospaced, faint bars, a rule under the header
+            // a table: monospaced, faint bars, a rule under the header. Inside a quote or callout the row sits after the `>` marker.
+            let cut = q?.range.length ?? 0
+            let rowRange = NSRange(location: cut, length: len - cut)
+            let row = (t as NSString).substring(with: rowRange)
+            if row.trimmingCharacters(in: .whitespaces).hasPrefix("|") {
                 let first = !inTable; inTable = true
-                if trimmed.contains("-"), trimmed.range(of: #"^\|?[\s:\-|]+\|?$"#, options: .regularExpression) != nil {
+                if let q {
+                    hide(q.range, leading: true)
+                    quote = (start: quote?.start ?? r.location, end: NSMaxRange(r), tint: quote?.tint)
+                }
+                if row.contains("-"), row.trimmingCharacters(in: .whitespaces).range(of: #"^\|?[\s:\-|]+\|?$"#, options: .regularExpression) != nil {
                     hide(all); decos.append(Decoration(kind: .tableRule, range: r)); continue
                 }
-                s.addAttribute(.font, value: font(13, first ? .bold : .regular, mono: true), range: r)
-                for (i, ch) in t.utf16.enumerated() where ch == 124 { s.addAttribute(.foregroundColor, value: faint, range: at(NSRange(location: i, length: 1))) }
+                s.addAttribute(.font, value: font(13, first ? .bold : .regular, mono: true), range: at(rowRange))
+                for (i, ch) in row.utf16.enumerated() where ch == 124 { s.addAttribute(.foregroundColor, value: faint, range: at(NSRange(location: cut + i, length: 1))) }
                 continue
             } else { inTable = false }
 

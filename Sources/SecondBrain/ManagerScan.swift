@@ -6,6 +6,8 @@ import SwiftUI
 enum Support {
     static var dir: URL {
         if let v = ProcessInfo.processInfo.environment["SECOND_BRAIN_VAULT"] { return URL(fileURLWithPath: v).appending(path: ".app-support") }
+        // the self-checks log, chat and file jobs of their own; those must not land in your real Activity Log
+        if CommandLine.arguments.contains("--check") { return FileManager.default.temporaryDirectory.appending(path: "SecondBrain-check") }
         return URL.applicationSupportDirectory.appending(path: "SecondBrain")
     }
 }
@@ -411,7 +413,9 @@ extension Store {
             let team = Agent.teamLog(activity), r = await Agent.doWork(role: w.role, task: w.task, note: n.id, extra: extra + (team.isEmpty ? "" : "\n\n" + team), advice: advice, creating: w.creates, sections: w.sections, feedback: nil, session: nil, root: root)
             if r.stopped { ok = true; stopped = true; summary = Agent.stoppedText }
             else if r.session == nil { ok = false; summary = r.text; if r.limited { pauseForLimit() } }
-            else if r.text.hasPrefix("NOTHING:") { nothing = true } else { summary = r.text; session = r.session }
+            else if r.text.hasPrefix("NOTHING:") { nothing = true }
+            else if Review.refused(r.text) { ok = false; summary = "The helper said its edit was refused, so nothing changed: " + String(r.text.prefix(160)) }
+            else { summary = r.text; session = r.session }
         case .learn: return
         }
         thinking.remove(agent)
@@ -545,7 +549,7 @@ extension Store {
                     let r = Review.checkEdit(rel: rel, before: beforeText, after: after, sections: work?.sections, template: Sections.template(forFolder: folder, root: root))
                     v.problems += r.problems; v.flags += r.flags
                     if item.agent == "scribe", !after.lowercased().contains("slide"), !Vault.rawItems(after, "resources").isEmpty { v.flags.append("the write-up cites no slide numbers") }
-                    if ["librarian", "researcher"].contains(item.agent) { v.problems += await Review.deadLinks(in: after.replacingOccurrences(of: beforeText, with: "")) }
+                    if ["librarian", "researcher"].contains(item.agent) { v.problems += await Review.deadLinks(in: after, before: beforeText) }
                     if item.agent == "writer", let w = work?.sections {   // is what it wrote a plan, not finished prose?
                         for s in w.prefix(3) { if let b = Sections.body(s, in: after), b.count > 200, let d = await Review.judge("Is this an outline, plan or list of evidence rather than finished paragraphs written for submission?", of: b) { v.flags.append("“\(s)”: \(d)"); break } }
                     }

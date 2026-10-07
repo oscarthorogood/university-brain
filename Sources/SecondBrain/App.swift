@@ -229,7 +229,8 @@ struct SecondBrainApp: App {
     func visited(_ p: Page) {
         switch p {
         case .agent(let id): touchAgent(id)
-        case .note(let u), .unsorted(let u) where u.pathExtension == "md":
+        case .note(let u), .unsorted(let u):
+            guard u.pathExtension == "md" else { break }   // (a `where` after two patterns only applies to the last one)
             recentNotes = Array(([u] + recentNotes.filter { $0 != u }).prefix(10))
             UserDefaults.standard.set(recentNotes.map(\.path), forKey: "recentNotes")
         default: break
@@ -254,6 +255,7 @@ struct SecondBrainApp: App {
     @ObservationIgnored var tickRunning = false   // one autopilot tick at a time (a tick can outlive the timer that started it)
     @ObservationIgnored var manualClaims = Set<String>()   // notes an open "plan this" sheet has marked Agent In Progress
     @ObservationIgnored var autopilotTimer: Task<Void, Never>?
+    @ObservationIgnored var heartbeat: Task<Void, Never>?
     var newStructured = false
     var voiceMemo = false
     var zoteroSyncing = false
@@ -406,6 +408,17 @@ struct SecondBrainApp: App {
         // a new app version brings its Templates and Agents files into the vault (see AppFiles.swift)
         if AppFiles.installIfNeeded() != nil, let r = AppFiles.lastReport { log("manager", r.text) }
         rewatch(); computeNeeds(); scheduleAutopilot(after: 8)
+        // A tick that finds nothing to do ends without scheduling another, and nothing else wakes a quiet vault: calendar and Zotero sync, the morning brief,
+        // due-today notices and the hourly checks would wait for the next file change. So the Manager looks again every five minutes.
+        heartbeat = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(300))
+                guard !Task.isCancelled, let self else { return }
+                if self.autopilotOn, !self.tickRunning { self.scheduleAutopilot(after: 2) }
+            }
+        }
+        // Quitting ends every Claude process the app started; without this a job in progress keeps editing its note, with no review and no Undo.
+        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in Agent.stopAllRuns() }
     }
     func rewatch() {
         watcher = VaultWatcher(path: Vault.root.path) { [weak self] in MainActor.assumeIsolated { self?.reloadInBackground() } }
@@ -446,9 +459,9 @@ struct SecondBrainApp: App {
         }
     }
     func reload() { releaseStaleClaims(); notes = Vault.load(); unsorted = Vault.unsorted(); computeNeeds(); revision += 1; scheduleAutopilot() }
-    var semesterStart: Date { Vault.parseDate("2026-09-21") ?? today }   // Semester 1, which the week numbers count from
-    /// The semesters the Semester page can switch between. ponytail: Semester 2's start is a guess (mid-January); correct it here.
-    static let semesters = [(name: "Semester 1", start: "2026-09-21"), (name: "Semester 2", start: "2027-01-18")]
+    var semesterStart: Date { Vault.currentSemesterStart }   // the semester it is now, which the week numbers count from
+    /// The semesters the Semester page can switch between (the dates are in `Vault.semesters`).
+    static let semesters = Vault.semesters
     var currentSemester: Int { Self.semesters.lastIndex { (Vault.parseDate($0.start) ?? .distantFuture) <= today } ?? 0 }
     var semesterWeek: Int { (Calendar.current.dateComponents([.day], from: semesterStart, to: today).day ?? 0) / 7 + 1 }
     /// The next things on: classes still to come and open deadlines, soonest first.
@@ -1036,7 +1049,7 @@ struct OverviewPage: View {
         let today = store.todayItems
         VStack(spacing: 0) {
             PageHeader(title: Date.now.formatted(.dateTime.weekday(.wide)),
-                       subtitle: Date.now.formatted(.dateTime.day().month(.wide)) + " · Semester 1, Week \(store.semesterWeek)") {
+                       subtitle: Date.now.formatted(.dateTime.day().month(.wide)) + " · Semester \(store.currentSemester + 1), Week \(store.semesterWeek)") {
                 HStack(spacing: 10) {
                     Pills(options: [(nil, "All"), ("MSOA", "MSOA"), ("SM", "SM"), ("TEM", "TEM")] as [(String?, String)], selection: $store.filter)
                     RoundButton(icon: "calendar", label: "Month") { store.page = .month }
@@ -1230,7 +1243,7 @@ enum Check {
         Vault.checkEditing()
         Manager.check()
         let tags = TagsPage.build(notes); precondition(!tags.isEmpty, "tags are indexed from frontmatter")
-        let week: (Date?) -> Int = { d in d.map { Int((Double(Calendar.current.dateComponents([.day], from: Vault.semesterOneStart, to: $0).day ?? 0) / 7).rounded(.down)) + 1 } ?? 0 }
+        let week: (Date?) -> Int = { d in d.map { Int((Double(Calendar.current.dateComponents([.day], from: Vault.currentSemesterStart, to: $0).day ?? 0) / 7).rounded(.down)) + 1 } ?? 0 }
         let mapped = CourseGraph.build(notes.filter { $0.course == "SM" && CourseGraph.row($0) != nil }, week: week)
         precondition(mapped.nodes.count > 5 && mapped.edges.contains(where: \.explicit), "the course map finds notes and the links written between them")
         let essay = notes.first { $0.folder == "Essays" && $0.course == "SM" }
