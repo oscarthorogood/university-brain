@@ -62,7 +62,7 @@ enum StudyParse {
     }
     /// The audio an episode note points at: an `Audio:` line holding a link to a file in the vault, or a web address.
     static func audio(_ text: String) -> URL? {
-        guard let m = text.firstMatch(of: /(?im)^\s*audio\s*:\s*(.+)$/) else { return nil }
+        guard let m = text.firstMatch(of: /(?im)^[ \t]*audio[ \t]*:[ \t]*(.+)$/) else { return nil }   // same line only: an empty `Audio:` must not pick up the next line
         let v = String(m.1)
         if let link = v.firstMatch(of: /\[\[([^\]|#]+)/) {
             let t = String(link.1), u = Vault.root.appending(path: Vault.real(t))
@@ -95,6 +95,7 @@ extension StudyParse {
         let pp = paper("1. Explain X. (10 marks)\n\n   **Mark scheme:** Points.\n\n2. Define Y.\n   **Answer:** Z")
         precondition(pp.count == 2 && pp[0].answer == "Points." && pp[1].answer == "Z", "past paper parse")
         precondition(transcript("## 🎧 Episode\nAudio: x\n\n## 📝 Transcript\n\nHello\n\n## 💡 Takeaways\n- a").contains("Hello"), "transcript section")
+        precondition(audio("Audio: \n\n## 📝 Transcript\nhttps://example.com/a.mp3") == nil && audio("Audio: https://example.com/a.mp3") != nil, "an empty Audio: line stays empty")
         print("study previews ok: quiz, cards, glossary, mind map, past paper and transcript formats parse")
     }
 }
