@@ -388,7 +388,10 @@ struct AppSubPage: View {
                     let t = StudyParse.terms(text)
                     if t.isEmpty { fallback(text) } else { GlossaryTester(url: url, terms: t) }
                 case .podcast:
-                    if let a = StudyParse.audio(text) { EpisodePlayer(url: url, audio: a, transcript: StudyParse.transcript(text)) } else { fallback(text) }
+                    let script = StudyParse.transcript(text)
+                    if let a = StudyParse.audio(text) { EpisodePlayer(url: url, audio: a, transcript: script) }
+                    else if !script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { ScriptOnlyEpisode(transcript: script) }
+                    else { fallback(text) }
                 }
             }
         }
@@ -405,6 +408,22 @@ struct AppSubPage: View {
         let shape: String = switch kind { case .mcq: "a quiz"; case .flashcards: "a deck"; case .glossary: "a glossary"; case .podcast: "an episode" }
         let message = blank ? hint : "Its text can’t be shown as \(shape). Press Edit note to see it. " + hint
         return EmptyAppNote(url: url, icon: kind.icon, title: blank ? title : "This note isn’t in the \(kind.rawValue) format", hint: message)
+    }
+}
+
+/// An episode that is a script so far: the transcript is there, the audio is not. Shown as what it is, not as a broken note.
+struct ScriptOnlyEpisode: View {
+    let transcript: String
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 10) {
+                    Image(systemName: "waveform.slash").foregroundStyle(Color.ink2)
+                    Text("No audio yet. Add an Audio: line with a link to the episode to get the player.").font(.system(size: 13)).foregroundStyle(Color.ink2)
+                }.padding(14).frame(maxWidth: .infinity, alignment: .leading).appCard()
+                MarkdownView(text: transcript)
+            }.frame(maxWidth: 680).padding(.horizontal, 24).padding(.vertical, 18).frame(maxWidth: .infinity)
+        }
     }
 }
 
