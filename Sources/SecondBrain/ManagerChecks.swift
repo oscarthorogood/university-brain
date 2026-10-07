@@ -115,7 +115,7 @@ extension Store {
     }
 
     /// 16. Wikilinks and `resources` files that point at nothing. A mistyped link that can only mean one note is corrected, and the next lecture or tutorial in a
-    /// course that something already links to is created from its template (three a day at most); both can be undone. The rest is reported.
+    /// course that something already links to is created from its template (fifteen a day at most); both can be undone. The rest is reported.
     func brokenLinks(texts: [URL: String]? = nil) {
         let have = Set(notes.map { $0.title.lowercased() })
         let fileExt: Set<String> = ["pdf", "ppt", "pptx", "png", "jpg", "jpeg", "xlsx", "xls", "docx", "doc", "csv", "zip", "mp4", "mp3", "base", "txt", "json", "html"]
@@ -152,21 +152,20 @@ extension Store {
             }
             if did > 0, (try? Vault.write(text, to: id)) != nil { changed.append(Vault.rel(id)); mended += did }
         }
-        // the next class in a course, when a link already names it
-        var made: [String] = [], next: [String: Int] = [:]
-        for c in future.sorted(by: { $0.number < $1.number }) where made.count < 3 {
+        // every lecture or tutorial a link names that has no note (unless that number is already taken in its course): fifteen a day at most
+        var made: [String] = [], taken: [String: Set<Int>] = [:]
+        for c in future.sorted(by: { $0.number < $1.number }) where made.count < 15 {
             let key = c.course + "|" + c.kind.rawValue
-            var top = 0
-            if let known = next[key] { top = known } else {
-                let mine = notes.filter { $0.folder == c.kind.folder && $0.courseName == c.course }
-                var highest = 0
-                for n in mine { if let m = n.title.firstMatch(of: /\b[LT](\d{2,3}) - /), let v = Int(m.1) { highest = max(highest, v) } }
-                top = highest + 1
+            if taken[key] == nil {
+                var numbers = Set<Int>()
+                for n in notes where n.folder == c.kind.folder && n.courseName == c.course {
+                    if let m = n.title.firstMatch(of: /\b[LT](\d{2,3}) - /), let v = Int(m.1) { numbers.insert(v) }
+                }
+                taken[key] = numbers
             }
-            next[key] = top
-            guard c.number == top, Self.linkKey(c.kind.title(course: c.course, number: c.number, topic: c.topic)) == Self.linkKey(c.link),
+            guard taken[key]?.contains(c.number) == false, Self.linkKey(c.kind.title(course: c.course, number: c.number, topic: c.topic)) == Self.linkKey(c.link),
                   let url = try? Vault.create(c.kind, course: c.course, number: c.number, topic: c.topic, date: nil) else { continue }
-            made.append(Vault.rel(url)); next[key] = top + 1
+            made.append(Vault.rel(url)); taken[key]?.insert(c.number)
         }
         if mended > 0 || !made.isEmpty {
             var parts: [String] = []
@@ -201,8 +200,8 @@ extension Store {
         recordFix(title: "Vault index: updated \(changes) count\(changes == 1 ? "" : "s")", key: "index:\(dayStamp)", message: "Vault index: updated \(changes) folder count\(changes == 1 ? "" : "s") in VAULT-INDEX.md to match the folders.", changed: [Vault.rel(url)])
     }
 
-    /// 24. Paths the agents' instructions name that aren't in the vault (a folder that was dropped, a guide that was renamed). Reported, never edited:
-    /// those files are the agents' own rules, so you decide whether to fix the text or restore the folder.
+    /// 24. Paths the agents' instructions name that aren't in the vault (a folder that was dropped, a guide that was renamed). The Activity Log says so, and a helper corrects the
+    /// mentions in the three instruction files (see `fixDocs`).
     func docsDrift() async {
         let root = Vault.root
         let missing: [String] = await Task.detached(priority: .utility) {
@@ -217,8 +216,41 @@ extension Store {
             return out
         }.value
         if !missing.isEmpty, once("docs:\(dayStamp)") {
-            log(Agent.manager.id, "Docs check: AGENTS.md, CLAUDE.md or the index name \(missing.count) path\(missing.count == 1 ? "" : "s") that aren't in the vault (\(missing.prefix(3).joined(separator: ", "))). Fix the instructions or restore the folder.")
+            log(Agent.manager.id, "Docs check: AGENTS.md, CLAUDE.md or the index name \(missing.count) path\(missing.count == 1 ? "" : "s") that aren't in the vault (\(missing.prefix(3).joined(separator: ", "))).")
+            if jobOn("docsfix"), budgetLeft(deep: false) { await fixDocs(missing) }
         }
+    }
+
+    /// The three instruction files a docs fix may edit, and nothing else.
+    private static let docFiles = ["Agents/Shared Agents/AGENTS.md", "Agents/Shared Agents/CLAUDE.md", "Agents/Shared Agents/VAULT-INDEX.md"]
+
+    /// A helper (Haiku, once a day) corrects those mentions in the three files. It may write only to them; each is snapshotted first so the log can Undo it,
+    /// and an edit that removes more than a fifth of a file is put back.
+    private func fixDocs(_ missing: [String]) async {
+        let root = Vault.root
+        let urls = Self.docFiles.map { root.appending(path: $0) }
+        var before: [URL: String] = [:]
+        for u in urls { if let t = try? String(contentsOf: u, encoding: .utf8) { before[u] = t; try? Vault.snapshot(u) } }
+        guard !before.isEmpty else { return }
+        let prompt = """
+        The vault's instruction files name paths that are not in the vault: \(missing.prefix(20).joined(separator: ", ")).
+        Edit only AGENTS.md, CLAUDE.md and VAULT-INDEX.md in Agents/Shared Agents. For each path, correct the mention to what exists now (look at the folders), or remove that sentence or table row if the thing was dropped (tasks moved from TaskNotes/ to Items/Assignments/ on 2026-10-03). Change nothing else: no rule, no other wording, no counts.
+        Reply with one short line per change.
+        """
+        let reply = await Agent.run(prompt, system: Agent.systemPrompt(Agent.role("planner")), session: nil, canEdit: false, root: root, tier: .quick, writes: Self.docFiles.map { Agent.scope(file: $0) })
+        guard reply.session != nil else { return }
+        var changed: [String] = []
+        for u in urls {
+            guard let old = before[u], let new = try? String(contentsOf: u, encoding: .utf8), new != old else { continue }
+            if new.count < old.count * 8 / 10 {
+                try? old.write(to: u, atomically: true, encoding: .utf8)
+                log(Agent.manager.id, "Docs fix: put \(u.lastPathComponent) back, because the edit removed too much of it.")
+                continue
+            }
+            changed.append(Vault.rel(u))
+        }
+        guard !changed.isEmpty else { return }
+        recordFix(title: "Docs fix: corrected \(changed.count) instruction file\(changed.count == 1 ? "" : "s")", key: "docsfix:\(dayStamp)", message: "Docs fix: " + String(reply.text.prefix(240)), changed: changed)
     }
 
     /// 25. Runs the vault's own verifier (Agents/Shared Agents/verify-vault.py, read-only) and says so when it finds a rule broken.
