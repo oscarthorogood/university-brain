@@ -159,7 +159,7 @@ extension Store {
             if taken[key] == nil {
                 var numbers = Set<Int>()
                 for n in notes where n.folder == c.kind.folder && n.courseName == c.course {
-                    if let m = n.title.firstMatch(of: /\b[LT](\d{2,3}) - /), let v = Int(m.1) { numbers.insert(v) }
+                    if let m = n.title.firstMatch(of: /\b[LT](\d{2,3})\s-\s/), let v = Int(m.1) { numbers.insert(v) }
                 }
                 taken[key] = numbers
             }
