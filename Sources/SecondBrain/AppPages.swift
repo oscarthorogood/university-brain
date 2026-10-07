@@ -473,7 +473,7 @@ struct ScriptOnlyEpisode: View {
                     var md = try String(contentsOf: note, encoding: .utf8)
                     let line = "Audio: [[\(name)]]"
                     if md.firstMatch(of: /(?im)^[ \t]*audio[ \t]*:[ \t]*$/) != nil { md = md.replacing(/(?im)^[ \t]*audio[ \t]*:[ \t]*$/, with: line, maxReplacements: 1) }
-                    else if md.firstMatch(of: /(?m)^##.*Episode.*$/) != nil { md = md.replacing(/(?m)^(##.*Episode.*)$/, with: { "\($0.1)\n\n\(line)" }, maxReplacements: 1) }
+                    else if let h = md.firstMatch(of: /(?m)^##.*Episode.*$/) { md.insert(contentsOf: "\n\n" + line, at: h.range.upperBound) }
                     else { md += "\n\(line)\n" }
                     try md.write(to: note, atomically: true, encoding: .utf8)
                     return nil
