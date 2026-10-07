@@ -254,6 +254,7 @@ struct SecondBrainApp: App {
     @ObservationIgnored var tickRunning = false   // one autopilot tick at a time (a tick can outlive the timer that started it)
     @ObservationIgnored var manualClaims = Set<String>()   // notes an open "plan this" sheet has marked Agent In Progress
     @ObservationIgnored var autopilotTimer: Task<Void, Never>?
+    @ObservationIgnored var heartbeat: Task<Void, Never>?
     var newStructured = false
     var voiceMemo = false
     var zoteroSyncing = false
@@ -406,6 +407,17 @@ struct SecondBrainApp: App {
         // a new app version brings its Templates and Agents files into the vault (see AppFiles.swift)
         if AppFiles.installIfNeeded() != nil, let r = AppFiles.lastReport { log("manager", r.text) }
         rewatch(); computeNeeds(); scheduleAutopilot(after: 8)
+        // A tick that finds nothing to do ends without scheduling another, and nothing else wakes a quiet vault: calendar and Zotero sync, the morning brief,
+        // due-today notices and the hourly checks would wait for the next file change. So the Manager looks again every five minutes.
+        heartbeat = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(300))
+                guard !Task.isCancelled, let self else { return }
+                if self.autopilotOn, !self.tickRunning { self.scheduleAutopilot(after: 2) }
+            }
+        }
+        // Quitting ends every Claude process the app started; without this a job in progress keeps editing its note, with no review and no Undo.
+        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in Agent.stopAllRuns() }
     }
     func rewatch() {
         watcher = VaultWatcher(path: Vault.root.path) { [weak self] in MainActor.assumeIsolated { self?.reloadInBackground() } }

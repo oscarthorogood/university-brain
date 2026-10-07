@@ -598,9 +598,13 @@ struct NotePage: View {
     func autosave() {
         guard text != saved else { return }
         do {
-            if (Vault.history(url).first?.date ?? .distantPast) < Date.now.addingTimeInterval(-300) { try Vault.snapshot(url) }
+            // something else (an agent, Obsidian, Zotero) changed the file since it was loaded: that version goes to History before this one replaces it
+            let onDisk = try? String(contentsOf: url, encoding: .utf8)
+            let changedOutside = onDisk != nil && onDisk != saved
+            if changedOutside || (Vault.history(url).first?.date ?? .distantPast) < Date.now.addingTimeInterval(-300) { try Vault.snapshot(url) }
             try text.write(to: url, atomically: true, encoding: .utf8)
-            saved = text; saveError = nil
+            saved = text
+            saveError = changedOutside ? "This note was changed outside the editor while you were typing. Your version is saved; the other one is in its History." : nil
         } catch { saveError = "Couldn’t save: \(error.localizedDescription)" }
     }
     /// Plain notes, and an app's note while it is open for editing, are edited in place; other study notes read as what they are, with Read / Edit.
