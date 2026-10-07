@@ -19,7 +19,7 @@ extension Agent {
 
     /// Agents have no clock and the course briefings drift, so every prompt starts from the real date and teaching week.
     static var clock: String {
-        let start = Vault.semesterOneStart, week = (Calendar.current.dateComponents([.day], from: start, to: .now).day ?? 0) / 7 + 1
+        let start = Vault.currentSemesterStart, week = (Calendar.current.dateComponents([.day], from: start, to: .now).day ?? 0) / 7 + 1
         return "Today is \(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide).year())). Semester 1 teaching week \(week) of 13 (Week 1 began Mon 21 Sep 2026). Trust this over any week number or status written in a briefing or note, and say so when they disagree."
     }
 

@@ -123,14 +123,15 @@ extension Store {
         for n in notes { byKey[Self.linkKey(n.title), default: []].append(n.title) }
         var dead: [(note: Note, target: String)] = [], missingFiles: [String] = []
         for n in notes {
-            guard let text = texts?[n.id] ?? (try? String(contentsOf: n.id, encoding: .utf8)) else { continue }
+            guard let raw = texts?[n.id] ?? (try? String(contentsOf: n.id, encoding: .utf8)) else { continue }
+            let text = raw.replacing(/```[\s\S]*?```/, with: "").replacing(/`[^`\n]*`/, with: "")   // a link shown inside code is an example, not a link
             for m in text.matches(of: /\[\[([^\]|#]+)/) {
                 let t = String(m.1).trimmingCharacters(in: .whitespaces)
-                if t.isEmpty || t.contains("/") || fileExt.contains((t as NSString).pathExtension.lowercased()) || have.contains(t.lowercased()) { continue }
+                if t.isEmpty || t.lowercased() == "course name" || t.contains("/") || fileExt.contains((t as NSString).pathExtension.lowercased()) || have.contains(t.lowercased()) { continue }
                 dead.append((n, t))
             }
-            for raw in Vault.rawItems(text, "resources") {
-                let path = Vault.unlink(raw.trimmingCharacters(in: CharacterSet(charactersIn: " \"'"))).components(separatedBy: "|")[0]
+            for item in Vault.rawItems(raw, "resources") {
+                let path = Vault.unlink(item.trimmingCharacters(in: CharacterSet(charactersIn: " \"'"))).components(separatedBy: "|")[0]
                 if fileExt.contains((path as NSString).pathExtension.lowercased()), !FileManager.default.fileExists(atPath: Vault.root.appending(path: Vault.real(path)).path) { missingFiles.append("\(n.title): \(path)") }
             }
         }

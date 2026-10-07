@@ -755,7 +755,7 @@ struct QuickNote: View {
         .onDisappear { if text != saved { save() } }
     }
     func save() {
-        guard (try? text.write(to: url, atomically: true, encoding: .utf8)) != nil else { return }
+        guard (try? Vault.write(text, to: url)) != nil else { return }   // keeps what was there in History, like every other save
         saved = text
     }
 }

@@ -84,10 +84,10 @@ extension Store {
     /// Semester week (Week 1 starts 21 Sep) for a date, or 0 when it has none.
     func week(of d: Date?) -> Int {
         guard let d else { return 0 }
-        let days = Calendar.current.dateComponents([.day], from: Vault.semesterOneStart, to: d).day ?? 0
+        let days = Calendar.current.dateComponents([.day], from: Vault.currentSemesterStart, to: d).day ?? 0
         return Int((Double(days) / 7).rounded(.down)) + 1
     }
-    func weekStart(_ w: Int) -> Date { Calendar.current.date(byAdding: .day, value: (w - 1) * 7, to: Vault.semesterOneStart) ?? Vault.semesterOneStart }
+    func weekStart(_ w: Int) -> Date { Calendar.current.date(byAdding: .day, value: (w - 1) * 7, to: Vault.currentSemesterStart) ?? Vault.currentSemesterStart }
 }
 
 // MARK: Outline
@@ -319,7 +319,7 @@ struct CourseTimeline: View {
     struct Track: View {
         let work: [Note]; let code: String; let today: Date
         var body: some View {
-            let start = Vault.semesterOneStart
+            let start = Vault.currentSemesterStart
             let last = work.compactMap(\.when).max() ?? start
             let end = max(last, Calendar.current.date(byAdding: .day, value: 84, to: start)!).addingTimeInterval(7 * 86400)
             let tint = Color.course(code)
