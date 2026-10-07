@@ -390,7 +390,7 @@ struct AppSubPage: View {
                 case .podcast:
                     let script = StudyParse.transcript(text)
                     if let a = StudyParse.audio(text) { EpisodePlayer(url: url, audio: a, transcript: script) }
-                    else if !script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { ScriptOnlyEpisode(transcript: script) }
+                    else if !script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { ScriptOnlyEpisode(url: url, transcript: script) }
                     else { fallback(text) }
                 }
             }
@@ -411,18 +411,75 @@ struct AppSubPage: View {
     }
 }
 
-/// An episode that is a script so far: the transcript is there, the audio is not. Shown as what it is, not as a broken note.
+/// An episode that is a script so far: the transcript is there, the audio is not. Shown as what it is, not as a broken note,
+/// with a button that has this Mac read it aloud into an audio file (macOS's own `say`: free, offline) and links it from the note.
 struct ScriptOnlyEpisode: View {
+    let url: URL
     let transcript: String
+    @State private var making = false
+    @State private var failure: String?
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 10) {
-                    Image(systemName: "waveform.slash").foregroundStyle(Color.ink2)
-                    Text("No audio yet. Add an Audio: line with a link to the episode to get the player.").font(.system(size: 13)).foregroundStyle(Color.ink2)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "waveform.slash").foregroundStyle(Color.ink2)
+                        Text("No audio yet. This Mac can read the transcript aloud and add the file to this note.").font(.system(size: 13)).foregroundStyle(Color.ink2)
+                    }
+                    HStack(spacing: 12) {
+                        Button(making ? "Making audio…" : "Make audio") { make() }.disabled(making)
+                        if making { ProgressView().controlSize(.small) }
+                    }
+                    if let failure { Text(failure).font(.system(size: 12)).foregroundStyle(.red) }
                 }.padding(14).frame(maxWidth: .infinity, alignment: .leading).appCard()
                 MarkdownView(text: transcript)
             }.frame(maxWidth: 680).padding(.horizontal, 24).padding(.vertical, 18).frame(maxWidth: .infinity)
+        }
+    }
+
+    /// What is spoken: the transcript without its Markdown, callout marks, section tags like `[Intro]` and any empty `Audio:` line.
+    static func spoken(_ transcript: String) -> String {
+        transcript.components(separatedBy: "\n").map { line -> String in
+            var l = line.trimmingCharacters(in: .whitespaces)
+            while l.hasPrefix(">") { l.removeFirst(); l = l.trimmingCharacters(in: .whitespaces) }
+            l = l.replacing("**", with: "").replacing(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/) { String($0.2 ?? $0.1) }
+            if l.hasPrefix("[!") || l.lowercased().hasPrefix("audio:") || l.wholeMatch(of: /\[[^\]]*\]/) != nil { return "" }
+            return l
+        }.joined(separator: "\n").replacing(/\n{3,}/, with: "\n\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func make() {
+        let text = Self.spoken(transcript)
+        guard !text.isEmpty else { failure = "There is nothing to read aloud."; return }
+        making = true; failure = nil
+        let note = url, folder = Vault.root.appending(path: Vault.dir("Podcast"))
+        let name = note.deletingPathExtension().lastPathComponent + ".m4a"
+        Task {
+            let result: String? = await Task.detached { () -> String? in
+                let out = folder.appending(path: name), script = FileManager.default.temporaryDirectory.appending(path: "episode-\(UUID().uuidString).txt")
+                do {
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    try text.write(to: script, atomically: true, encoding: .utf8)
+                    defer { try? FileManager.default.removeItem(at: script) }
+                    let p = Process(), err = Pipe()
+                    p.executableURL = URL(fileURLWithPath: "/usr/bin/say")
+                    p.arguments = ["-r", "175", "-f", script.path, "-o", out.path, "--data-format=aac"]
+                    p.standardError = err
+                    try p.run(); p.waitUntilExit()
+                    guard p.terminationStatus == 0, FileManager.default.fileExists(atPath: out.path) else {
+                        return String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "The Mac couldn’t make the audio."
+                    }
+                    var md = try String(contentsOf: note, encoding: .utf8)
+                    let line = "Audio: [[\(name)]]"
+                    if md.firstMatch(of: /(?im)^[ \t]*audio[ \t]*:[ \t]*$/) != nil { md = md.replacing(/(?im)^[ \t]*audio[ \t]*:[ \t]*$/, with: line, maxReplacements: 1) }
+                    else if md.firstMatch(of: /(?m)^##.*Episode.*$/) != nil { md = md.replacing(/(?m)^(##.*Episode.*)$/, with: { "\($0.1)\n\n\(line)" }, maxReplacements: 1) }
+                    else { md += "\n\(line)\n" }
+                    try md.write(to: note, atomically: true, encoding: .utf8)
+                    return nil
+                } catch { return error.localizedDescription }
+            }.value
+            making = false; failure = result
         }
     }
 }
