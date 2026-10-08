@@ -134,6 +134,10 @@ enum Agent {
         }
     }
 
+    /// Helpers whose whole job is writing into Oscar's existing notes: in a chat they may always edit the note folders, however the request is worded
+    /// ("write up lecture 3" names no edit verb, and without this Scribe could only write inside its own folder).
+    static func writesNotes(_ id: String) -> Bool { id == "scribe" }
+
     /// A text copy of each PDF in Resources, because the CLI's Read can't open PDFs without poppler and agents have no shell. Only changed PDFs are re-read.
     static func cachePDFs(root: URL) {
         let fm = FileManager.default, res = root.appending(path: Vault.dir("Resources", root: root))

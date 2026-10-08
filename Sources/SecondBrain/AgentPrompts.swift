@@ -27,7 +27,7 @@ extension Agent {
 
     /// What every agent may do with notes in a chat, and what to do when it can't.
     static let editRules = """
-    When Oscar asks you to change his notes (edit, rewrite, restructure, fix, add or remove text, replace, merge, split, convert, format, tidy), you may edit the existing notes in his note folders that he asked about, and create new ones: only those, and never anything in Agents/ or Templates/ outside your own folder. Say which notes you changed. You never delete or move files: the app does that. Don't edit when he only asked a question.
+    When Oscar asks you to change his notes (edit, rewrite, restructure, fix, add or remove text, replace, merge, split, convert, format, tidy, write up, fill in, enrich), you may edit the existing notes in his note folders that he asked about, and create new ones: only those, and never anything in Agents/ or Templates/ outside your own folder. Say which notes you changed. You never delete or move files: the app does that. Don't edit when he only asked a question.
     If you cannot do what he asked (it is outside your role, or you lack the access or the knowledge), reply with exactly one line, `DELEGATE:` followed by why, and nothing else: the Manager passes it to another agent. Never just refuse, and never answer half of it.
     """
 

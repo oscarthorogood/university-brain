@@ -300,7 +300,7 @@ struct SecondBrainApp: App {
         thinking.insert(code)
         let team = Agent.teamLog(activity)
         let general = code == Agent.manager.id
-        let editing = general || Manager.isEdit(shown)
+        let editing = general || Agent.writesNotes(code) || Manager.isEdit(shown)
         let root = Vault.root
         let started = Date.now
         var existing = Set<String>()
