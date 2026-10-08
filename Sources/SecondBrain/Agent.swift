@@ -156,6 +156,7 @@ enum Agent {
     /// PDFs: the app extracts the text itself so the agent doesn't need PDF tools.
     static func pdfText(_ url: URL) -> String {
         let ext = url.pathExtension.lowercased()
+        if ext == "pptx" { return pptxText(url) }
         if ext == "docx" || ext == "xlsx" { return officeText(url, part: ext == "docx" ? "word/document.xml" : "xl/sharedStrings.xml") }
         guard ext == "pdf", let doc = PDFDocument(url: url) else { return "" }
         let pages = (0..<doc.pageCount).compactMap { i in doc.page(at: i)?.string.map { "[slide \(i + 1)] " + $0 } }
@@ -165,17 +166,41 @@ enum Agent {
 
     /// Word and Excel files are zips of XML: the app reads their text itself, because the agent has no shell to open them with.
     static func officeText(_ url: URL, part: String) -> String {
+        let text = xmlText(url, part: part)
+        return text.isEmpty ? "" : "\n\nIts text, extracted by the app:\n\(text)\n"
+    }
+
+    /// A PowerPoint deck: one `[slide N]` block per slide, in slide order (slide10 comes after slide2), so a write-up can cite slide numbers.
+    /// The old `.ppt` format is not a zip and can't be read this way.
+    static func pptxText(_ url: URL) -> String {
+        let p = Process(), pipe = Pipe()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/unzip"); p.arguments = ["-Z1", url.path]
+        p.standardOutput = pipe; p.standardError = FileHandle.nullDevice
+        guard (try? p.run()) != nil else { return "" }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
+        let slides = String(decoding: data, as: UTF8.self).split(separator: "\n").compactMap { line -> (Int, String)? in
+            guard let m = line.firstMatch(of: /^ppt\/slides\/slide(\d+)\.xml$/), let n = Int(m.1) else { return nil }
+            return (n, String(line))
+        }.sorted { $0.0 < $1.0 }
+        let text = slides.compactMap { n, part -> String? in
+            let t = xmlText(url, part: part)
+            return t.isEmpty ? nil : "[slide \(n)]\n" + t
+        }.joined(separator: "\n").prefix(40_000)
+        return text.isEmpty ? "" : "\n\nIts text, extracted by the app (\(slides.count) slides; pictures and charts are not included):\n\(text)\n"
+    }
+
+    /// The text of one XML part of a zip (Word paragraphs, Excel shared strings, PowerPoint text runs), one line per paragraph.
+    private static func xmlText(_ url: URL, part: String) -> String {
         let p = Process(), pipe = Pipe()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/unzip"); p.arguments = ["-p", url.path, part]
         p.standardOutput = pipe; p.standardError = FileHandle.nullDevice
         guard (try? p.run()) != nil else { return "" }
         let data = pipe.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
         var xml = String(decoding: data, as: UTF8.self)
-        for end in ["</w:p>", "</si>"] { xml = xml.replacingOccurrences(of: end, with: "\n") }
-        let text = xml.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        for end in ["</w:p>", "</si>", "</a:p>"] { xml = xml.replacingOccurrences(of: end, with: "\n") }
+        return String(xml.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
             .replacingOccurrences(of: "&lt;", with: "<").replacingOccurrences(of: "&gt;", with: ">").replacingOccurrences(of: "&quot;", with: "\"").replacingOccurrences(of: "&amp;", with: "&")
-            .split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: "\n").prefix(40_000)
-        return text.isEmpty ? "" : "\n\nIts text, extracted by the app:\n\(text)\n"
+            .split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: "\n").prefix(40_000))
     }
 
     /// The Sorter reads what is in Unsorted and replies with where each file goes (read-only); the app does the moves.

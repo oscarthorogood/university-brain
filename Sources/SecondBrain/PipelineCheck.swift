@@ -164,6 +164,14 @@ extension Store {
             try! "<w:document><w:p><w:t>Team &amp; charter</w:t></w:p><w:p><w:t>Meeting day</w:t></w:p></w:document>".write(to: dx.appending(path: "word/document.xml"), atomically: true, encoding: .utf8)
             let zip = Process(); zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip"); zip.currentDirectoryURL = dx; zip.arguments = ["-qr", "../charter.docx", "word"]; try! zip.run(); zip.waitUntilExit()
             expect(Agent.pdfText(box.appending(path: "charter.docx")).contains("Team & charter\nMeeting day"), "a docx's paragraphs are read: \(Agent.pdfText(box.appending(path: "charter.docx")))")
+            let px = box.appending(path: "pptx-src")   // a deck's slides reach the Scribe in slide order (slide10 after slide2), not in file order
+            try! fm.createDirectory(at: px.appending(path: "ppt/slides"), withIntermediateDirectories: true)
+            for (n, t) in [(10, "Porter &amp; five forces"), (2, "Learning objectives")] {
+                try! "<p:sld><a:p><a:r><a:t>\(t)</a:t></a:r></a:p></p:sld>".write(to: px.appending(path: "ppt/slides/slide\(n).xml"), atomically: true, encoding: .utf8)
+            }
+            let zip2 = Process(); zip2.executableURL = URL(fileURLWithPath: "/usr/bin/zip"); zip2.currentDirectoryURL = px; zip2.arguments = ["-qr", "../deck.pptx", "ppt"]; try! zip2.run(); zip2.waitUntilExit()
+            let deck = Agent.pdfText(box.appending(path: "deck.pptx"))
+            expect(deck.contains("[slide 2]\nLearning objectives\n[slide 10]\nPorter & five forces"), "a pptx's slides are read in slide order: \(deck)")
             mode = "sort"; st.reload()
             await st.runJob(.sorting(unsorted, key: "k7"))
             item = st.inbox.last { $0.key == "k7" }!
