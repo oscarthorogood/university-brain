@@ -93,8 +93,10 @@ struct ReminderItem: Sendable { let id: String, title: String, due: String, done
 
     private static func fetch(_ cal: EKCalendar) async -> [ReminderItem] {
         let predicate = store.predicateForReminders(in: [cal])
-        return await withCheckedContinuation { cont in
-            store.fetchReminders(matching: predicate) { list in
+        return await withCheckedContinuation { (cont: CheckedContinuation<[ReminderItem], Never>) in
+            // EventKit answers on its own queue. A closure made here would count as main-actor code and the runtime stops the app when it is called from another queue
+            // (that was the crash), so it is marked `@Sendable` and touches nothing of this type.
+            store.fetchReminders(matching: predicate) { @Sendable list in
                 cont.resume(returning: (list ?? []).map {
                     ReminderItem(id: $0.calendarItemIdentifier, title: $0.title ?? "", due: ReminderKeys.due($0.dueDateComponents), done: $0.isCompleted, notes: $0.notes ?? "")
                 })
