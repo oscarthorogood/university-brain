@@ -248,7 +248,7 @@ extension Store {
             else if work?.role == "librarian", !hasSource { work = AgentWork.findSource; id = "source" }
             else if work == nil, n.folder == "Lectures", let c = n.course, newestLecture[c] == n.id { work = AgentWork.revisionSet; id = "revisionset" }
             else if work == nil, n.folder == "Lectures", let d = due, (0...7).contains(d), !missingReadings(text).isEmpty { work = AgentWork.readingNotes(missing: missingReadings(text)); id = "readingnotes" }
-            guard let w = work, !cooling(w.role, n.path) else { continue }
+            guard var w = work, !cooling(w.role, n.path) else { continue }
             var score = 0.0, why = "", suffix = Int((try? n.id.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)?.timeIntervalSince1970 ?? 0)
             switch (w.role, w.heading) {
             case ("writer", _):   // essays and projects due within four weeks that still have a blank outline; costly, so gated
@@ -271,8 +271,14 @@ extension Store {
                 guard !(revisionText ?? "").contains(n.title) else { continue }
                 score = 30; why = "Written up recently with no revision set"; suffix = 0   // once per lecture
             case ("scribe", _):
-                guard (n.when ?? .distantFuture) <= .now, hasSource else { continue }
-                score = 50; why = "Delivered, slides linked, not written up"
+                guard (n.when ?? .distantFuture) <= .now else { continue }
+                if hasSource { score = 50; why = "Delivered, slides linked, not written up" }
+                else {   // no slides after two days: organise what Oscar's own notes say, once (a filled Definitions or Key concepts means that pass is done)
+                    let notesBody = Sections.body("Notes", in: text) ?? ""
+                    guard n.folder == "Lectures", let d = due, d <= -2, Sections.hasContent("Notes", in: text, template: tpl), notesBody.split(whereSeparator: \.isWhitespace).count >= 40,
+                          Sections.isTemplate("Definitions", in: text, template: tpl), Sections.isTemplate("Key concepts", in: text, template: tpl) else { continue }
+                    w = AgentWork.fromNotes; score = 35; why = "Delivered \(-d) days ago with no slides: your own notes can be organised meanwhile"
+                }
             default:
                 guard hasSource else { continue }
                 id = "citation"; score = 20; why = "Reading with a source to confirm"
@@ -422,9 +428,14 @@ extension Store {
         if nothing { inbox.removeAll { $0.id == id }; saveInbox(); markHandled(item.key); return }
         guard ok else {
             let byYou = summary == Agent.stoppedText   // stopped while only reading: nothing to put back, and not a failure
-            update { $0.state = byYou ? .dismissed : .failed; $0.result = summary }
-            markHandled(item.key); startCooling(agent, rel0 ?? item.key)
-            log(agent, (byYou ? "Stopped: " : "Didn’t finish: ") + item.title)
+            // A refused write is a permission wall, not a bad job: it is tried again once, an hour later, instead of being written off for the day.
+            let refused = summary.hasPrefix("The helper said its edit was refused"), refusals = UserDefaults.standard.integer(forKey: "refused-" + item.key)
+            let retry = refused && refusals < 1
+            if refused { UserDefaults.standard.set(refusals + 1, forKey: "refused-" + item.key) }
+            update { $0.state = byYou ? .dismissed : retry ? .rejected : .failed; $0.result = summary }   // a rejected job is not "known", so the scan can pick the note up again
+            if !retry { markHandled(item.key) }
+            startCooling(agent, rel0 ?? item.key, hours: refused ? 1 : 6)
+            log(agent, (byYou ? "Stopped: " : "Didn’t finish: ") + item.title + (refused ? " (its write was refused, so nothing changed)" : ""))
             say(agent, byYou ? "Stopped “\(clipped(item.title, 60))”." : "I couldn't finish “\(clipped(item.title, 60))”.")
             return
         }

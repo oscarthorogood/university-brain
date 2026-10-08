@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import PDFKit
 
 /// Set by the timeout on one queue and read by the reader on another, so it is locked.
@@ -139,18 +140,47 @@ enum Agent {
     static func writesNotes(_ id: String) -> Bool { id == "scribe" }
 
     /// A text copy of each PDF in Resources, because the CLI's Read can't open PDFs without poppler and agents have no shell. Only changed PDFs are re-read.
+    /// A page with no text (a slide that is only a picture) is also saved as an image under `.pdf-images/<the PDF's vault path>/page-N.png`, which the Read tool can view.
     static func cachePDFs(root: URL) {
         let fm = FileManager.default, res = root.appending(path: Vault.dir("Resources", root: root))
         guard let walk = fm.enumerator(at: res, includingPropertiesForKeys: [.contentModificationDateKey]) else { return }
         for case let pdf as URL in walk where pdf.pathExtension.lowercased() == "pdf" {
-            let out = root.appending(path: ".pdf-text/" + pdf.path.replacingOccurrences(of: root.path + "/", with: "") + ".txt")
+            let rel = pdf.path.replacingOccurrences(of: root.path + "/", with: "")
+            let out = root.appending(path: ".pdf-text/" + rel + ".txt"), images = root.appending(path: ".pdf-images/" + rel)
             let made = (try? out.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-            if let made, made >= ((try? pdf.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantFuture) { continue }
+            // the marker says the pictures were looked for too (copies made before pictures were saved are redone once)
+            if let made, made >= ((try? pdf.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantFuture), fm.fileExists(atPath: images.appending(path: ".done").path) { continue }
             guard let doc = PDFDocument(url: pdf) else { continue }
-            let text = (0..<doc.pageCount).map { "[pdf page \($0 + 1)]\n" + (doc.page(at: $0)?.string ?? "") }.joined(separator: "\n")
+            try? fm.removeItem(at: images)
+            var saved = 0
+            let text = (0..<doc.pageCount).map { i -> String in
+                let page = doc.page(at: i), body = page?.string ?? ""
+                var line = "[pdf page \(i + 1)]\n" + body
+                if body.trimmingCharacters(in: .whitespacesAndNewlines).count < 25, saved < maxPageImages, let png = pagePNG(page) {
+                    try? fm.createDirectory(at: images, withIntermediateDirectories: true)
+                    if (try? png.write(to: images.appending(path: "page-\(i + 1).png"))) != nil { saved += 1; line += "(a picture, no text: Read .pdf-images/\(rel)/page-\(i + 1).png to see it)" }
+                }
+                return line
+            }.joined(separator: "\n")
             try? fm.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
             try? text.write(to: out, atomically: true, encoding: .utf8)
+            try? fm.createDirectory(at: images, withIntermediateDirectories: true)
+            fm.createFile(atPath: images.appending(path: ".done").path, contents: nil)
         }
+    }
+
+    /// The most picture-only pages saved for one PDF (a scanned book would otherwise fill the disk).
+    static let maxPageImages = 60
+
+    /// One PDF page as a PNG about 1,400 pixels wide: enough to read slide text and see a chart.
+    private static func pagePNG(_ page: PDFPage?) -> Data? {
+        guard let page else { return nil }
+        let box = page.bounds(for: .mediaBox)
+        guard box.width > 1, box.height > 1 else { return nil }
+        let scale = 1400 / box.width
+        let image = page.thumbnail(of: CGSize(width: box.width * scale, height: box.height * scale), for: .mediaBox)
+        guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return nil }
+        return rep.representation(using: .png, properties: [:])
     }
 
     /// PDFs: the app extracts the text itself so the agent doesn't need PDF tools.
@@ -159,7 +189,14 @@ enum Agent {
         if ext == "pptx" { return pptxText(url) }
         if ext == "docx" || ext == "xlsx" { return officeText(url, part: ext == "docx" ? "word/document.xml" : "xl/sharedStrings.xml") }
         guard ext == "pdf", let doc = PDFDocument(url: url) else { return "" }
-        let pages = (0..<doc.pageCount).compactMap { i in doc.page(at: i)?.string.map { "[slide \(i + 1)] " + $0 } }
+        // a page with no text is a picture: say so, and where the image will be (the app saves it for PDFs under Resources before the agent starts)
+        let rel = Vault.rel(url), saved = rel.hasPrefix(Vault.dir("Resources") + "/")
+        let pages = (0..<doc.pageCount).compactMap { i -> String? in
+            guard let page = doc.page(at: i) else { return nil }
+            let body = page.string ?? ""
+            if body.trimmingCharacters(in: .whitespacesAndNewlines).count < 25 { return "[slide \(i + 1)] (a picture, no text" + (saved ? "; Read .pdf-images/\(rel)/page-\(i + 1).png to see it)" : ")") }
+            return "[slide \(i + 1)] " + body
+        }
         let text = pages.joined(separator: "\n").prefix(40_000)
         return text.isEmpty ? "" : "\n\nIts text, extracted by the app (\(doc.pageCount) pages):\n\(text)\n"
     }

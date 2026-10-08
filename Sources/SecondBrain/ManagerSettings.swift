@@ -81,6 +81,12 @@ struct ManagerSettings: View {
                     ForEach(Agent.roles + Agent.courseRoles) { r in
                         let u = usage.first { $0.agent == r.id }
                         Toggle(r.name + (u.map { "  ·  \($0.today) of \(store.dailyCap(r.id)) today, \($0.week) this week" } ?? ""), isOn: Binding(get: { store.agentOn(r.id) }, set: { store.setAgentOn(r.id, $0) }))
+                        if let until = store.breakerUntil(r.id) {
+                            HStack(spacing: 8) {
+                                Text("Paused until \(until.formatted(date: .omitted, time: .shortened)) after failing the Manager’s review").font(.caption).foregroundStyle(.secondary)
+                                Button("Resume") { store.resume(r.id) }.controlSize(.small)
+                            }.padding(.leading, 20)
+                        }
                     }
                     Text("A helper that fails the Manager’s review three times in a row is paused for a day.").font(.caption).foregroundStyle(.secondary).padding(.top, 4)
                 }

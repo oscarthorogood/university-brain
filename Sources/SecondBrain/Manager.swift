@@ -191,6 +191,7 @@ enum Manager {
         precondition(Store.lineDiff("a\nb\nc", "a\nx\nc") == "- b\n+ x", "diff of what you changed: \(Store.lineDiff("a\nb\nc", "a\nx\nc"))")
         precondition(Tier.quick < Tier.deep && Tier.clamp(.deep, max: .standard) == .standard, "tier ceiling")
         precondition(isEdit("rewrite my lecture 3 notes") && isEdit("Fix the typos in this essay") && !isEdit("What's due this week?") && !isEdit("explain Porter's five forces") && isEdit("Write up lecture 3 from the slides") && isEdit("Can you write-up the SM L02 lecture?") && isEdit("fill out tutorial 4 from its sheet"), "edit requests")
+        precondition(isPrepare("Get me ready for Thursday's SM lecture") && isPrepare("catch me up on TEM") && !isPrepare("What's due this week?") && !isPrepare("Write up lecture 3 from the slides"), "prepare requests")
         precondition(Agent.Reply(text: "DELEGATE: I can't edit files\nsorry", session: "s").delegation == "I can't edit files" && Agent.Reply(text: "Done.", session: "s").delegation == nil && Agent.Reply(text: "DELEGATE: x", session: nil).delegation == nil, "delegation")
         print("routing ok: \(cases.count) requests go where they should")
     }
