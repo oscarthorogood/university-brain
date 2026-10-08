@@ -147,7 +147,7 @@ enum Manager {
     }
     /// A request to change notes, not just to read or answer: the run is allowed to edit the note folders (and the edits are checked and can be undone).
     static func isEdit(_ text: String) -> Bool {
-        text.lowercased().range(of: #"\b(edit|rewrite|reword|rephrase|change|update|fix|correct|add|insert|append|remove|delete|replace|rename|merge|split|combine|reformat|restructure|reorgani[sz]e|convert|clean ?up|tidy|shorten|expand|translate|proofread|format|fill in|complete|tick|untick|apply|move)\b"#, options: .regularExpression) != nil
+        text.lowercased().range(of: #"\b(edit|rewrite|reword|rephrase|change|update|fix|correct|add|insert|append|remove|delete|replace|rename|merge|split|combine|reformat|restructure|reorgani[sz]e|convert|clean ?up|tidy|shorten|expand|translate|proofread|format|fill( in| out)?|complete|tick|untick|apply|move|write|write[- ]?up|writing up|enrich|flesh out|populate|backfill|finish)\b"#, options: .regularExpression) != nil
     }
 
     /// `previous` is who last answered in this chat: a short message with no clues ("start with what you know") is a follow-up to them.
@@ -190,7 +190,8 @@ enum Manager {
         precondition(Manager.needsBrief("Paste the exact essay question") && !Manager.needsBrief("The question: why?"), "blank brief")
         precondition(Store.lineDiff("a\nb\nc", "a\nx\nc") == "- b\n+ x", "diff of what you changed: \(Store.lineDiff("a\nb\nc", "a\nx\nc"))")
         precondition(Tier.quick < Tier.deep && Tier.clamp(.deep, max: .standard) == .standard, "tier ceiling")
-        precondition(isEdit("rewrite my lecture 3 notes") && isEdit("Fix the typos in this essay") && !isEdit("What's due this week?") && !isEdit("explain Porter's five forces"), "edit requests")
+        precondition(isEdit("rewrite my lecture 3 notes") && isEdit("Fix the typos in this essay") && !isEdit("What's due this week?") && !isEdit("explain Porter's five forces") && isEdit("Write up lecture 3 from the slides") && isEdit("Can you write-up the SM L02 lecture?") && isEdit("fill out tutorial 4 from its sheet"), "edit requests")
+        precondition(isPrepare("Get me ready for Thursday's SM lecture") && isPrepare("catch me up on TEM") && !isPrepare("What's due this week?") && !isPrepare("Write up lecture 3 from the slides"), "prepare requests")
         precondition(Agent.Reply(text: "DELEGATE: I can't edit files\nsorry", session: "s").delegation == "I can't edit files" && Agent.Reply(text: "Done.", session: "s").delegation == nil && Agent.Reply(text: "DELEGATE: x", session: nil).delegation == nil, "delegation")
         print("routing ok: \(cases.count) requests go where they should")
     }

@@ -285,6 +285,8 @@ struct SecondBrainApp: App {
         guard !text.isEmpty, !thinking.contains(code) else { return }
         // "apply the MCQ template to the existing MCQ files": an agent does it a few notes at a time, and the app checks and tidies each one
         if let folder = Self.templateRequest(text) { applyTemplates(folder, asked: text, in: code); return }
+        // "get me ready for Thursday's lecture": the Manager lines up the team's jobs for it and works through them
+        if code == Agent.manager.id, Manager.isPrepare(text) { prepare(text); return }
         if code == Agent.manager.id { dispatch(text, tier: tier) } else { send(code, text, tier: tier ?? Manager.tier(text, role: code)) }
     }
     /// The last few turns of the Manager's chat, so the agent it hands a follow-up to knows what "that" and "these" mean.
@@ -300,7 +302,7 @@ struct SecondBrainApp: App {
         thinking.insert(code)
         let team = Agent.teamLog(activity)
         let general = code == Agent.manager.id
-        let editing = general || Manager.isEdit(shown)
+        let editing = general || Agent.writesNotes(code) || Manager.isEdit(shown)
         let root = Vault.root
         let started = Date.now
         var existing = Set<String>()

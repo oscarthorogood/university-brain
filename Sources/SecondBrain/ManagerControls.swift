@@ -84,7 +84,23 @@ extension Store {
     }
     /// The same agent isn't put on the same note again for six hours, whatever happened.
     func cooling(_ role: String, _ path: String) -> Bool { ((d.object(forKey: "cool-\(role)|\(path)") as? Date) ?? .distantPast) > .now }
-    func startCooling(_ role: String, _ path: String) { d.set(Date.now.addingTimeInterval(6 * 3600), forKey: "cool-\(role)|\(path)") }
+    func startCooling(_ role: String, _ path: String, hours: Double = 6) { d.set(Date.now.addingTimeInterval(hours * 3600), forKey: "cool-\(role)|\(path)") }
+    /// Until when the loop breaker has this agent paused, or nil when it isn't.
+    func breakerUntil(_ agent: String) -> Date? {
+        guard let until = d.object(forKey: "breaker-\(agent)") as? Date, until > .now else { return nil }
+        return until
+    }
+    /// Lets a paused agent work again now: clears the pause, its run of failed reviews and the six-hour wait on the notes it was given.
+    func resume(_ agent: String) {
+        d.removeObject(forKey: "breaker-\(agent)"); d.set(0, forKey: "rejects-\(agent)")
+        for k in d.dictionaryRepresentation().keys where k.hasPrefix("cool-\(agent)|") || k.hasPrefix("refused-work:\(agent):") { d.removeObject(forKey: k) }
+        // jobs it was given and couldn't finish count as already tried, so they would never come back: forget them
+        inbox.removeAll { $0.agent == agent && $0.kind == .work && $0.state == .failed }; saveInbox()
+        handled = handled.filter { !$0.hasPrefix("work:\(agent):") }
+        d.set(Array(handled), forKey: "autopilotHandled")
+        log(Agent.manager.id, "\(Agent.role(agent).name) can take jobs again: you resumed it.")
+        revision += 1
+    }
     /// A note you changed in the last five minutes, or have open, is left alone.
     func inUse(_ url: URL) -> Bool {
         if case .note(let open) = page, open == url { return true }

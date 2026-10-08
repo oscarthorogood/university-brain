@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import PDFKit
 
 /// Set by the timeout on one queue and read by the reader on another, so it is locked.
@@ -134,44 +135,109 @@ enum Agent {
         }
     }
 
+    /// Helpers whose whole job is writing into Oscar's existing notes: in a chat they may always edit the note folders, however the request is worded
+    /// ("write up lecture 3" names no edit verb, and without this Scribe could only write inside its own folder).
+    static func writesNotes(_ id: String) -> Bool { id == "scribe" }
+
     /// A text copy of each PDF in Resources, because the CLI's Read can't open PDFs without poppler and agents have no shell. Only changed PDFs are re-read.
+    /// A page with no text (a slide that is only a picture) is also saved as an image under `.pdf-images/<the PDF's vault path>/page-N.png`, which the Read tool can view.
     static func cachePDFs(root: URL) {
         let fm = FileManager.default, res = root.appending(path: Vault.dir("Resources", root: root))
         guard let walk = fm.enumerator(at: res, includingPropertiesForKeys: [.contentModificationDateKey]) else { return }
         for case let pdf as URL in walk where pdf.pathExtension.lowercased() == "pdf" {
-            let out = root.appending(path: ".pdf-text/" + pdf.path.replacingOccurrences(of: root.path + "/", with: "") + ".txt")
+            let rel = pdf.path.replacingOccurrences(of: root.path + "/", with: "")
+            let out = root.appending(path: ".pdf-text/" + rel + ".txt"), images = root.appending(path: ".pdf-images/" + rel)
             let made = (try? out.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-            if let made, made >= ((try? pdf.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantFuture) { continue }
+            // the marker says the pictures were looked for too (copies made before pictures were saved are redone once)
+            if let made, made >= ((try? pdf.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantFuture), fm.fileExists(atPath: images.appending(path: ".done").path) { continue }
             guard let doc = PDFDocument(url: pdf) else { continue }
-            let text = (0..<doc.pageCount).map { "[pdf page \($0 + 1)]\n" + (doc.page(at: $0)?.string ?? "") }.joined(separator: "\n")
+            try? fm.removeItem(at: images)
+            var saved = 0
+            let text = (0..<doc.pageCount).map { i -> String in
+                let page = doc.page(at: i), body = page?.string ?? ""
+                var line = "[pdf page \(i + 1)]\n" + body
+                if body.trimmingCharacters(in: .whitespacesAndNewlines).count < 25, saved < maxPageImages, let png = pagePNG(page) {
+                    try? fm.createDirectory(at: images, withIntermediateDirectories: true)
+                    if (try? png.write(to: images.appending(path: "page-\(i + 1).png"))) != nil { saved += 1; line += "(a picture, no text: Read .pdf-images/\(rel)/page-\(i + 1).png to see it)" }
+                }
+                return line
+            }.joined(separator: "\n")
             try? fm.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
             try? text.write(to: out, atomically: true, encoding: .utf8)
+            try? fm.createDirectory(at: images, withIntermediateDirectories: true)
+            fm.createFile(atPath: images.appending(path: ".done").path, contents: nil)
         }
+    }
+
+    /// The most picture-only pages saved for one PDF (a scanned book would otherwise fill the disk).
+    static let maxPageImages = 60
+
+    /// One PDF page as a PNG about 1,400 pixels wide: enough to read slide text and see a chart.
+    private static func pagePNG(_ page: PDFPage?) -> Data? {
+        guard let page else { return nil }
+        let box = page.bounds(for: .mediaBox)
+        guard box.width > 1, box.height > 1 else { return nil }
+        let scale = 1400 / box.width
+        let image = page.thumbnail(of: CGSize(width: box.width * scale, height: box.height * scale), for: .mediaBox)
+        guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return nil }
+        return rep.representation(using: .png, properties: [:])
     }
 
     /// PDFs: the app extracts the text itself so the agent doesn't need PDF tools.
     static func pdfText(_ url: URL) -> String {
         let ext = url.pathExtension.lowercased()
+        if ext == "pptx" { return pptxText(url) }
         if ext == "docx" || ext == "xlsx" { return officeText(url, part: ext == "docx" ? "word/document.xml" : "xl/sharedStrings.xml") }
         guard ext == "pdf", let doc = PDFDocument(url: url) else { return "" }
-        let pages = (0..<doc.pageCount).compactMap { i in doc.page(at: i)?.string.map { "[slide \(i + 1)] " + $0 } }
+        // a page with no text is a picture: say so, and where the image will be (the app saves it for PDFs under Resources before the agent starts)
+        let rel = Vault.rel(url), saved = rel.hasPrefix(Vault.dir("Resources") + "/")
+        let pages = (0..<doc.pageCount).compactMap { i -> String? in
+            guard let page = doc.page(at: i) else { return nil }
+            let body = page.string ?? ""
+            if body.trimmingCharacters(in: .whitespacesAndNewlines).count < 25 { return "[slide \(i + 1)] (a picture, no text" + (saved ? "; Read .pdf-images/\(rel)/page-\(i + 1).png to see it)" : ")") }
+            return "[slide \(i + 1)] " + body
+        }
         let text = pages.joined(separator: "\n").prefix(40_000)
         return text.isEmpty ? "" : "\n\nIts text, extracted by the app (\(doc.pageCount) pages):\n\(text)\n"
     }
 
     /// Word and Excel files are zips of XML: the app reads their text itself, because the agent has no shell to open them with.
     static func officeText(_ url: URL, part: String) -> String {
+        let text = xmlText(url, part: part)
+        return text.isEmpty ? "" : "\n\nIts text, extracted by the app:\n\(text)\n"
+    }
+
+    /// A PowerPoint deck: one `[slide N]` block per slide, in slide order (slide10 comes after slide2), so a write-up can cite slide numbers.
+    /// The old `.ppt` format is not a zip and can't be read this way.
+    static func pptxText(_ url: URL) -> String {
+        let p = Process(), pipe = Pipe()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/unzip"); p.arguments = ["-Z1", url.path]
+        p.standardOutput = pipe; p.standardError = FileHandle.nullDevice
+        guard (try? p.run()) != nil else { return "" }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
+        let slides = String(decoding: data, as: UTF8.self).split(separator: "\n").compactMap { line -> (Int, String)? in
+            guard let m = line.firstMatch(of: /^ppt\/slides\/slide(\d+)\.xml$/), let n = Int(m.1) else { return nil }
+            return (n, String(line))
+        }.sorted { $0.0 < $1.0 }
+        let text = slides.compactMap { n, part -> String? in
+            let t = xmlText(url, part: part)
+            return t.isEmpty ? nil : "[slide \(n)]\n" + t
+        }.joined(separator: "\n").prefix(40_000)
+        return text.isEmpty ? "" : "\n\nIts text, extracted by the app (\(slides.count) slides; pictures and charts are not included):\n\(text)\n"
+    }
+
+    /// The text of one XML part of a zip (Word paragraphs, Excel shared strings, PowerPoint text runs), one line per paragraph.
+    private static func xmlText(_ url: URL, part: String) -> String {
         let p = Process(), pipe = Pipe()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/unzip"); p.arguments = ["-p", url.path, part]
         p.standardOutput = pipe; p.standardError = FileHandle.nullDevice
         guard (try? p.run()) != nil else { return "" }
         let data = pipe.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
         var xml = String(decoding: data, as: UTF8.self)
-        for end in ["</w:p>", "</si>"] { xml = xml.replacingOccurrences(of: end, with: "\n") }
-        let text = xml.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        for end in ["</w:p>", "</si>", "</a:p>"] { xml = xml.replacingOccurrences(of: end, with: "\n") }
+        return String(xml.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
             .replacingOccurrences(of: "&lt;", with: "<").replacingOccurrences(of: "&gt;", with: ">").replacingOccurrences(of: "&quot;", with: "\"").replacingOccurrences(of: "&amp;", with: "&")
-            .split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: "\n").prefix(40_000)
-        return text.isEmpty ? "" : "\n\nIts text, extracted by the app:\n\(text)\n"
+            .split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: "\n").prefix(40_000))
     }
 
     /// The Sorter reads what is in Unsorted and replies with where each file goes (read-only); the app does the moves.

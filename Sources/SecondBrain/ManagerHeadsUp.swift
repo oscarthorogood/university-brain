@@ -32,6 +32,19 @@ extension Store {
                 add("slides:\(n.path)", "\(n.display) is \(whenText(w)) and has no slides linked yet.", go: .note(n.id))
             }
         }
+        // a class that has happened, isn't written up and has no slides to write it up from
+        let slideless = current.filter { n in
+            guard ["Lectures", "Tutorials"].contains(n.folder), n.unfilled, let w = n.when, (-7...(-1)).contains(days(w)) else { return false }
+            let text = (try? String(contentsOf: n.id, encoding: .utf8)) ?? ""
+            return Vault.rawItems(text, "resources").allSatisfy { $0.trimmingCharacters(in: .whitespaces).isEmpty }
+        }.sorted { $0.whenOrFar > $1.whenOrFar }
+        for n in slideless.prefix(2) {
+            add("noslides:\(n.path)", "\(n.display) was \(-days(n.whenOrFar)) day\(days(n.whenOrFar) == -1 ? "" : "s") ago and still has no slides. Drop them in Unsorted and Scribe will write it up.", go: .note(n.id))
+        }
+        // an agent the loop breaker has paused (it is easy to miss, and nothing else says why its jobs stopped)
+        if c == nil {
+            for r in Agent.roles { if let until = breakerUntil(r.id) { add("paused:\(r.id)", "\(r.name) is paused until \(whenText(until)) after failing the Manager’s review three times. Resume it in Settings → Agents.") } }
+        }
         // essays and projects due within a week that haven't been started
         for n in current where ["Essays", "Projects"].contains(n.folder) && !n.done && n.status == "Not started" {
             guard let w = n.when, (0...7).contains(days(w)) else { continue }
@@ -58,7 +71,7 @@ extension Store {
         guard briefOn, UserDefaults.standard.string(forKey: "lastBrief") != today, !thinking.contains(Agent.manager.id), !notes.isEmpty else { return }
         UserDefaults.standard.set(today, forKey: "lastBrief")
         chats[Agent.manager.id, default: []].append(Message(fromAgent: false, text: "Morning brief"))
-        chats[Agent.manager.id, default: []].append(Message(fromAgent: true, text: composeBrief()))
+        chats[Agent.manager.id, default: []].append(Message(fromAgent: true, text: composeBrief() + (briefTeamLine().map { "\n\n" + $0 } ?? "")))
     }
     /// The day in plain facts, written on this Mac: no model, no cost.
     func composeBrief() -> String {

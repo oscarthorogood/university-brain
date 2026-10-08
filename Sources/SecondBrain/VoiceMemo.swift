@@ -46,7 +46,8 @@ import Speech
     }
 
     /// On this Mac when the language model is installed, so nothing leaves it. nil when not allowed or not available.
-    static func transcribe(_ url: URL) async -> String? {
+    /// `nonisolated`: the speech framework answers on its own queues, and a callback made in main-actor code would stop the app when called from one.
+    nonisolated static func transcribe(_ url: URL) async -> String? {
         let status = await withCheckedContinuation { c in SFSpeechRecognizer.requestAuthorization { c.resume(returning: $0) } }
         guard status == .authorized, let rec = SFSpeechRecognizer(locale: Locale(identifier: "en-GB")) ?? SFSpeechRecognizer(), rec.isAvailable else { return nil }
         let req = SFSpeechURLRecognitionRequest(url: url)

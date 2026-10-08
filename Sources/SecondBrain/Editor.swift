@@ -191,9 +191,15 @@ final class MDTextView: NSTextView {
                 let box = NSRect(x: o.x, y: b.minY - 2, width: width, height: b.height + 4)
                 NSColor.labelColor.withAlphaComponent(0.06).setFill()
                 NSBezierPath(roundedRect: box, xRadius: 8, yRadius: 8).fill()
-            case .rule, .tableRule:
+            case .rule:
                 MarkdownStyler.faint.setFill()
                 NSBezierPath(rect: NSRect(x: o.x, y: b.midY, width: width, height: 1)).fill()
+            case .tableRow(let header, let inset):   // a tinted header and a faint line under every row; inside a callout the table sits in from the bar
+                let x = o.x + inset, w = width - inset - (inset > 0 ? 14 : 0)
+                let row = NSRect(x: x, y: b.minY - 2, width: w, height: b.height + 4)
+                if header { MarkdownStyler.accent.withAlphaComponent(0.12).setFill(); NSBezierPath(roundedRect: row, xRadius: 6, yRadius: 6).fill() }
+                MarkdownStyler.faint.withAlphaComponent(header ? 1 : 0.55).setFill()
+                NSBezierPath(rect: NSRect(x: x, y: row.maxY - 1, width: w, height: 1)).fill()
             case .bullet:
                 MarkdownStyler.accent.setFill()
                 NSBezierPath(ovalIn: NSRect(x: b.midX - 2.5, y: b.midY - 2.5, width: 5, height: 5)).fill()
@@ -419,6 +425,13 @@ struct MarkdownEditor: NSViewRepresentable {
             let line = ns.substring(with: lr).trimmingCharacters(in: .newlines)
             let all = NSRange(location: 0, length: (line as NSString).length)
             let ls = line as NSString
+            // Return in a table adds a row under it; Return on an empty row ends the table
+            if let row = tableRow(line) {
+                if ls.substring(from: row.cut).allSatisfy({ $0 == "|" || $0 == " " || $0 == "\t" }) {
+                    remove(NSRange(location: lr.location + row.cut, length: ls.length - row.cut), in: tv)
+                } else { addRow(tv, line: line, lineStart: lr.location, cut: row.cut, pipes: row.pipes) }
+                return true
+            }
             var prefix = "", next = ""
             if let q = MarkdownStyler.quoteRX.firstMatch(in: line, range: all) {
                 // inside a quote or callout: keep the > marks, and carry on a list inside it
@@ -450,8 +463,67 @@ struct MarkdownEditor: NSViewRepresentable {
             return true
         }
 
-        /// Tab and Shift-Tab nest and un-nest a list item.
+        // MARK: Tables
+        /// A table row's quote marks (their length) and where its `|` marks are on the line; nil when the line is not a table row.
+        private func tableRow(_ line: String) -> (cut: Int, pipes: [Int])? {
+            let ns = line as NSString
+            let cut = MarkdownStyler.quoteRX.firstMatch(in: line, range: NSRange(location: 0, length: ns.length))?.range.length ?? 0
+            guard ns.substring(from: cut).trimmingCharacters(in: .whitespaces).hasPrefix("|") else { return nil }
+            return (cut, MarkdownStyler.pipePositions(in: ns, from: cut))
+        }
+
+        /// A new empty row under the one the cursor is on, with the same number of columns and the same quote marks; the cursor goes into its first cell.
+        private func addRow(_ tv: NSTextView, line: String, lineStart: Int, cut: Int, pipes: [Int]) {
+            let trailing = line.trimmingCharacters(in: .whitespaces).hasSuffix("|")
+            let columns = max(trailing ? pipes.count - 1 : pipes.count, 1)
+            let end = lineStart + (line as NSString).length
+            tv.insertText("\n" + (line as NSString).substring(to: cut) + "|" + String(repeating: "  |", count: columns), replacementRange: NSRange(location: end, length: 0))
+            tv.setSelectedRange(NSRange(location: end + 1 + cut + 2, length: 0))
+        }
+
+        /// Tab goes to the next cell (the last cell's Tab adds a row), Shift-Tab to the one before.
+        func tableCell(_ tv: NSTextView, _ dir: Int) -> Bool {
+            let sel = tv.selectedRange(), ns = tv.string as NSString
+            let lr = ns.lineRange(for: sel)
+            let line = ns.substring(with: lr).trimmingCharacters(in: .newlines)
+            guard let row = tableRow(line), !row.pipes.isEmpty else { return false }
+            let c = sel.location - lr.location
+            let k = row.pipes.firstIndex { $0 >= c } ?? row.pipes.count           // the pipe that ends the cell the cursor is in
+            let trailing = line.trimmingCharacters(in: .whitespaces).hasSuffix("|")
+            /// The caret position inside the cell that starts after `pipe` on the line at `at`: past the pipe and the space after it.
+            func inside(_ at: NSRange, _ pipe: Int) -> Int {
+                var p = at.location + pipe + 1
+                if p < ns.length, ns.character(at: p) == 32 { p += 1 }
+                return p
+            }
+            /// The next or previous row of this table that holds cells (the `| --- |` line is skipped), with its pipes.
+            func neighbour(_ forward: Bool) -> (range: NSRange, pipes: [Int])? {
+                var at = forward ? NSMaxRange(lr) : lr.location - 1
+                while at >= 0, at < ns.length {
+                    let r = ns.lineRange(for: NSRange(location: at, length: 0))
+                    let l = ns.substring(with: r).trimmingCharacters(in: .newlines)
+                    guard let t = tableRow(l) else { return nil }
+                    if !MarkdownStyler.isTableSeparator((l as NSString).substring(from: t.cut)) { return (r, t.pipes) }
+                    at = forward ? NSMaxRange(r) : r.location - 1
+                }
+                return nil
+            }
+            if dir > 0 {
+                if k < (trailing ? row.pipes.count - 1 : row.pipes.count) { tv.setSelectedRange(NSRange(location: inside(lr, row.pipes[k]), length: 0)) }
+                else if let next = neighbour(true), let first = next.pipes.first { tv.setSelectedRange(NSRange(location: inside(next.range, first), length: 0)) }
+                else { addRow(tv, line: line, lineStart: lr.location, cut: row.cut, pipes: row.pipes) }
+            } else if k >= 2 {
+                tv.setSelectedRange(NSRange(location: inside(lr, row.pipes[k - 2]), length: 0))
+            } else if let prev = neighbour(false) {
+                let starts = (ns.substring(with: prev.range).trimmingCharacters(in: .whitespacesAndNewlines).hasSuffix("|")) ? Array(prev.pipes.dropLast()) : prev.pipes
+                if let last = starts.last { tv.setSelectedRange(NSRange(location: inside(prev.range, last), length: 0)) }
+            }
+            return true
+        }
+
+        /// Tab and Shift-Tab move between a table's cells, and nest and un-nest a list item.
         func indent(_ tv: NSTextView, _ dir: Int) -> Bool {
+            if tableCell(tv, dir) { return true }
             let ns = tv.string as NSString
             let lr = ns.lineRange(for: tv.selectedRange())
             let line = ns.substring(with: lr)
@@ -475,7 +547,7 @@ struct MarkdownEditor: NSViewRepresentable {
     static let leadingKey = NSAttributedString.Key("sb.leading")    // the marks in front of a line's text: the cursor stays after them
 
     struct Decoration {
-        enum Kind { case bullet, checkbox(Bool), callout(NSColor), quote, code, rule, tableRule }
+        enum Kind { case bullet, checkbox(Bool), callout(NSColor), quote, code, rule, tableRow(header: Bool, inset: CGFloat) }
         let kind: Kind
         let range: NSRange
     }
@@ -539,7 +611,8 @@ struct MarkdownEditor: NSViewRepresentable {
 
         s.beginEditing()
         s.setAttributes([.font: font(baseSize), .foregroundColor: ink, .paragraphStyle: paragraph()], range: full)
-        for r in lines {
+        var widths: [Int] = []      // the table's column widths, in characters
+        for (idx, r) in lines.enumerated() {
             let t = ns.substring(with: r)
             let len = (t as NSString).length
             let all = NSRange(location: 0, length: len)
@@ -566,21 +639,36 @@ struct MarkdownEditor: NSViewRepresentable {
             }
             if fenced { s.addAttributes([.font: font(13, mono: true), .foregroundColor: ink], range: r); continue }
 
-            // a table: monospaced, faint bars, a rule under the header. Inside a quote or callout the row sits after the `>` marker.
+            // a table: monospaced, columns lined up, a faint line under each row. Inside a quote or callout the row sits after the `>` marker.
             let cut = q?.range.length ?? 0
             let rowRange = NSRange(location: cut, length: len - cut)
             let row = (t as NSString).substring(with: rowRange)
             if row.trimmingCharacters(in: .whitespaces).hasPrefix("|") {
                 let first = !inTable; inTable = true
+                if first { widths = columnWidths(lines: lines, from: idx, in: ns) }
                 if let q {
                     hide(q.range, leading: true)
                     quote = (start: quote?.start ?? r.location, end: NSMaxRange(r), tint: quote?.tint)
                 }
-                if row.contains("-"), row.trimmingCharacters(in: .whitespaces).range(of: #"^\|?[\s:\-|]+\|?$"#, options: .regularExpression) != nil {
-                    hide(all); decos.append(Decoration(kind: .tableRule, range: r)); continue
+                if isTableSeparator(row) {   // the `| --- |` line is not shown, and takes no height
+                    hide(all)
+                    let collapsed = NSMutableParagraphStyle()
+                    collapsed.lineSpacing = 0; collapsed.paragraphSpacing = 0; collapsed.paragraphSpacingBefore = 0; collapsed.maximumLineHeight = 1; collapsed.minimumLineHeight = 1
+                    s.addAttributes([.font: font(1), .paragraphStyle: collapsed], range: ns.lineRange(for: r))
+                    continue
                 }
-                s.addAttribute(.font, value: font(13, first ? .bold : .regular, mono: true), range: at(rowRange))
-                for (i, ch) in row.utf16.enumerated() where ch == 124 { s.addAttribute(.foregroundColor, value: faint, range: at(NSRange(location: cut + i, length: 1))) }
+                let inset: CGFloat = q == nil ? 0 : 14
+                s.addAttributes([.font: font(13, first ? .bold : .regular, mono: true), .paragraphStyle: paragraph(first: inset, head: inset, before: 3)], range: at(rowRange))
+                let rowNS = row as NSString, pipes = pipePositions(in: rowNS, from: 0)
+                for p in pipes { s.addAttribute(.foregroundColor, value: faint, range: at(NSRange(location: cut + p, length: 1))) }
+                inline(r, t, s)
+                // pad each cell with space after its text so the columns line up (the characters themselves never change)
+                for k in stride(from: 1, to: pipes.count, by: 1) where k - 1 < widths.count {
+                    let cell = rowNS.substring(with: NSRange(location: pipes[k - 1] + 1, length: pipes[k] - pipes[k - 1] - 1))
+                    let extra = widths[k - 1] - shownLength(cell)
+                    if extra > 0, !cell.isEmpty { s.addAttribute(.kern, value: CGFloat(extra) * monoAdvance, range: at(NSRange(location: cut + pipes[k] - 1, length: 1))) }
+                }
+                decos.append(Decoration(kind: .tableRow(header: first, inset: inset), range: r))
                 continue
             } else { inTable = false }
 
@@ -607,6 +695,13 @@ struct MarkdownEditor: NSViewRepresentable {
                 quote = (start: quote?.start ?? r.location, end: NSMaxRange(r), tint: color)
             }
 
+            // a heading inside a quote or callout (`> ### Before the tutorial`): sized and bold, its `#` marks hidden
+            if q != nil, let h = headingRX.firstMatch(in: t, range: NSRange(location: start, length: len - start)) {
+                let sizes: [CGFloat] = [20, 18, 16.5, 15.5, 15, 15]
+                s.addAttributes([.font: font(sizes[h.range(at: 1).length - 1], .bold), .paragraphStyle: paragraph(first: indent, head: indent, before: 6)], range: at(NSRange(location: start, length: len - start)))
+                hide(h.range, leading: true)
+                inline(r, t, s); continue
+            }
             var first = indent, head = indent
             let body = NSRange(location: start, length: len - start)
             if let c = checkRX.firstMatch(in: t, range: body) {
@@ -642,6 +737,52 @@ struct MarkdownEditor: NSViewRepresentable {
             lm.invalidateLayout(forCharacterRange: full, actualCharacterRange: nil)
         }
         return decos
+    }
+
+    // MARK: Tables
+    /// The width of one character of the table font, which every cell is padded in multiples of.
+    private static var monoAdvance: CGFloat { (" " as NSString).size(withAttributes: [.font: font(13, mono: true)]).width }
+    /// Where the `|` marks are in `ns` from `from` on (a `\|` is part of a cell, not a divider).
+    static func pipePositions(in ns: NSString, from: Int) -> [Int] {
+        var out: [Int] = []
+        var i = from
+        while i < ns.length {
+            if ns.character(at: i) == 124, i == from || ns.character(at: i - 1) != 92 { out.append(i) }
+            i += 1
+        }
+        return out
+    }
+    /// The `| --- | --- |` line under a table's header.
+    static func isTableSeparator(_ row: String) -> Bool {
+        row.contains("-") && row.trimmingCharacters(in: .whitespaces).range(of: #"^\|?[\s:\-|]+\|?$"#, options: .regularExpression) != nil
+    }
+    /// How many characters a cell shows: links show their name or alias and bold, code and highlight marks are hidden.
+    private static func shownLength(_ cell: String) -> Int {
+        var t = cell
+        for (pattern, with) in [(#"\[\[[^\]|\\]+\\?\|([^\]]+)\]\]"#, "$1"), (#"\[\[([^\]]+)\]\]"#, "$1"), (#"\[([^\]]+)\]\([^)]+\)"#, "$1")] {
+            t = t.replacingOccurrences(of: pattern, with: with, options: .regularExpression)
+        }
+        for mark in ["**", "~~", "==", "`"] { t = t.replacingOccurrences(of: mark, with: "") }
+        return t.count
+    }
+    /// The widest cell in each column over the rows of the table that starts at line `idx`.
+    private static func columnWidths(lines: [NSRange], from idx: Int, in ns: NSString) -> [Int] {
+        var widths: [Int] = []
+        var i = idx
+        while i < lines.count {
+            let t = ns.substring(with: lines[i])
+            let cut = quoteRX.firstMatch(in: t, range: NSRange(location: 0, length: (t as NSString).length))?.range.length ?? 0
+            let row = (t as NSString).substring(from: cut)
+            guard row.trimmingCharacters(in: .whitespaces).hasPrefix("|") else { break }
+            i += 1
+            if isTableSeparator(row) { continue }
+            let rowNS = row as NSString, pipes = pipePositions(in: rowNS, from: 0)
+            for k in stride(from: 1, to: pipes.count, by: 1) {
+                let n = shownLength(rowNS.substring(with: NSRange(location: pipes[k - 1] + 1, length: pipes[k] - pipes[k - 1] - 1)))
+                if k - 1 < widths.count { widths[k - 1] = max(widths[k - 1], n) } else { widths.append(n) }
+            }
+        }
+        return widths
     }
 
     private static func trait(_ mask: NSFontTraitMask, _ range: NSRange, _ s: NSTextStorage) {

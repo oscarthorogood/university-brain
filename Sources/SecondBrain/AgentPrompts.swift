@@ -14,6 +14,7 @@ extension Agent {
     - Courses/<Course>.md is a course note (key dates, outline); Agents/Helper Agents/Planner/Calendar Sync.md is the synced timetable and deadlines.
     - Items/ (Lectures, Tutorials, Readings, Essays, Projects, Exams, Assignments for tasks), Apps/ (MCQ, Flashcards, Glossary, Podcast) and Files/ (Zotero, Resources, OneDrive, Summaries, Past Papers, Mind Maps, Research) hold the notes and files; Files/Resources/<Course>/ holds slides and documents (note links still write them as Resources/<Course>/…); Unsorted/ is the intake tray.
     - PDFs: the Read tool can't open them here, so the app keeps a text copy of every PDF under Files/Resources/ at `.pdf-text/<the PDF's vault path>.txt`, with `[pdf page N]` markers (the book's printed page numbers usually differ by a few). Read that copy, never the PDF, and never say a PDF was unreadable without trying it.
+    - Pictures: a PDF page with no text (a slide that is only an image) is saved as `.pdf-images/<the PDF's vault path>/page-N.png`, and the text copy says so on that page. The Read tool shows PNG files: look at the image, describe or transcribe what the slide shows, and cite it by slide number.
     Be exact: cite the note and the slide or page. Nobody can answer a question during a run, so if something is unclear, say what you couldn't verify and leave it out rather than guess.
     """ }
 
@@ -27,7 +28,7 @@ extension Agent {
 
     /// What every agent may do with notes in a chat, and what to do when it can't.
     static let editRules = """
-    When Oscar asks you to change his notes (edit, rewrite, restructure, fix, add or remove text, replace, merge, split, convert, format, tidy), you may edit the existing notes in his note folders that he asked about, and create new ones: only those, and never anything in Agents/ or Templates/ outside your own folder. Say which notes you changed. You never delete or move files: the app does that. Don't edit when he only asked a question.
+    When Oscar asks you to change his notes (edit, rewrite, restructure, fix, add or remove text, replace, merge, split, convert, format, tidy, write up, fill in, enrich), you may edit the existing notes in his note folders that he asked about, and create new ones: only those, and never anything in Agents/ or Templates/ outside your own folder. Say which notes you changed. You never delete or move files: the app does that. Don't edit when he only asked a question.
     If you cannot do what he asked (it is outside your role, or you lack the access or the knowledge), reply with exactly one line, `DELEGATE:` followed by why, and nothing else: the Manager passes it to another agent. Never just refuse, and never answer half of it.
     """
 
