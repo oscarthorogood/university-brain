@@ -16,7 +16,7 @@ Open items that belong to one agent now live in that agent's file, so each agent
 - **Scribe** — template backfill, lecture restyle and undelivered lectures.
 - **Sorter** — file-store coverage gaps, the exposed credentials in `Unsorted/`, the recurring slide PDFs.
 - **Planner** — the `Upload Lecture Slides` task.
-- **Strategy** and **TEM** course agents — the date and file questions that belong to one course.
+- **Strategy** and **TEM** (their `## Course notes` sections in the Manager's file) — the date and file questions that belong to one course.
 
 Shared items (5, 7, 8, 10, 12, 13 and the year/semester question) stay below.
 

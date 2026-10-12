@@ -81,21 +81,21 @@ extension Store {
         return kinds.first { t.range(of: $0.0, options: .regularExpression) != nil }?.1
     }
 
-    /// Which helper owns a kind of note (its template is the one it fills), when the chat that asked isn't with one.
+    /// Which kind of work owns a kind of note (its template is the one it fills).
     nonisolated static func templateOwner(_ folder: String) -> String {
         ["Lectures": "scribe", "Tutorials": "scribe", "Readings": "librarian", "Research": "researcher", "Essays": "writer", "Projects": "writer", "Exams": "planner"][folder] ?? "tutor"
     }
 
-    /// A chat message asking for it, in any agent's chat. The agent does the editing, a few notes at a time, with write access to just those notes (chat agents otherwise never edit
+    /// A chat message asking for it. The Manager does the editing, a few notes at a time, with write access to just those notes (chat agents otherwise never edit
     /// an existing note). The Manager then checks every note against what it was, puts back any that lost text or changed a value, and tidies what is still off the template.
-    func applyTemplates(_ folder: String, asked text: String, in code: String) {
+    func applyTemplates(_ folder: String, asked text: String) {
+        let code = Agent.manager.id
         chats[code, default: []].append(Message(fromAgent: false, text: text))
         thinking.insert(code)
         chatTasks[code] = Task { [weak self] in
             guard let self else { return }
             defer { chatTasks[code] = nil }
-            let helper = Agent.role(code).course == nil && code != Agent.manager.id ? code : Self.templateOwner(folder)
-            let reply = await agentApplyTemplates(folder, by: helper, shownIn: code)
+            let reply = await agentApplyTemplates(folder, by: Self.templateOwner(folder), shownIn: code)
             streaming[code] = nil
             chats[code, default: []].append(Message(fromAgent: true, text: reply))
             thinking.remove(code)
@@ -157,7 +157,7 @@ extension Store {
             }
             return (kept, reverted, tidied, matched)
         }.value
-        var line = "\(stopped ? "Stopped. " : "")\(helper == "tutor" ? "" : Agent.role(helper).name + " ")Brought \(result.kept.count) of \(rels.count) \(folder) notes to their template (frontmatter in the template’s order, missing sections added at the end)."
+        var line = "\(stopped ? "Stopped. " : "")Brought \(result.kept.count) of \(rels.count) \(folder) notes to their template (frontmatter in the template’s order, missing sections added at the end)."
         if result.matched > 0 { line += " \(result.matched) already matched." }
         if result.tidied > 0 { line += " The Manager finished \(result.tidied) the agent had left." }
         if !result.reverted.isEmpty { line += " \(result.reverted.count) put back because the check found a problem: " + result.reverted.prefix(3).joined(separator: "; ") + "." }

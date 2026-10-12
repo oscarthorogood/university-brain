@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The Manager's controls, in one dropdown at the top right of the Agents page: pause, scan, what it is doing, undo, what it looks for, which agents are on,
+/// The Manager's controls, in one dropdown at the top right of the Manager page: pause, scan, what it is doing, undo, what it looks for, which kinds of work are on,
 /// the background budget, quiet hours, and records.
 struct ManagerMenu: View {
     @Environment(Store.self) private var store
@@ -12,7 +12,7 @@ struct ManagerMenu: View {
         let _ = store.revision   // the menu reads UserDefaults, so it redraws when a setting changes
         let blocked = store.blockedReason()
         Menu {
-            Text(blocked ?? (store.activeJobs.first.map { "\(Agent.role($0.agent).name): \($0.title)" } ?? "Idle: looking for work"))
+            Text(blocked ?? (store.activeJobs.first.map { "\(Agent.Label($0.agent)): \($0.title)" } ?? "Idle: looking for work"))
             if store.pausedUntil == nil { Button("Pause the Manager", systemImage: "pause.fill") { store.pause(for: nil) } }
             else { Button("Resume the Manager", systemImage: "play.fill") { store.resume() } }
             Menu("Pause for…", systemImage: "clock") {
@@ -36,9 +36,9 @@ struct ManagerMenu: View {
                     }
                 }
             }
-            Menu("Agents", systemImage: "person.2") {
-                ForEach(Agent.roles + Agent.courseRoles) { r in
-                    Toggle(r.name + (store.agentFree(r.id) || !store.agentOn(r.id) ? "" : " (paused or at its daily limit)"), isOn: Binding(get: { store.agentOn(r.id) }, set: { store.setAgentOn(r.id, $0) }))
+            Menu("Kinds of work", systemImage: "square.stack") {
+                ForEach(Agent.roles) { r in
+                    Toggle(Agent.Label(r.id) + (store.agentFree(r.id) || !store.agentOn(r.id) ? "" : " (paused or at its daily limit)"), isOn: Binding(get: { store.agentOn(r.id) }, set: { store.setAgentOn(r.id, $0) }))
                 }
             }
             Divider()
@@ -63,11 +63,11 @@ struct ManagerMenu: View {
                 Picker("Until", selection: Binding(get: { store.quietTo }, set: { store.setQuiet(to: $0) })) { ForEach(0..<24, id: \.self) { Text(String(format: "%02d:00", $0)).tag($0) } }
             }
             Menu("Daily limits and usage", systemImage: "chart.bar") {
-                ForEach(store.usageByAgent(), id: \.agent) { u in Text("\(Agent.role(u.agent).name): \(u.today) of \(store.dailyCap(u.agent)) today · \(u.week) this week") }
+                ForEach(store.usageByAgent(), id: \.agent) { u in Text("\(Agent.Label(u.agent)): \(u.today) of \(store.dailyCap(u.agent)) today · \(u.week) this week") }
             }
             Divider()
             Button("Activity Log", systemImage: "list.bullet.rectangle") { showLog = true }
-            Button("Agent Roster", systemImage: "tablecells") { store.page = .note(Vault.root.appending(path: "Agents/Shared Agents/Agent Roster.md")) }
+            Button("What it does (roster)", systemImage: "tablecells") { store.page = .note(Vault.root.appending(path: "Agents/Shared Agents/Agent Roster.md")) }
             Button("The Manager’s own file", systemImage: "doc.text") { store.page = .note(Vault.root.appending(path: Agent.file(Agent.manager.id))) }
             SettingsLink { Text("Settings…") }
         } label: {

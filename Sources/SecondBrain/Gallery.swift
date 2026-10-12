@@ -187,7 +187,7 @@ private struct GalleryCard: View {
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
-        .animation(.easeOut(duration: 0.15), value: hover)
+        .animation(DS.Motion.hover, value: hover)
         .contextMenu { item.menu }
     }
 

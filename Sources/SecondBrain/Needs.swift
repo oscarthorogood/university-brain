@@ -69,32 +69,32 @@ extension Store {
     }
 }
 
+/// What the Manager can't do without you, from every kind of work, newest deadline first within each.
 struct NeedsCard: View {
     @Environment(Store.self) private var store
-    let code: String
     var body: some View {
-        let list = store.needs[code] ?? []
+        let list = Agent.roles.flatMap { r in (store.needs[r.id] ?? []).map { (r.id, $0) } }
         Card(title: "Needs You", trailing: list.isEmpty ? "" : "\(list.count)") {
             if list.isEmpty {
                 Label("Nothing waiting on you", systemImage: "checkmark.circle").font(.system(size: 13)).foregroundStyle(Color.ink2).padding(16)
             } else {
                 ScrollView {
                     VStack(spacing: 4) {
-                        ForEach(list) { need in
+                        ForEach(list, id: \.1.id) { mode, need in
                             Button {
-                                if let p = need.prompt { store.ask(code, p) } else if let o = need.open { store.page = o }
+                                if let p = need.prompt { store.ask(p) } else if let o = need.open { store.page = o }
                             } label: {
                                 HStack(spacing: 10) {
                                     Image(systemName: need.prompt == nil ? "exclamationmark.circle" : "sparkle").foregroundStyle(need.prompt == nil ? Color.warnFG : Color.ink2)
                                     VStack(alignment: .leading, spacing: 1) {
                                         Text(need.title).font(.system(size: 13)).lineLimit(1)
-                                        Text(need.sub).font(.system(size: 11)).foregroundStyle(Color.ink2).lineLimit(1)
+                                        Text(need.sub + " · " + Agent.label(mode)).font(.system(size: 11)).foregroundStyle(Color.ink2).lineLimit(1)
                                     }
                                     Spacer(minLength: 0)
                                     Image(systemName: need.prompt == nil ? "chevron.right" : "arrow.up").font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.ink2)
                                 }.padding(.horizontal, 10).padding(.vertical, 7).contentShape(.rect)
                             }
-                            .buttonStyle(.glassRow).disabled(need.prompt != nil && store.thinking.contains(code))
+                            .buttonStyle(.glassRow).disabled(need.prompt != nil && store.thinking.contains(Agent.manager.id))
                             .help(need.prompt ?? "Open")
                         }
                     }.padding(.horizontal, 6).padding(.bottom, 8)
@@ -121,7 +121,7 @@ struct ActivityLog: View {
                                 else { Image(systemName: "book.closed").frame(width: 24, height: 24).foregroundStyle(Color.ink2) }
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(a.text).font(.system(size: 13)).fixedSize(horizontal: false, vertical: true)
-                                    Text((Agent.all.first { $0.id == a.agent }?.name ?? "Vault log") + " · " + a.time.formatted(.relative(presentation: .named)))
+                                    Text((Agent.all.contains { $0.id == a.agent } ? (a.agent == Agent.manager.id ? Agent.manager.name : Agent.Label(a.agent)) : "Vault log") + " · " + a.time.formatted(.relative(presentation: .named)))
                                         .font(.system(size: 11)).foregroundStyle(Color.ink2)
                                     if let u = a.undo.flatMap(UUID.init(uuidString:)), store.canUndo(u) {
                                         Button("Undo") { store.undoJob(u) }.buttonStyle(.glassAction(.chip)).help("Put the note or files back as they were")
@@ -139,11 +139,11 @@ struct ActivityLog: View {
 extension Store {
     /// What a job in progress looks like in a bubble.
     func jobLine(_ item: InboxItem) -> String {
-        let who = Agent.role(item.agent).name
+        let what = Agent.label(item.agent)
         switch item.state {
-        case .consulting: return "Asking the course agent about “\(item.title)”."
-        case .checking: return "Checking \(who)’s work on “\(item.title)”."
-        default: return "\(who) is on “\(item.title)”."
+        case .consulting: return "Getting the course context for “\(item.title)”."
+        case .checking: return "Checking my \(what) on “\(item.title)”."
+        default: return "Working on “\(item.title)” (\(what))."
         }
     }
     /// What the Manager would tell you right now across all courses, and where each thing leads. Plain facts from the vault, so always true.
@@ -181,11 +181,11 @@ extension Store {
         }.map { (role: $0.0, need: $0.1) }
     }
 
-    /// What a course agent would say right now, in its own voice, and where each thing leads. Plain facts from the vault, so always true.
+    /// What the Manager would say right now about one course, and where each thing leads. Plain facts from the vault, so always true.
     func courseSays(_ c: String) -> [Say] {
         let mine = notes.filter { $0.course == c }
         var out: [Say] = []
-        for item in activeJobs where item.agent == c || item.paths.contains(where: { p in notes.first { Vault.rel($0.id) == p }?.course == c }) {
+        for item in activeJobs where item.paths.contains(where: { p in notes.first { Vault.rel($0.id) == p }?.course == c }) {
             out.append(Say(text: jobLine(item), go: .messages))
         }
         out += headsUps(course: c)
@@ -204,77 +204,17 @@ extension Store {
         if due > 0 { out.append(Say(text: "I’ve got \(due) reading\(due == 1 ? "" : "s") due this week.", go: .folder("Readings"))) }
         let find = mine.filter { $0.folder == "Readings" && $0.status == "To Find" }.count
         if find > 0 { out.append(Say(text: "\(find) reading\(find == 1 ? "" : "s") still need\(find == 1 ? "s" : "") a source.", go: .folder("Readings"))) }
-        for (role, n) in courseNeeds(c).prefix(2) { if let o = n.open { out.append(Say(text: "\(Agent.role(role).name): \(n.title)", go: o)) } }
+        for (role, n) in courseNeeds(c).prefix(2) { if let o = n.open { out.append(Say(text: "\(Agent.Label(role)): \(n.title)", go: o)) } }
         return out.isEmpty ? [Say(text: "All quiet here.", go: nil)] : out
     }
 }
 
-/// One thing an agent says, and where clicking it goes.
+/// One thing the Manager says, and where clicking it goes.
 struct Say: Equatable {
     let text: String; var go: Page? = nil
     var gotIt: String? = nil       // a free heads-up: "got it" hides it for a day
     var askRole: String? = nil     // clicking it asks this agent…
     var askPrompt: String? = nil   // …this
-}
-
-/// A speech bubble: types (…), says one insight, then moves on to the next.
-struct SayBubble: View {
-    let lines: [Say]; let delay: Double; var tail = BubbleShape.Tail.left; var align = Alignment.leading; var open: (Page) -> Void = { _ in }
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(Store.self) private var store
-    @State private var index = 0
-    @State private var typing = true
-    /// The line on show; nil only when there is nothing to say (`index % 0` would crash).
-    private var line: Say? { lines.isEmpty ? nil : lines[index % lines.count] }
-    private func activate() {
-        guard let l = line else { return }
-        if let role = l.askRole, let prompt = l.askPrompt { open(.agent(role)); store.ask(role, prompt); if let k = l.gotIt { store.gotIt(k) } }
-        else if let go = l.go { open(go) }
-    }
-    var body: some View {
-        if let line { bubble(line) }
-    }
-    private func bubble(_ line: Say) -> some View {
-        HStack(spacing: 0) {
-            ZStack {
-                if typing && !reduceMotion { TypingDots().transition(.opacity) }
-                else {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(line.text).font(.system(size: 11)).multilineTextAlignment(.leading).lineLimit(4)
-                        if let key = line.gotIt {
-                            Button { store.gotIt(key) } label: { Text("Got it").font(.system(size: 10, weight: .semibold)) }
-                                .buttonStyle(.glassAction(.chip)).accessibilityLabel("Got it")
-                        }
-                    }
-                    .id(index).transition(.asymmetric(insertion: .scale(scale: 0.8).combined(with: .opacity), removal: .opacity))
-                }
-            }
-            .padding(.leading, tail == .left ? 18 : 12).padding(.trailing, tail == .right ? 18 : 12).padding(.top, 8).padding(.bottom, tail == .bottom ? 18 : 8)
-            .frame(minWidth: 44, minHeight: 32, alignment: .leading)
-            .glassEffect(.regular, in: BubbleShape(tail: tail, radius: DS.Radius.row, tailAt: tail == .bottom ? (align == .trailing ? 0.86 : 0.14) : nil))
-            .contentShape(Rectangle())
-            .onTapGesture(perform: activate)
-        }
-        .frame(maxWidth: .infinity, alignment: align)
-        // VoiceOver: one element that reads the line and does what a click does; "Got it" stays reachable as a named action
-        .accessibilityElement(children: .ignore).accessibilityLabel(line.text)
-        .accessibilityAddTraits(line.go != nil || line.askPrompt != nil ? .isButton : [])
-        .accessibilityAction { activate() }
-        .accessibilityActions { if let k = line.gotIt { Button("Got it") { store.gotIt(k) } } }
-        .task(id: lines) {
-            index = 0
-            if reduceMotion { typing = false; return }
-            try? await Task.sleep(for: .seconds(0.6 + delay))
-            while !Task.isCancelled {
-                withAnimation(.easeOut(duration: 0.2)) { typing = true }
-                try? await Task.sleep(for: .seconds(1.1))
-                withAnimation(.spring(duration: 0.4, bounce: 0.35)) { typing = false }
-                try? await Task.sleep(for: .seconds(6))
-                guard lines.count > 1 else { return }
-                index += 1
-            }
-        }
-    }
 }
 
 struct TypingDots: View {

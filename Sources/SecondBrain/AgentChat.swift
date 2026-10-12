@@ -1,12 +1,11 @@
 import SwiftUI
 
-/// The conversation with one agent: messages, a busy indicator and the box to type in. Used on the agent's page.
+/// The conversation with the agent: messages, a busy indicator and the box to type in. Used on the agent's page.
 struct AgentChatCard: View {
     @Environment(Store.self) private var store
-    let code: String
-    var suggest = false          // while the chat is empty, offer the agent's example questions
     @State private var draft = ""
-    var role: Agent.Role { Agent.role(code) }
+    private let code = Agent.manager.id
+    var role: Agent.Role { Agent.manager }
     var body: some View {
         let messages = store.chats[code] ?? []
         let busy = store.thinking.contains(code)
@@ -15,20 +14,8 @@ struct AgentChatCard: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         if messages.isEmpty {
-                            Text(code == Agent.manager.id ? "Tell me what you need. I pick the agent and how much effort it deserves, on your Mac for free, say why, then hand it over. Any agent can read your whole vault and change your notes when you ask; one that can’t do a request hands it back to me, and I pick another."
-                                 : role.course != nil ? "Ask \(role.name) anything about \(role.job.replacingOccurrences(of: "Course agent · ", with: "")). It reads your notes and changes them when you ask."
-                                 : "\(role.name) \(role.job.prefix(1).lowercased() + role.job.dropFirst()). It reads your whole vault and edits your notes when you ask\(Agent.deliverables(role.id).isEmpty ? "" : ", and makes new study notes")\(role.id == "researcher" ? " and research briefs" : ""); if it can’t do something it hands it to the Manager.")
+                            Text("Tell me what you need. I choose the kind of work and how much effort it deserves (on your Mac, for free), say which, and do it. I can read your whole vault and change your notes when you ask; every change is checked and has an Undo.")
                                 .font(.system(size: 13)).foregroundStyle(Color.ink2).padding(.top, 8)
-                            if suggest {
-                                VStack(spacing: 6) {
-                                    ForEach(role.actions, id: \.self) { a in
-                                        Button { store.ask(code, a) } label: {
-                                            HStack(spacing: 8) { Image(systemName: "sparkle"); Text(a).multilineTextAlignment(.leading); Spacer(minLength: 0) }
-                                                .font(.system(size: 12)).padding(.horizontal, 10).padding(.vertical, 7)
-                                        }.buttonStyle(.glassRow).disabled(busy)
-                                    }
-                                }
-                            }
                         }
                         // found once for the whole list; checking the messages after each one made every redraw quadratic in the length of the chat
                         let lastMineAt = messages.lastIndex { !$0.fromAgent }, lastAnswerAt = messages.lastIndex { $0.fromAgent && !$0.text.hasPrefix("→") }   // a routing note isn't an answer
@@ -61,17 +48,17 @@ struct AgentChatCard: View {
             HStack(spacing: 8) {
                 // "+": the agent's example requests, a tap away (Messages' + opens attachments)
                 Menu {
-                    ForEach(role.actions, id: \.self) { a in Button(a) { store.ask(code, a) } }
+                    ForEach(role.actions, id: \.self) { a in Button(a) { store.ask(a) } }
                 } label: {
                     Image(systemName: "plus").font(.system(size: 13, weight: .semibold)).foregroundStyle(Color.ink2).frame(width: 30, height: 30).glassEffect(.regular.interactive(), in: .circle)
-                }.menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize().disabled(busy).help("Things to ask \(role.name)").accessibilityLabel("Ask something")
+                }.menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize().disabled(busy).help("Things to ask").accessibilityLabel("Ask something")
                 HStack(spacing: 8) {
-                    TextField(code == Agent.manager.id ? "Message the Manager" : "Message", text: $draft, axis: .vertical).textFieldStyle(.plain).lineLimit(1...4).onSubmit { send() }
+                    TextField("Message the Manager", text: $draft, axis: .vertical).textFieldStyle(.plain).lineLimit(1...4).onSubmit { send() }
                     let ready = !busy && !draft.trimmingCharacters(in: .whitespaces).isEmpty
                     if busy {
                         Button { store.stopChat(code) } label: {
                             Image(systemName: "stop.fill").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white).frame(width: 24, height: 24).background(Color.ink2, in: .circle)
-                        }.buttonStyle(.plain).help("Stop \(role.name)").accessibilityLabel("Stop")
+                        }.buttonStyle(.plain).help("Stop").accessibilityLabel("Stop")
                     } else if ready {
                         Button(action: send) {
                             Image(systemName: "arrow.up").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.white).frame(width: 24, height: 24).background(IM.blue, in: .circle)
@@ -84,12 +71,12 @@ struct AgentChatCard: View {
             .padding(.horizontal, 12).padding(.bottom, 12).padding(.top, 4)
         }
     }
-    /// Under your latest message, like Messages: "Read 13:06" once an agent has answered, "Delivered" while it works.
+    /// Under your latest message, like Messages: "Read 13:06" once it has answered, "Delivered" while it works.
     private func receipt(after i: Int, in messages: [Message], replied: Bool, busy: Bool) -> String? {
         if replied, let at = messages[(i + 1)...].first(where: { $0.fromAgent && !$0.text.hasPrefix("→") })?.time {
             return "**Read** " + at.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
         }
         return busy ? "**Delivered**" : nil
     }
-    func send() { store.ask(code, draft); draft = "" }
+    func send() { store.ask(draft); draft = "" }
 }

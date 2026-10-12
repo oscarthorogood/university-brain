@@ -45,7 +45,7 @@ extension Store {
         switch p {
         case .newTab: ("New Tab", "plus.square.dashed")
         case .overview: ("Home", "house")
-        case .messages: ("Messages", "message")
+        case .messages: ("Manager", "message")
         case .inbox, .sortNow: ("Unsorted", "tray")
         case .week: ("Week", "chart.bar")
         case .month: ("Month", "calendar")
@@ -54,7 +54,7 @@ extension Store {
         case .folder(let f): (SideNav.label(f), SideNav.folders.first { $0.name == f }?.icon ?? "folder")
         case .unsorted(let u): (Vault.label(u), "tray")
         case .search: ("Search", "magnifyingglass")
-        case .agent(let id): (Agent.role(id).name, "sparkles")
+        case .agent: ("Manager", "sparkles")
         case .note(let u): (notes.first { $0.id == u }?.display ?? u.deletingPathExtension().lastPathComponent, "doc.text")
         case .file(let u): (u.deletingPathExtension().lastPathComponent, "doc.richtext")
         case .tags: ("Tags", "number")
@@ -139,7 +139,7 @@ private struct ChromeButton: View {
                 .background(Capsule().fill(Color.ink.opacity(on ? 0.1 : hover ? 0.06 : 0)))
         }
         .buttonStyle(.plain).onHover { hover = $0 }
-        .animation(.easeOut(duration: 0.12), value: hover)
+        .animation(DS.Motion.hover, value: hover)
         .help(help).accessibilityLabel(help)
     }
 }
@@ -264,6 +264,6 @@ private struct NewTabCard: View {
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
-        .animation(.easeOut(duration: 0.15), value: hover)
+        .animation(DS.Motion.hover, value: hover)
     }
 }

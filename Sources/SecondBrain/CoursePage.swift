@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A course page: lectures and tutorials in the top half beside the course agent's stage; below, the week-by-week outline,
+/// A course page: lectures and tutorials in the top half beside what the Manager has to say; below, the week-by-week outline,
 /// a map of how the course's notes relate, and the assessment timeline.
 struct CoursePage: View {
     @Environment(Store.self) private var store
@@ -21,7 +21,7 @@ struct CoursePage: View {
             GeometryReader { g in
                 let lecturesCard = Card(title: "Lectures", trailing: "\(lectures.filter(\.done).count)/\(lectures.count)") { ClassList(notes: lectures, empty: "No lectures") }
                 let tutorialsCard = Card(title: "Tutorials", trailing: "\(tutorials.filter(\.done).count)/\(tutorials.count)") { ClassList(notes: tutorials, empty: "No tutorials") }
-                let stage = Card { AgentStage(id: code, says: store.courseSays(code)) }
+                let stage = Card { AgentSays(says: store.courseSays(code), chat: false) }
                 if mainWidth >= 840 && g.size.height >= 540 {
                     let half = (g.size.height - 12) / 2, w = g.size.width
                     VStack(spacing: 12) {
@@ -61,7 +61,7 @@ struct ClassList: View {
                     if let next { label("Up next"); NoteRow(note: next).background(Color.ink.opacity(0.04), in: .rect(cornerRadius: DS.Radius.row)).padding(.horizontal, 6) }
                     if todo.count > 1 { label("Later"); ForEach(todo.dropFirst()) { NoteRow(note: $0) } }
                     if !done.isEmpty {
-                        Button { withAnimation(.snappy) { showDone.toggle() } } label: {
+                        Button { withAnimation(DS.Motion.move) { showDone.toggle() } } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold)).rotationEffect(.degrees(showDone ? 90 : 0))
                                 Text("Done · \(done.count)").font(.system(size: 11, weight: .semibold))
@@ -143,7 +143,7 @@ struct CourseOutline: View {
                     NoteList(notes: reads, empty: "No readings set")
                 } else {
                     VStack(spacing: 0) {
-                        NoteList(notes: revision.sorted { $0.title < $1.title }, empty: "No MCQs, flashcards or exams yet. Ask the course agent for MCQs.")
+                        NoteList(notes: revision.sorted { $0.title < $1.title }, empty: "No MCQs, flashcards or exams yet. Ask the Manager for MCQs.")
                         Button { store.filter = code; store.page = .folder("MCQ") } label: { Label("Open Study", systemImage: "arrow.right") }
                             .buttonStyle(.glassRow).padding(8)
                     }
@@ -159,7 +159,7 @@ struct CourseOutline: View {
         switch n.folder { case "Lectures": "play.rectangle"; case "Tutorials": "person.2"; case "Essays": "doc.text"; default: "flag" }
     }
     private func tabButton(_ title: String, _ i: Int) -> some View {
-        Button { withAnimation(.snappy) { tab = i } } label: {
+        Button { withAnimation(DS.Motion.move) { tab = i } } label: {
             Text(title).font(.system(size: 12, weight: tab == i ? .semibold : .regular)).foregroundStyle(tab == i ? Color.ink : Color.ink2).lineLimit(1).fixedSize()
         }.buttonStyle(.plain)
     }

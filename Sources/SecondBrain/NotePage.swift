@@ -429,7 +429,7 @@ struct NotePage: View {
         }
     }
     var infoButton: some View {
-        Button { withAnimation(.snappy(duration: 0.25)) { showInspector.toggle() } } label: { Image(systemName: "info.circle").font(.system(size: 15)) }
+        Button { withAnimation(DS.Motion.move) { showInspector.toggle() } } label: { Image(systemName: "info.circle").font(.system(size: 15)) }
             .buttonStyle(.glassIcon(prominent: showInspector)).help("Inspector: contents, tasks, attachments, find, properties, agent").accessibilityLabel("Inspector")
     }
     @ViewBuilder var toolbarTrailing: some View {
@@ -557,7 +557,7 @@ struct NotePage: View {
         if let note {
                         Card {
                             VStack(spacing: 0) {
-                                AgentStage(id: note.course ?? Agent.manager.id, says: store.noteSays(note), chat: false).frame(height: 340)
+                                AgentSays(says: store.noteSays(note), chat: false).frame(height: 340)
                                 if let w = AgentWork.forNote(note) {
                                     Button { work = w } label: {
                                         HStack(spacing: 8) { AgentPortrait(id: w.role, size: 20); Text(w.label).fontWeight(.medium); Spacer() }

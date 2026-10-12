@@ -113,7 +113,7 @@ extension Store {
             .filter { $0.id != note.id && Self.itemFolders.contains($0.folder) && seen.insert($0.id).inserted }
     }
 
-    /// What the course agent has to say about one note, worked out from the note itself.
+    /// What the Manager has to say about one note, worked out from the note itself.
     func noteSays(_ n: Note) -> [Say] {
         let text = (try? String(contentsOf: n.id, encoding: .utf8)) ?? "", fm = Vault.frontmatter(text), body = Vault.body(text)
         func tidy(_ s: String, _ cap: Int = 90) -> String {

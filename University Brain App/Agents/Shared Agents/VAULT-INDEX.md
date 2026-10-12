@@ -33,7 +33,7 @@ Note folders sit under `Items/` (work), `Files/` (Zotero, Resources, OneDrive, S
 | `Templates/Human/` | Templates Oscar fills by hand (Unsorted Notes) | 1 | — |
 | `Templates/Guides/` | Naming Conventions, TaskNotes Guide | 2 | — |
 | `Unsorted/` | Intake tray for raw captures — cleared daily by a routine | — | — |
-| `Agents/` | `Shared Agents/` (agent instructions, this index, decision log, open items, `verify-vault.py`); then `Course Agents/` (`MSOA/`, `Strategy/`, `TEM/`) and `Helper Agents/` (`Sorter/`, `Scribe/`, `Librarian/` (reading lists and notes, `Ellevenread/`), `Planner/` (`Calendar Sync.md`, `Learn.md`), `Tutor/`, `Writer/`, `Researcher/`, `Analyst/`), and `Manager Agent/` (the Manager's instructions file; it sits outside both groups), one folder per agent, each starting with its own instructions file (`{Name} agent.md`) | — | — |
+| `Agents/` | `Shared Agents/` (agent instructions, this index, decision log, open items, `verify-vault.py`); then `Course Agents/` (`MSOA/`, `Strategy/`, `TEM/`: each a course's `Course briefing.md`) and `Helper Agents/` (the working folders of the kinds of work: `Sorter/`, `Scribe/`, `Librarian/` (reading lists and notes, `Ellevenread/`), `Planner/` (`Calendar Sync.md`, `Learn.md`), `Tutor/`, `Writer/`, `Researcher/`, `Analyst/`), and `Manager Agent/` (the one agent: `Manager agent.md`, its instructions with a section for each kind of work, and `Learned rules.md`) | — | — |
 | `Files/Resources/` | Finished reference **files**, by course and type (16 course folders) | — | — |
 | `Files/OneDrive/` | Active working **files**, by course and note type (12 course folders) | — | — |
 

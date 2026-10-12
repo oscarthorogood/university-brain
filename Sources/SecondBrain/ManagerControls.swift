@@ -1,7 +1,7 @@
 import SwiftUI
 import IOKit.ps
 
-/// Everything the Manager menu switches: pausing, quiet hours, the background budget, which jobs and agents are on, daily caps, and the loop breaker.
+/// Everything the Manager menu switches: pausing, quiet hours, the background budget, which jobs and kinds of work are on, daily caps, and the loop breaker.
 extension Store {
     /// The jobs and checks the Manager looks for, each with a switch.
     nonisolated static let jobKinds: [(id: String, title: String, group: String)] = [
@@ -72,25 +72,25 @@ extension Store {
     private func dayKey(_ agent: String) -> String { "jobsToday-\(agent)-" + Date.now.formatted(.iso8601.year().month().day()) }
     func jobsToday(_ agent: String) -> Int { d.integer(forKey: dayKey(agent)) }
     func spendJob(_ agent: String) { d.set(jobsToday(agent) + 1, forKey: dayKey(agent)) }
-    /// Whether this agent can take another job now: switched on, under its daily cap, and not paused by the breaker.
+    /// Whether this kind of work can take another job now: switched on, under its daily cap, and not paused by the breaker.
     func agentFree(_ agent: String) -> Bool {
         agentOn(agent) && jobsToday(agent) < dailyCap(agent) && ((d.object(forKey: "breaker-\(agent)") as? Date) ?? .distantPast) < .now
     }
-    /// Three failed reviews in a row pause that agent for a day.
+    /// Three failed reviews in a row pause that kind of work for a day.
     func recordReview(_ agent: String, passed: Bool) {
         let k = "rejects-\(agent)", n = passed ? 0 : d.integer(forKey: k) + 1
         d.set(n, forKey: k)
-        if n >= 3 { d.set(Date.now.addingTimeInterval(86400), forKey: "breaker-\(agent)"); d.set(0, forKey: k); log(Agent.manager.id, "\(Agent.role(agent).name) failed my review three times in a row, so I'm pausing its jobs for a day.") }
+        if n >= 3 { d.set(Date.now.addingTimeInterval(86400), forKey: "breaker-\(agent)"); d.set(0, forKey: k); log(Agent.manager.id, "My \(Agent.label(agent)) work failed my review three times in a row, so I'm pausing that kind of job for a day.") }
     }
-    /// The same agent isn't put on the same note again for six hours, whatever happened.
+    /// The same kind of work isn't put on the same note again for six hours, whatever happened.
     func cooling(_ role: String, _ path: String) -> Bool { ((d.object(forKey: "cool-\(role)|\(path)") as? Date) ?? .distantPast) > .now }
     func startCooling(_ role: String, _ path: String, hours: Double = 6) { d.set(Date.now.addingTimeInterval(hours * 3600), forKey: "cool-\(role)|\(path)") }
-    /// Until when the loop breaker has this agent paused, or nil when it isn't.
+    /// Until when the loop breaker has this kind of work paused, or nil when it isn't.
     func breakerUntil(_ agent: String) -> Date? {
         guard let until = d.object(forKey: "breaker-\(agent)") as? Date, until > .now else { return nil }
         return until
     }
-    /// Lets a paused agent work again now: clears the pause, its run of failed reviews and the six-hour wait on the notes it was given.
+    /// Lets a paused kind of work start again now: clears the pause, its run of failed reviews and the six-hour wait on the notes it was given.
     func resume(_ agent: String) {
         d.removeObject(forKey: "breaker-\(agent)"); d.set(0, forKey: "rejects-\(agent)")
         for k in d.dictionaryRepresentation().keys where k.hasPrefix("cool-\(agent)|") || k.hasPrefix("refused-work:\(agent):") { d.removeObject(forKey: k) }
@@ -98,7 +98,7 @@ extension Store {
         inbox.removeAll { $0.agent == agent && $0.kind == .work && $0.state == .failed }; saveInbox()
         handled = handled.filter { !$0.hasPrefix("work:\(agent):") }
         d.set(Array(handled), forKey: "autopilotHandled")
-        log(Agent.manager.id, "\(Agent.role(agent).name) can take jobs again: you resumed it.")
+        log(Agent.manager.id, "\(Agent.Label(agent)) jobs can start again: you resumed them.")
         revision += 1
     }
     /// A note you changed in the last five minutes, or have open, is left alone.
@@ -108,7 +108,7 @@ extension Store {
         return m > .now.addingTimeInterval(-300)
     }
 
-    /// Jobs used per agent this week, for the menu.
+    /// Jobs used per kind of work this week, for the menu.
     func usageByAgent() -> [(agent: String, today: Int, week: Int)] {
         (Agent.roles).map { r in
             let week = (0..<7).reduce(0) { acc, i in
