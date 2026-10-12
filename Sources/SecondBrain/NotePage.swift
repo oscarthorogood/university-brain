@@ -314,7 +314,7 @@ struct NotePage: View {
                                 Rectangle().fill(Color.line.opacity(0.6)).frame(height: 1).padding(.vertical, 6)
                                 if !liveEdit { readView }
                                 else {
-                                    MarkdownEditor(text: Binding(get: { NoteText.body(text) }, set: { text = NoteText.front(text) + $0 }), controller: editor)
+                                    MarkdownEditor(text: $text, controller: editor)
                                         .overlay(alignment: .topLeading) {
                                             if NoteText.body(text).isEmpty { Text("Start writing…").font(.system(size: 15)).foregroundStyle(Color.ink2.opacity(0.6)).padding(.top, 4).allowsHitTesting(false) }
                                         }
@@ -356,6 +356,7 @@ struct NotePage: View {
         }
         .sheet(item: $work) { AgentWorkSheet(work: $0, note: url).environment(store) }
         .task(id: url) { load() }
+        .onAppear { editor.openLink = { follow($0) } }
         .onChange(of: text) {
             guard text != saved else { return }
             pending?.cancel()
@@ -645,6 +646,15 @@ struct NotePage: View {
             }.frame(maxHeight: 260)
             if !versions.isEmpty { Text("Restore puts it in the editor. Save to keep it; your current text is kept in history too.").font(.caption).foregroundStyle(Color.ink2).frame(width: 240, alignment: .leading) }
         }.padding(14).frame(width: 268)
+    }
+    /// Command-click on a link in the text: a web address opens in the browser, anything else is a note or file in the vault.
+    func follow(_ target: String) {
+        let t = target.trimmingCharacters(in: .whitespaces)
+        if let u = URL(string: t), let scheme = u.scheme?.lowercased(), ["http", "https", "mailto"].contains(scheme) { NSWorkspace.shared.open(u); return }
+        var name = t.removingPercentEncoding ?? t
+        if let hash = name.firstIndex(of: "#") { name = String(name[..<hash]) }      // [[Note#Heading]] opens Note
+        if name.hasSuffix(".md") { name.removeLast(3) }
+        if !name.isEmpty { store.openTarget(name) }
     }
     func open(_ value: String, isFile: Bool) {
         if isFile || value.contains(".") && !value.hasSuffix(".md") {
