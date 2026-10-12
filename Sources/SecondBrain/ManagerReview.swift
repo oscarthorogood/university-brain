@@ -89,6 +89,15 @@ enum Review {
         }
         return out
     }
+    /// Every Markdown file under the given vault folders. A plain function, because a directory walk can't be iterated from async code.
+    static func markdown(under tops: [String], root: URL) -> [URL] {
+        var out: [URL] = []
+        for top in tops {
+            guard let walk = FileManager.default.enumerator(at: root.appending(path: top), includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) else { continue }
+            for case let u as URL in walk where u.pathExtension == "md" { out.append(u) }
+        }
+        return out
+    }
     /// `touched`, off the main thread: it walks the whole vault.
     static func touchedInBackground(since: Date, root: URL) async -> [String] {
         await Task.detached { touched(since: since, root: root) }.value

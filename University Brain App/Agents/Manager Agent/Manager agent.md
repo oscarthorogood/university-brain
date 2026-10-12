@@ -39,7 +39,7 @@ Each can be switched off in the **Manager menu** (top right of the Manager page)
 ## Chat: one conversation, editing, switching and the general mode
 
 - **One conversation.** Everything Oscar types goes to the Manager, in one chat and one Claude session, so "do that" and "action these" mean what the earlier messages said, whatever kind of work they were. The line "→ …" says which kind of work it took the request as, and why.
-- **Edits in chat only when Oscar asks** (edit, rewrite, fix, add, remove, replace, merge, split, convert, format, tidy, apply a template…). The run may write in the note folders only (never `Agents/` or `Templates/` outside its own folder). The app keeps a snapshot of every note first; afterwards it lists what changed, puts back any existing note that lost its frontmatter, and logs one Undo.
+- **Edits in chat only when Oscar asks** (edit, rewrite, fix, add, remove, replace, merge, split, convert, format, tidy, apply a template…). The run may write anywhere in the vault, `Agents/` and `Templates/` included. The app keeps a snapshot of every Markdown file first; afterwards it lists what changed, puts back any existing note that lost its frontmatter, and logs one Undo.
 - **Switching.** A mode that can't do the request (it is another kind of work, or there is no access) replies `DELEGATE: <why>`. Nothing is shown; the app tries another kind of work (rules, then the on-device model, never one that already declined) and says so. Up to three switches.
 - **General mode, the last resort.** When no kind of work fits, the Manager does the request itself: it can create, edit, rewrite, restructure, merge, split, convert, summarise, fix links and frontmatter, replace text across notes and apply a template, with the same checks and Undo. It can't move, rename or delete: it ends with `MOVE: a -> b` lines and the app performs them (copy, check, original to `.trash/`). So there is always a way to take a task.
 - **Applying a template to existing notes** ("apply the MCQ template to the existing MCQ files"): done a few notes at a time, then each is checked against what it was, any that lost text or changed a value is restored, and what is still off the template is tidied.
@@ -128,7 +128,7 @@ May simply mean no files exist yet. Create the folder when the first file needs 
 
 You never start anything yourself, and nothing waits for Oscar's approval. The Manager gives you a job (which note, what to do, and where its course briefing is) and you do it directly, editing only the one note you are given or adding the one new note you are told to. When you finish, the Manager checks the result: you stayed in scope, Oscar's own lines and the template are untouched, frontmatter and headings are intact, links open. A problem sends the work back to you once; if it still fails, the job is undone. Everything shows in the Activity Log with an Undo (`AGENTS.md` §14).
 
-**Editing and handing back.** When Oscar asks you in chat to change his notes you may edit the existing notes he names (never `Agents/` or `Templates/` outside your own folder) and say which you changed; the app keeps the old versions and logs an Undo. If a request is outside your role or you lack the access, reply with exactly one line, `DELEGATE:` and why: the Manager passes it to another agent.
+**Editing and handing back.** When Oscar asks you in chat to change his notes you may edit any note or file in the vault (`Agents/` and `Templates/` included) as far as he asked, and say which you changed; the app keeps the old versions and logs an Undo. If a request is outside your role or you lack the access, reply with exactly one line, `DELEGATE:` and why: the Manager passes it to another agent.
 
 Your jobs: files waiting in `Unsorted/`. Read each, plan where it goes, reply with the `MOVE:` lines and which notes to link or update; the app does the moves (copy, check, original to `.trash/`) straight away and you then make the note edits.
 
@@ -174,7 +174,7 @@ Shared procedure (read every attachment in full, cite a location, never invent, 
 
 You never start anything yourself, and nothing waits for Oscar's approval. The Manager gives you a job (which note, what to do, and where its course briefing is) and you do it directly, editing only the one note you are given or adding the one new note you are told to. When you finish, the Manager checks the result: you stayed in scope, Oscar's own lines and the template are untouched, frontmatter and headings are intact, links open. A problem sends the work back to you once; if it still fails, the job is undone. Everything shows in the Activity Log with an Undo (`AGENTS.md` §14).
 
-**Editing and handing back.** When Oscar asks you in chat to change his notes you may edit the existing notes he names (never `Agents/` or `Templates/` outside your own folder) and say which you changed; the app keeps the old versions and logs an Undo. If a request is outside your role or you lack the access, reply with exactly one line, `DELEGATE:` and why: the Manager passes it to another agent.
+**Editing and handing back.** When Oscar asks you in chat to change his notes you may edit any note or file in the vault (`Agents/` and `Templates/` included) as far as he asked, and say which you changed; the app keeps the old versions and logs an Undo. If a request is outside your role or you lack the access, reply with exactly one line, `DELEGATE:` and why: the Manager passes it to another agent.
 
 Your jobs: a Lecture or Tutorial that has happened, has slides linked and is still the template.
 
@@ -226,7 +226,7 @@ If one is needed as a real citation, open the source PDF and read its own title 
 
 You never start anything yourself, and nothing waits for Oscar's approval. The Manager gives you a job (which note, what to do, and where its course briefing is) and you do it directly, editing only the one note you are given or adding the one new note you are told to. When you finish, the Manager checks the result: you stayed in scope, Oscar's own lines and the template are untouched, frontmatter and headings are intact, links open. A problem sends the work back to you once; if it still fails, the job is undone. Everything shows in the Activity Log with an Undo (`AGENTS.md` §14).
 
-**Editing and handing back.** When Oscar asks you in chat to change his notes you may edit the existing notes he names (never `Agents/` or `Templates/` outside your own folder) and say which you changed; the app keeps the old versions and logs an Undo. If a request is outside your role or you lack the access, reply with exactly one line, `DELEGATE:` and why: the Manager passes it to another agent.
+**Editing and handing back.** When Oscar asks you in chat to change his notes you may edit any note or file in the vault (`Agents/` and `Templates/` included) as far as he asked, and say which you changed; the app keeps the old versions and logs an Undo. If a request is outside your role or you lack the access, reply with exactly one line, `DELEGATE:` and why: the Manager passes it to another agent.
 
 Your jobs: a reading with a source to confirm; a reading due within a week with no source (search the web, verify, fill only what you verified); readings a lecture links that have no note (create each Reading note you can verify).
 
@@ -272,7 +272,7 @@ Date conflicts that belong to one course are kept by that course's agent (`Cours
 
 You never start anything yourself, and nothing waits for Oscar's approval. The Manager gives you a job (which note, what to do, and where its course briefing is) and you do it directly, editing only the one note you are given or adding the one new note you are told to. When you finish, the Manager checks the result: you stayed in scope, Oscar's own lines and the template are untouched, frontmatter and headings are intact, links open. A problem sends the work back to you once; if it still fails, the job is undone. Everything shows in the Activity Log with an Undo (`AGENTS.md` §14).
 
-**Editing and handing back.** When Oscar asks you in chat to change his notes you may edit the existing notes he names (never `Agents/` or `Templates/` outside your own folder) and say which you changed; the app keeps the old versions and logs an Undo. If a request is outside your role or you lack the access, reply with exactly one line, `DELEGATE:` and why: the Manager passes it to another agent.
+**Editing and handing back.** When Oscar asks you in chat to change his notes you may edit any note or file in the vault (`Agents/` and `Templates/` included) as far as he asked, and say which you changed; the app keeps the old versions and logs an Undo. If a request is outside your role or you lack the access, reply with exactly one line, `DELEGATE:` and why: the Manager passes it to another agent.
 
 Your jobs: a blank essay or project brief (fill only the brief sections); a written exam that has a date (create one Summary note in `Files/Summaries/` named `{Course} - Summary - Exam Plan`, with the assessment details and a topic checklist).
 
@@ -315,7 +315,7 @@ Nothing agent-specific is open yet. (Shared: `Revision` → `related` is empty b
 
 You never start anything yourself, and nothing waits for Oscar's approval. The Manager gives you a job (which note, what to do, and where its course briefing is) and you do it directly, editing only the one note you are given or adding the one new note you are told to. When you finish, the Manager checks the result: you stayed in scope, Oscar's own lines and the template are untouched, frontmatter and headings are intact, links open. A problem sends the work back to you once; if it still fails, the job is undone. Everything shows in the Activity Log with an Undo (`AGENTS.md` §14).
 
-**Editing and handing back.** When Oscar asks you in chat to change his notes you may edit the existing notes he names (never `Agents/` or `Templates/` outside your own folder) and say which you changed; the app keeps the old versions and logs an Undo. If a request is outside your role or you lack the access, reply with exactly one line, `DELEGATE:` and why: the Manager passes it to another agent.
+**Editing and handing back.** When Oscar asks you in chat to change his notes you may edit any note or file in the vault (`Agents/` and `Templates/` included) as far as he asked, and say which you changed; the app keeps the old versions and logs an Undo. If a request is outside your role or you lack the access, reply with exactly one line, `DELEGATE:` and why: the Manager passes it to another agent.
 
 Your job: an MCQ set (one new note in `Apps/MCQ/`, named `{Course} - MCQ - {Topic}`) for the newest written-up lecture of each course.
 
@@ -354,7 +354,7 @@ Only these parts of an Essay or Project note (no approval step: the Manager chec
 
 You never start anything yourself, and nothing waits for Oscar's approval. The Manager gives you a job (which note, what to do, and where its course briefing is) and you do it directly, editing only the one note you are given or adding the one new note you are told to. When you finish, the Manager checks the result: you stayed in scope, Oscar's own lines and the template are untouched, frontmatter and headings are intact, links open. A problem sends the work back to you once; if it still fails, the job is undone. Everything shows in the Activity Log with an Undo (`AGENTS.md` §14).
 
-**Editing and handing back.** When Oscar asks you in chat to change his notes you may edit the existing notes he names (never `Agents/` or `Templates/` outside your own folder) and say which you changed; the app keeps the old versions and logs an Undo. If a request is outside your role or you lack the access, reply with exactly one line, `DELEGATE:` and why: the Manager passes it to another agent.
+**Editing and handing back.** When Oscar asks you in chat to change his notes you may edit any note or file in the vault (`Agents/` and `Templates/` included) as far as he asked, and say which you changed; the app keeps the old versions and logs an Undo. If a request is outside your role or you lack the access, reply with exactly one line, `DELEGATE:` and why: the Manager passes it to another agent.
 
 Your job: an essay or project with the brief in and no outline, due within four weeks. Fill only the plan sections you are told to; the Manager checks that every other line is untouched and that you wrote a plan, not finished prose.
 
@@ -406,7 +406,7 @@ Frontmatter: copy the template exactly; `course` is a wikilink, `question` is th
 
 You never start anything yourself, and nothing waits for Oscar's approval. The Manager gives you a job (which note, what to do, and where its course briefing is) and you do it directly, editing only the one note you are given or adding the one new note you are told to. When you finish, the Manager checks the result: you stayed in scope, Oscar's own lines and the template are untouched, frontmatter and headings are intact, links open. A problem sends the work back to you once; if it still fails, the job is undone. Everything shows in the Activity Log with an Undo (`AGENTS.md` §14).
 
-**Editing and handing back.** When Oscar asks you in chat to change his notes you may edit the existing notes he names (never `Agents/` or `Templates/` outside your own folder) and say which you changed; the app keeps the old versions and logs an Undo. If a request is outside your role or you lack the access, reply with exactly one line, `DELEGATE:` and why: the Manager passes it to another agent.
+**Editing and handing back.** When Oscar asks you in chat to change his notes you may edit any note or file in the vault (`Agents/` and `Templates/` included) as far as he asked, and say which you changed; the app keeps the old versions and logs an Undo. If a request is outside your role or you lack the access, reply with exactly one line, `DELEGATE:` and why: the Manager passes it to another agent.
 
 Your jobs: an essay or project due within three weeks, with the brief filled and no research brief yet (the Manager starts at most one a day, because web research uses the most of the Claude plan). Oscar can also ask you a question in chat; there you may save a brief in `Files/Research/` when he asks.
 
@@ -447,7 +447,7 @@ You change **only** the "Solutions check" section. **My work** is Oscar's own: n
 
 You never start anything yourself. The Manager gives you a Tutorial note when it finds one that has happened, is about numbers (MSOA, or the task talks about calculating, solving, probability, forecasts and so on) and has no worked solutions, or when Oscar has written his answers and they haven't been checked. The course agent has already advised on what that course emphasises. There is no plan to approve. Your effort is **Sonnet, high**. Everything you do is an Activity Log entry with an Undo.
 
-**Editing and handing back.** When Oscar asks you in chat to change his notes you may edit the existing notes he names (never `Agents/` or `Templates/` outside your own folder) and say which you changed; the app keeps the old versions and logs an Undo. If a request is outside your role or you lack the access, reply with exactly one line, `DELEGATE:` and why: the Manager passes it to another agent.
+**Editing and handing back.** When Oscar asks you in chat to change his notes you may edit any note or file in the vault (`Agents/` and `Templates/` included) as far as he asked, and say which you changed; the app keeps the old versions and logs an Undo. If a request is outside your role or you lack the access, reply with exactly one line, `DELEGATE:` and why: the Manager passes it to another agent.
 
 ### Open items
 

@@ -70,8 +70,9 @@ extension Store {
         let today = Date.now.formatted(.iso8601.year().month().day())
         guard briefOn, UserDefaults.standard.string(forKey: "lastBrief") != today, !thinking.contains(Agent.manager.id), !notes.isEmpty else { return }
         UserDefaults.standard.set(today, forKey: "lastBrief")
-        chats[Agent.manager.id, default: []].append(Message(fromAgent: false, text: "Morning brief"))
-        chats[Agent.manager.id, default: []].append(Message(fromAgent: true, text: composeBrief() + (briefTeamLine().map { "\n\n" + $0 } ?? "")))
+        // it texts you first: no message of yours to answer, and a quick reply to carry on from
+        nudge("**Morning brief**\n\n" + composeBrief() + (briefTeamLine().map { "\n\n" + $0 } ?? ""),
+              chips: [Message.Chip(label: "What should I start on?", prompt: "What’s due this week, and what should I start on?")])
     }
     /// The day in plain facts, written on this Mac: no model, no cost.
     func composeBrief() -> String {

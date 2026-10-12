@@ -31,6 +31,33 @@ enum AgentFiles {
         return out
     }
 
+    /// `rule` as a list line under `## <heading>` (the heading is added at the end if it is missing), replacing the "Nothing yet." placeholder. A rule already there is not added twice.
+    static func insertRule(into text: String, rule: String, heading: String) -> String {
+        let line = "- " + rule
+        var lines = text.components(separatedBy: "\n")
+        guard let h = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "## " + heading }) else {
+            return text.trimmingCharacters(in: .newlines) + "\n\n## \(heading)\n\n\(line)\n"
+        }
+        if lines.contains(line) { return text }
+        let end = lines[(h + 1)...].firstIndex { $0.hasPrefix("## ") } ?? lines.count
+        var body = lines[(h + 1)..<end].filter { $0.trimmingCharacters(in: .whitespaces).lowercased() != "nothing yet." }
+        while let last = body.last, last.trimmingCharacters(in: .whitespaces).isEmpty { body.removeLast() }
+        while let first = body.first, first.trimmingCharacters(in: .whitespaces).isEmpty { body.removeFirst() }
+        lines.replaceSubrange((h + 1)..<end, with: [""] + body + [line, ""])
+        return lines.joined(separator: "\n")
+    }
+
+    /// Adds a rule to the Manager's learned rules (the old text stays in history). False if the file couldn't be written.
+    @discardableResult
+    static func addRule(_ rule: String, heading: String, root: URL = Vault.root) -> Bool {
+        ensureLearnedFile(in: root)
+        let url = root.appending(path: Agent.learned)
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return false }
+        let new = insertRule(into: text, rule: rule, heading: heading)
+        if new == text { return true }
+        return (try? Vault.write(new, to: url, root: root)) != nil
+    }
+
     /// Makes the learned-rules file if the vault has none yet (an install normally does, from the copy that ships).
     static func ensureLearnedFile(in root: URL = Vault.root) {
         let url = root.appending(path: Agent.learned), fm = FileManager.default

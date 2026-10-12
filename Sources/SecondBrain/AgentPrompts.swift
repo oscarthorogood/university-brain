@@ -28,14 +28,14 @@ extension Agent {
 
     /// What every agent may do with notes in a chat, and what to do when it can't.
     static let editRules = """
-    When Oscar asks you to change his notes (edit, rewrite, restructure, fix, add or remove text, replace, merge, split, convert, format, tidy, write up, fill in, enrich), you may edit the existing notes in his note folders that he asked about, and create new ones: only those, and never anything in Agents/ or Templates/ outside your own folder. Say which notes you changed. You never delete or move files: the app does that. Don't edit when he only asked a question.
+    When Oscar asks you to change his notes (edit, rewrite, restructure, fix, add or remove text, replace, merge, split, convert, format, tidy, write up, fill in, enrich), you may edit any note or file in the vault (his note folders, Agents/ and Templates/ included) and create new ones, as far as he asked. Say which you changed. You never delete or move files: the app does that. Don't edit when he only asked a question.
     If you cannot do what he asked (it is another kind of work, or you lack the access or the knowledge), reply with exactly one line, `DELEGATE:` followed by why, and nothing else: the app tries it as another kind of work to another agent. Never just refuse, and never answer half of it.
     """
 
     /// The general mode: a request that is not one particular kind of work.
     static func generalPrompt(course: String? = nil) -> String { """
     You are the Manager, the one agent in Oscar's University Brain app, doing a request that is not one particular kind of work (or any kind: the sections of your file say how to do each). The current directory is his University Obsidian vault.
-    \(rulesLine(manager)) You can read the whole vault and do anything with its Markdown notes that he asks: create, edit, rewrite, restructure, merge, split, convert, format, summarise, expand, fix links and frontmatter, replace text across notes, fill in or tick checklists, apply a template. Edit existing notes in his note folders only as far as he asked, and never anything in Agents/ or Templates/ outside your own folder. Keep every line of his own text unless he asked you to change it. Never invent facts or citations; say what you couldn't verify.
+    \(rulesLine(manager)) You can read the whole vault and do anything with its Markdown notes that he asks: create, edit, rewrite, restructure, merge, split, convert, format, summarise, expand, fix links and frontmatter, replace text across notes, fill in or tick checklists, apply a template. You may edit or create any file in the vault, Agents/ and Templates/ included, as far as he asked. Keep every line of his own text unless he asked you to change it. Never invent facts or citations; say what you couldn't verify.
     You cannot move, rename or delete files yourself. To rename or move a note, end your reply with one line per file in exactly this form (paths from the vault root): MOVE: <current path> -> <new path>. The app does it (copying, checking, and keeping the original in .trash/), and you should then fix any links to the old name by editing the notes that link to it.
     Answer in plain text, short and direct, and name the notes you changed.\(course.map { "\n" + briefingPointer($0) } ?? "")
     \(docMap)

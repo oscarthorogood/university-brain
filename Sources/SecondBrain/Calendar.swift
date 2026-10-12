@@ -28,7 +28,7 @@ enum CalendarSync {
         }
         let utc = value.hasSuffix("Z")
         // `.first`, not `[0]`: a feed line ending in a bare `TZID=` would otherwise crash the app
-        let tz = key.contains("TZID=") ? key.components(separatedBy: "TZID=").last?.split(separator: ";").first.map(String.init) : nil
+        let tz = key.contains("TZID=") ? key.components(separatedBy: "TZID=").last?.split(separator: ";").first.map { String($0).trimmingCharacters(in: CharacterSet(charactersIn: "\"")) } : nil   // some feeds quote the zone
         f.timeZone = utc ? .gmt : (tz.flatMap { TimeZone(identifier: $0) } ?? london)
         f.dateFormat = utc ? "yyyyMMdd'T'HHmmss'Z'" : "yyyyMMdd'T'HHmmss"
         return f.date(from: value).map { ($0, false) }
@@ -39,19 +39,16 @@ enum CalendarSync {
         var cal = Calendar(identifier: .gregorian); cal.timeZone = london
         var out: [Event] = []
         var cur: [String: (String, String)]? = nil, exdates: [Date] = []
+        // A moved or cancelled single class of a repeating series arrives as its own VEVENT with a RECURRENCE-ID. The series must skip that slot, or the
+        // class shows twice (once where it was, once where it went) and a cancelled one stays on the list.
+        var replaced: [String: [Date]] = [:]
+        var found: [(props: [String: (String, String)], skip: [Date])] = []
         for line in unfold(ics) {
             if line == "BEGIN:VEVENT" { cur = [:]; exdates = []; continue }
             if line == "END:VEVENT", let p = cur {
                 cur = nil
-                guard let s = p["DTSTART"], let (start, allDay) = parseDate(s.0, s.1), p["STATUS"]?.1 != "CANCELLED" else { continue }
-                let end = p["DTEND"].flatMap { parseDate($0.0, $0.1)?.0 } ?? start
-                let dur = end.timeIntervalSince(start)
-                var starts = [start]
-                if let r = p["RRULE"]?.1 { starts = expand(start, rule: r, window: window, cal: cal) }
-                for st in starts where window.contains(st) && !exdates.contains(st) {
-                    out.append(Event(title: unescape(p["SUMMARY"]?.1 ?? "Untitled"), start: st, end: st.addingTimeInterval(dur), allDay: allDay,
-                                     location: unescape(p["LOCATION"]?.1 ?? ""), color: color))
-                }
+                if let r = p["RECURRENCE-ID"], let uid = p["UID"]?.1, let was = parseDate(r.0, r.1)?.0 { replaced[uid, default: []].append(was) }
+                found.append((p, exdates))
                 continue
             }
             guard cur != nil, let c = line.firstIndex(of: ":") else { continue }
@@ -59,6 +56,18 @@ enum CalendarSync {
             guard let name = key.split(separator: ";").first.map(String.init) else { continue }   // a malformed line starting with ":" has no name
             if name == "EXDATE" { for v in val.split(separator: ",") { if let d = parseDate(key, String(v))?.0 { exdates.append(d) } } }
             else { cur?[name] = (key, val) }
+        }
+        for (p, exdates) in found {
+            guard let s = p["DTSTART"], let (start, allDay) = parseDate(s.0, s.1), p["STATUS"]?.1 != "CANCELLED" else { continue }
+            let end = p["DTEND"].flatMap { parseDate($0.0, $0.1)?.0 } ?? start
+            let dur = end.timeIntervalSince(start)
+            var starts = [start]
+            if let r = p["RRULE"]?.1 { starts = expand(start, rule: r, window: window, cal: cal) }
+            let skipped = exdates + (p["RECURRENCE-ID"] == nil ? p["UID"].flatMap { replaced[$0.1] } ?? [] : [])
+            for st in starts where window.contains(st) && !skipped.contains(st) {
+                out.append(Event(title: unescape(p["SUMMARY"]?.1 ?? "Untitled"), start: st, end: st.addingTimeInterval(dur), allDay: allDay,
+                                 location: unescape(p["LOCATION"]?.1 ?? ""), color: color))
+            }
         }
         return out.sorted { $0.start < $1.start }
     }
@@ -83,7 +92,7 @@ enum CalendarSync {
             case "MONTHLY": cands = [cal.date(byAdding: .month, value: step * interval, to: start)].compactMap { $0 }
             default: return [start]   // ponytail: YEARLY/other rules fall back to the first occurrence
             }
-            if cands.allSatisfy({ $0 > limit }) { break }
+            if !cands.isEmpty, cands.allSatisfy({ $0 > limit }) { break }   // none left this week (before the start) is not the end of the series
             for c in cands where c <= limit && n < count { out.append(c); n += 1 }
             step += 1
         }
@@ -109,7 +118,11 @@ enum CalendarSync {
         let known = (lines[end...] + ticked).filter { $0.hasPrefix("- [x]") }
         let fresh = events.map(line).filter { l in !known.contains { $0.dropFirst(5) == l.dropFirst(5) } }
         lines.replaceSubrange((h + 1)..<end, with: [""] + fresh + [""])
-        if !ticked.isEmpty, let c = lines.firstIndex(of: completed) { lines.insert(contentsOf: ticked, at: c + 1) }
+        if !ticked.isEmpty {
+            // a note without the Completed heading would otherwise lose every tick the section held
+            if !lines.contains(completed) { lines += [completed, ""] }
+            if let c = lines.firstIndex(of: completed) { lines.insert(contentsOf: ticked, at: c + 1) }
+        }
         return lines.joined(separator: "\n")
     }
 
@@ -121,7 +134,11 @@ enum CalendarSync {
         let now = Date.now, window = now.addingTimeInterval(-86400 * Double(cfg.pastDays))..<now.addingTimeInterval(86400 * Double(cfg.futureDays))
         var all: [Event] = [], failed = 0
         for feed in feeds {
-            guard let ics = await fetch(feed.url) else { failed += 1; continue }
+            // A feed that doesn't answer keeps its last good copy (up to a week old) instead of its events vanishing from the note until it comes back.
+            let fresh = await fetch(feed.url)
+            if let fresh { SyncConfig.keep(fresh, for: feed) }
+            if fresh == nil { failed += 1 }
+            guard let ics = fresh ?? SyncConfig.kept(for: feed) else { continue }
             all += events(ics, color: feed.color, window: window)
         }
         if all.isEmpty && failed > 0 { return "Couldn’t reach the calendar feeds, so the note was left as it was." }
@@ -136,11 +153,12 @@ enum CalendarSync {
     /// The feed's text if it is a calendar. `webcal://` is the same address over https.
     static func fetch(_ address: String) async -> String? {
         let a = address.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "webcal://", with: "https://")
-        guard let url = URL(string: a), url.scheme?.hasPrefix("http") == true,
-              let (d, r) = try? await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 30)),   // a feed that hangs mustn't hold up the Manager's tick
-              (r as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true,
-              let ics = String(data: d, encoding: .utf8), ics.contains("BEGIN:VCALENDAR") else { return nil }
-        return ics
+        guard let url = URL(string: a), url.scheme?.hasPrefix("http") == true else { return nil }
+        var request = URLRequest(url: url, timeoutInterval: 30)   // a feed that hangs mustn't hold up the Manager's tick
+        request.cachePolicy = .reloadIgnoringLocalCacheData        // a sync that was answered from the cache would show last hour's calendar
+        guard let (d, r) = try? await URLSession.shared.data(for: request), (r as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true else { return nil }
+        let ics = String(data: d, encoding: .utf8) ?? String(decoding: d, as: UTF8.self)   // one stray byte shouldn't make a whole calendar "unreachable"
+        return ics.contains("BEGIN:VCALENDAR") ? ics : nil
     }
 
     /// Self-check on fixed input (called from `--check`).
@@ -169,6 +187,37 @@ enum CalendarSync {
         let doc = "## My Calendar Events\n- [x] old\n\n## Completed Calendar Tasks\n" + line(ev[1]).replacingOccurrences(of: "[ ]", with: "[x]") + "\n"
         let m = merge(doc, events: ev)
         precondition(m.contains("\n- [x] old") && m.components(separatedBy: "Essay due").count == 2 && m.components(separatedBy: "Lecture/01").count == 4, "merge: \(m)")
+        // a moved class takes its slot in the series instead of showing twice, and a cancelled one disappears
+        let series = """
+        BEGIN:VCALENDAR
+        BEGIN:VEVENT
+        UID:abc
+        SUMMARY:Operations - Lecture/01
+        DTSTART;TZID=Europe/London:20261005T090000
+        DTEND;TZID=Europe/London:20261005T095000
+        RRULE:FREQ=WEEKLY;COUNT=3
+        END:VEVENT
+        BEGIN:VEVENT
+        UID:abc
+        RECURRENCE-ID;TZID=Europe/London:20261012T090000
+        SUMMARY:Operations - Lecture/01
+        DTSTART;TZID=Europe/London:20261013T110000
+        DTEND;TZID=Europe/London:20261013T115000
+        END:VEVENT
+        BEGIN:VEVENT
+        UID:abc
+        RECURRENCE-ID;TZID=Europe/London:20261019T090000
+        STATUS:CANCELLED
+        SUMMARY:Operations - Lecture/01
+        DTSTART;TZID=Europe/London:20261019T090000
+        DTEND;TZID=Europe/London:20261019T095000
+        END:VEVENT
+        END:VCALENDAR
+        """
+        let moved = events(series, color: "#64748b", window: w).map(line)
+        precondition(moved.count == 2 && moved[0].contains("Monday - 09:00-09:50") && moved[1].contains("Tuesday - 11:00-11:50"), "moved and cancelled classes: \(moved)")
+        let bare = merge("## My Calendar Events\n- [x] kept\n", events: [])
+        precondition(bare.contains(completed) && bare.contains("- [x] kept"), "ticks survive a note with no Completed heading: \(bare)")
         // feeds imported from Obsidian's Calendar Importer, once
         let box = FileManager.default.temporaryDirectory.appending(path: "sb-sync-check")
         try? FileManager.default.removeItem(at: box)
@@ -207,6 +256,20 @@ struct SyncConfig: Codable, Equatable {
         try? JSONEncoder().encode(self).write(to: Self.file, options: [.atomic])
         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: Self.file.path)
     }
+    /// The last good copy of each feed, private like the settings (calendar contents can be as sensitive as their links).
+    private static func copy(_ feed: Feed) -> URL { file.deletingLastPathComponent().appending(path: "feeds/\(feed.id.uuidString).ics") }
+    static func keep(_ ics: String, for feed: Feed) {
+        let f = copy(feed)
+        try? FileManager.default.createDirectory(at: f.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? ics.write(to: f, atomically: true, encoding: .utf8)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: f.path)
+    }
+    static func kept(for feed: Feed, maxAge: TimeInterval = 7 * 86400) -> String? {
+        let f = copy(feed)
+        guard let made = (try? f.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate, Date.now.timeIntervalSince(made) < maxAge else { return nil }
+        return try? String(contentsOf: f, encoding: .utf8)
+    }
+    static func forget(_ feed: Feed) { try? FileManager.default.removeItem(at: copy(feed)) }
     static func obsidianFile(_ root: URL) -> URL { root.appending(path: ".obsidian/plugins/calendar-importer/data.json") }
     var canImport: Bool { FileManager.default.fileExists(atPath: Self.obsidianFile(Vault.root).path) }
 

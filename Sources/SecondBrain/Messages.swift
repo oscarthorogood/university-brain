@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// Chat looks like Apple Messages everywhere: your blue bubbles on the right, the agent's grey ones on the left, a small tail on the last bubble of a run
 /// (and tighter spacing inside a run), centred time stamps, "Read 13:06" under your latest message, and three dots while the agent works.
@@ -39,9 +40,13 @@ struct IMTyping: View {
 }
 
 struct MessageRow: View {
+    @Environment(Store.self) private var store
     let message: Message
     var firstInRun = true, lastInRun = true
     var receipt: String? = nil     // "**Read** 13:06" or "**Delivered**", under your latest message
+    var showChips = false          // quick replies appear only under the newest message
+    @State private var whyOpen = false
+    @State private var why = ""
     var body: some View {
         let mine = !message.fromAgent
         if !mine && message.text.hasPrefix("→") {   // which kind of work it took your request as
@@ -53,12 +58,47 @@ struct MessageRow: View {
                 HStack(spacing: 0) {
                     if mine { Spacer(minLength: 56) }
                     IMBubble(text: text, mine: mine, tail: lastInRun)
+                        .overlay(alignment: .topTrailing) { if !mine, let reaction = message.reaction { Tapback(kind: reaction).offset(x: 8, y: -9) } }
+                        .contextMenu { menu(text: text, mine: mine) }
+                        .popover(isPresented: $whyOpen, arrowEdge: .bottom) { whyForm }
                     if !mine { Spacer(minLength: 56) }
                 }
+                if let change = message.change { ChangeCard(id: change).padding(.top, 4) }
+                if showChips, let chips = message.chips, !chips.isEmpty { ChipRow(chips: chips, message: message.id).padding(.top, 4) }
                 if let receipt { Text(LocalizedStringKey(receipt)).font(.system(size: 10)).foregroundStyle(Color.ink2).padding(.trailing, 4) }
             }.frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
         }
     }
+
+    /// Right-click, the Mac's long-press: a tapback on the Manager's answer, or a copy.
+    @ViewBuilder private func menu(text: String, mine: Bool) -> some View {
+        if !mine {
+            Button { store.react(message.id, "up") } label: { Label("Helpful", systemImage: "hand.thumbsup") }
+            Button { whyOpen = true } label: { Label("Not right…", systemImage: "hand.thumbsdown") }
+            Button { store.react(message.id, "ask"); store.ask("Explain your last answer: what you did, which notes you used, and why.") } label: { Label("Explain", systemImage: "questionmark.bubble") }
+            Divider()
+        }
+        Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string) } label: { Label("Copy", systemImage: "doc.on.doc") }
+    }
+
+    /// "Not right": what was wrong, in a few words. It is kept as a rule the Manager reads before its next piece of that kind of work.
+    private var whyForm: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("What was wrong with that?").font(.system(size: 13, weight: .semibold))
+            Text("Say it in a few words and I'll keep it as a rule for next time.").font(.system(size: 11)).foregroundStyle(Color.ink2).fixedSize(horizontal: false, vertical: true)
+            TextField("Too long, wrong course, not my style…", text: $why).textFieldStyle(.roundedBorder).onSubmit(save)
+            HStack {
+                Spacer()
+                Button("Just mark it") { store.react(message.id, "down"); close() }
+                Button("Add rule", action: save).keyboardShortcut(.defaultAction).disabled(why.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }.padding(14).frame(width: 300)
+    }
+    private func save() {
+        guard !why.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        store.react(message.id, "down", reason: why); close()
+    }
+    private func close() { whyOpen = false; why = "" }
 }
 
 /// "Today 17:53", centred between conversations that are more than ten minutes apart.
