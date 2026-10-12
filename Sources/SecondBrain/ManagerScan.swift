@@ -138,6 +138,10 @@ extension Store {
         let wait = healthy ? Double(cfg.everyMinutes) * 60 : min(Double(cfg.everyMinutes) * 60, 300)
         guard Date.now.timeIntervalSince1970 - d.double(forKey: "lastCalendarSync") > wait else { return }
         let r = await syncCalendar()
+        // new classes and deadlines turned into notes are worth a text
+        if let added = r.firstMatch(of: /added (\d+) note/).flatMap({ Int($0.1) }), added > 0 {
+            nudge("**New from the calendar**\n\nI added \(added) note\(added == 1 ? "" : "s") from your calendar.", chips: [Message.Chip(label: "What’s due this week?", prompt: "What’s due this week, and what should I start on?")])
+        }
         if r.hasPrefix("Synced") && !r.contains("unreachable") { log("planner", r) }
         else if healthy || r != before { log("planner", r.hasPrefix("Synced") ? r : "Calendar sync failed: \(r)") }
     }
@@ -501,7 +505,7 @@ extension Store {
             recordReview(agent, passed: true)
             log(agent, "\(item.title)\(line.map { " — " + $0 } ?? "") · Manager \(note)" + (advice == nil ? "" : " · read the \(courses.map { Agent.courseName($0) }.joined(separator: ", ")) briefing"), undo: hasUndo ? id : nil)
             // and it texts you in the chat
-            chats[Agent.manager.id, default: []].append(Message(fromAgent: true, text: "I've finished “\(item.title)”\(line.map { ": " + $0 } ?? "")." + (verdict.flags.isEmpty ? "" : " My check flagged: \(verdict.flags.joined(separator: "; "))") + (hasUndo ? " Undo is in the Activity Log." : "")))
+            chats[Agent.manager.id, default: []].append(Message(fromAgent: true, text: "I've finished “\(item.title)”\(line.map { ": " + $0 } ?? "")." + (verdict.flags.isEmpty ? "" : " My check flagged: \(verdict.flags.joined(separator: "; "))"), change: hasUndo ? id : nil))
             scheduleAutopilot(after: 3)   // what it just did may be what the next job was waiting for (filing slides → a write-up; a filled brief → an outline)
         }
     }

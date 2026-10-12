@@ -16,7 +16,7 @@ extension Store {
     }
 
     /// What an agent changed since `started`: logs it with an Undo, and puts back any existing note that lost its frontmatter. Returns a line for the chat, or nil if nothing changed.
-    func recordEdits(since started: Date, existing: Set<String>, by code: String, root: URL) async -> String? {
+    func recordEdits(since started: Date, existing: Set<String>, by code: String, root: URL) async -> (line: String, item: UUID?)? {
         let touched = await Review.touchedInBackground(since: started, root: root).filter { $0.hasSuffix(".md") }
         guard !touched.isEmpty else { return nil }
         var changed: [String] = [], created: [String] = [], restored: [String] = [], snaps: [String: String] = [:]
@@ -31,15 +31,16 @@ extension Store {
             changed.append(rel); snaps[rel] = snap.url.lastPathComponent
         }
         let kept = changed.count + created.count
-        guard kept > 0 else { return restored.isEmpty ? nil : "I put back \(restored.joined(separator: ", ")): the edit had removed its frontmatter." }
+        guard kept > 0 else { return restored.isEmpty ? nil : ("I put back \(restored.joined(separator: ", ")): the edit had removed its frontmatter.", nil) }
         var item = InboxItem(kind: .work, agent: code, title: "Edited \(kept) note\(kept == 1 ? "" : "s") at your request", state: .done, key: "edit:\(UUID().uuidString)")
         item.undo = InboxItem.Undo(restore: changed, created: created, snapshots: snaps); item.verdict = "Checked: frontmatter intact"
         inbox.append(item); saveInbox()
         log(code, "Edited \(kept) note\(kept == 1 ? "" : "s") at your request.", undo: item.id)
         reload()
         let names = (changed + created).prefix(5).map { (($0 as NSString).lastPathComponent as NSString).deletingPathExtension }
-        return "Changed \(kept) note\(kept == 1 ? "" : "s"): " + names.joined(separator: ", ") + (kept > 5 ? " and \(kept - 5) more" : "") + "."
-            + (restored.isEmpty ? "" : " I put back \(restored.joined(separator: ", ")), because the edit had removed its frontmatter.") + " Undo is in the Activity Log."
+        let line = "Changed \(kept) note\(kept == 1 ? "" : "s"): " + names.joined(separator: ", ") + (kept > 5 ? " and \(kept - 5) more" : "") + "."
+            + (restored.isEmpty ? "" : " I put back \(restored.joined(separator: ", ")), because the edit had removed its frontmatter.")
+        return (line, item.id)   // the chat shows a card with the Undo
     }
 
     /// `MOVE: a -> b` lines in the general agent's reply (renames and moves, which it can't do itself): the app copies, checks, and keeps the original in `.trash`.

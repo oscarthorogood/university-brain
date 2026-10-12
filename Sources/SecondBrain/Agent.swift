@@ -346,8 +346,9 @@ enum Agent {
 
     /// `canEdit` allows edits anywhere; `writes` allows edits only to those files or folders (`Folder/**`); `web` adds web search for finding sources.
     /// `onText` hears the answer as it is written (about ten times a second at most), for a chat to show it growing.
+    /// `onStatus` hears what it is doing as it goes ("Reading SM L05.md"), for a chat to show under the dots.
     static func run(_ prompt: String, system: String, session: String?, canEdit: Bool, root: URL, tier: Manager.Tier = .standard, writes: [String] = [], web: Bool = false,
-                    onText: (@Sendable (String) -> Void)? = nil) async -> Reply {
+                    onText: (@Sendable (String) -> Void)? = nil, onStatus: (@Sendable (String) -> Void)? = nil) async -> Reply {
         let prompt = clip(prompt)
         if let stub { return await stub(prompt, system, session, writes, tier) }
         let background = Agent.background, button = Agent.button
@@ -360,19 +361,34 @@ enum Agent {
         if let session { args += ["--resume", session] }
         // a call that hangs would freeze the Manager, so each one has a time limit
         let limit: Double = tier == .quick ? 240 : tier == .standard ? 900 : 1500
-        var done = await launch(args + (onText == nil ? [] : ["--include-partial-messages"]), root: root, limit: limit, background: background, button: button, onText: onText)
+        var done = await launch(args + (onText == nil ? [] : ["--include-partial-messages"]), root: root, limit: limit, background: background, button: button, onText: onText, onStatus: onStatus)
         // a CLI that doesn't know the partial-messages flag fails at once with nothing to show: ask again without it
         if onText != nil, done.reply.session == nil, done.failedFast, !done.reply.stopped {
-            done = await launch(args, root: root, limit: limit, background: background, button: button, onText: onText)
+            done = await launch(args, root: root, limit: limit, background: background, button: button, onText: onText, onStatus: onStatus)
         }
         return done.reply
+    }
+
+    /// What a tool call looks like in the chat while it happens: "Reading SM L05.md". Nil for tools that aren't worth a line.
+    static func statusLine(tool: String, input: [String: Any]) -> String? {
+        func file() -> String? { (input["file_path"] as? String).map { ($0 as NSString).lastPathComponent } }
+        switch tool {
+        case "Read": return file().map { "Reading \($0)" }
+        case "Edit": return file().map { "Editing \($0)" }
+        case "Write": return file().map { "Writing \($0)" }
+        case "Grep": return "Searching the vault"
+        case "Glob": return "Looking through the vault"
+        case "WebSearch": return "Searching the web"
+        case "WebFetch": return "Reading a web page"
+        default: return nil
+        }
     }
 
     private struct Launch: Sendable { let reply: Reply; let failedFast: Bool }
 
     /// One Claude Code process, from start to its last line of output. Output is read as it arrives, so a chat can show the answer growing;
     /// cancelling the calling task (or `stopBackgroundRuns`) ends the process.
-    private static func launch(_ args: [String], root: URL, limit: Double, background: Bool, button: Bool, onText: (@Sendable (String) -> Void)?) async -> Launch {
+    private static func launch(_ args: [String], root: URL, limit: Double, background: Bool, button: Bool, onText: (@Sendable (String) -> Void)?, onStatus: (@Sendable (String) -> Void)?) async -> Launch {
         let handle = ProcessHandle(), id = live.add(handle, background: background, button: button)
         defer { live.remove(id) }
         return await withTaskCancellationHandler {
@@ -421,6 +437,11 @@ enum Agent {
                             if let m = e["message"] as? [String: Any], let parts = m["content"] as? [[String: Any]] {
                                 let text = parts.compactMap { $0["type"] as? String == "text" ? $0["text"] as? String : nil }.joined()
                                 if !text.isEmpty { current = text; emit(text, force: true) }
+                                if let onStatus {   // the tools it is about to use, as a line for the chat
+                                    for part in parts where part["type"] as? String == "tool_use" {
+                                        if let line = Agent.statusLine(tool: part["name"] as? String ?? "", input: part["input"] as? [String: Any] ?? [:]) { onStatus(line) }
+                                    }
+                                }
                             }
                         default: break
                         }

@@ -45,7 +45,15 @@ extension Page {
     }
 }
 
-struct Message: Identifiable, Codable { var id = UUID(); let fromAgent: Bool; let text: String; var time = Date.now }
+struct Message: Identifiable, Codable {
+    var id = UUID(); let fromAgent: Bool; let text: String; var time = Date.now
+    // Optional, so chats.json saved by older versions still loads.
+    var reaction: String?     // a tapback on this message: "up", "down" or "ask"
+    var change: UUID?         // the job or edit this message reports: it gets a card with what changed and an Undo
+    var proactive: Bool?      // the Manager started this one, you didn't ask
+    var chips: [Chip]?        // quick replies under it
+    struct Chip: Codable, Hashable { let label: String; let prompt: String }
+}
 
 extension Note {
     /// `when` for code that has already filtered to dated notes: a note with no date sorts last, where `when!` would have crashed.
@@ -256,19 +264,36 @@ struct SecondBrainApp: App {
     @ObservationIgnored var bodyCache: (rev: Int, bodies: [URL: String], backlinks: [String: [Note]])?
     /// Chats and each agent's Claude session survive a relaunch (they used to vanish, and every agent forgot the conversation).
     var chats: [String: [Message]] = Store.savedChats.chats { didSet { saveChats() } }
+    /// The conversations. The open one lives in `chats` and `sessions` under the Manager's id, so everything that already talks to the chat works on whichever is open;
+    /// the others keep their messages and Claude session here (see Threads.swift).
+    var threads: [ChatThread] = Store.savedChats.startThreads { didSet { saveChats() } }
+    var openThread: UUID = Store.savedChats.openID { didSet { saveChats() } }
+    /// A message to scroll to once its conversation is open (from a search result).
+    var chatFocus: UUID?
+    /// What the agent is doing right now ("Reading SM L05.md"), under the typing dots.
+    var workingOn: String?
+    /// When the chat was last in front of you, so the Manager's own messages since then can be counted.
+    var chatSeenAt = UserDefaults.standard.double(forKey: "chatSeenAt")
     var thinking: Set<String> = []
     /// What an agent has written so far of the answer it is still working on, for its chat to show growing.
     var streaming: [String: String] = [:]
     @ObservationIgnored var chatTasks: [String: Task<Void, Never>] = [:]
     /// Stops the agent working on a chat reply: the process ends and the chat says so.
     func stopChat(_ code: String) { chatTasks[code]?.cancel() }
-    @ObservationIgnored private var sessions: [String: String] = Store.savedChats.sessions
-    private struct SavedChats: Codable { var chats: [String: [Message]] = [:]; var sessions: [String: String] = [:] }
+    @ObservationIgnored var sessions: [String: String] = Store.savedChats.sessions
+    private struct SavedChats: Codable {
+        var chats: [String: [Message]] = [:]; var sessions: [String: String] = [:]
+        var threads: [ChatThread]?; var open: UUID?   // optional: older files have one chat and no threads
+        var startThreads: [ChatThread] { (threads?.isEmpty ?? true) ? [.general] : threads ?? [.general] }
+        var openID: UUID { open.flatMap { id in startThreads.contains { $0.id == id } ? id : nil } ?? startThreads[0].id }
+    }
     private static var chatFile: URL { Support.dir.appending(path: "chats.json") }
     private static var savedChats: SavedChats { (try? JSONDecoder().decode(SavedChats.self, from: Data(contentsOf: chatFile))) ?? SavedChats() }
     private func saveChats() {
         try? FileManager.default.createDirectory(at: Self.chatFile.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? JSONEncoder().encode(SavedChats(chats: chats.mapValues { Array($0.suffix(200)) }, sessions: sessions)).write(to: Self.chatFile, options: .atomic)
+        let saved = SavedChats(chats: chats.mapValues { Array($0.suffix(200)) }, sessions: sessions,
+                               threads: threads.map { t in var t = t; t.messages = Array(t.messages.suffix(200)); return t }, open: openThread)
+        try? JSONEncoder().encode(saved).write(to: Self.chatFile, options: .atomic)
     }
     /// The kind of work the last chat answer was, so a short follow-up ("start with what you know") goes to the same kind.
     @ObservationIgnored var lastMode: String?
@@ -277,6 +302,7 @@ struct SecondBrainApp: App {
     func ask(_ text: String, tier: Manager.Tier? = nil) {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !thinking.contains(Agent.manager.id) else { return }
+        nameOpenThread(after: text)
         // "apply the MCQ template to the existing MCQ files": done a few notes at a time, and the app checks and tidies each one
         if let folder = Self.templateRequest(text) { applyTemplates(folder, asked: text); return }
         // "get me ready for Thursday's lecture": lines up the jobs for it and works through them
@@ -305,21 +331,28 @@ struct SecondBrainApp: App {
                                             guard let self, self.streamEpoch == epoch else { return }   // a late piece after the answer is in is ignored
                                             self.streaming[m] = text
                                         }
+                                    },
+                                    onStatus: { [weak self] status in
+                                        Task { @MainActor in
+                                            guard let self, self.streamEpoch == epoch else { return }
+                                            self.workingOn = status
+                                        }
                                     })
         streamEpoch += 1
         streaming[m] = nil
+        workingOn = nil
         if let s = reply.session { sessions[m] = s }
         if let why = reply.delegation {   // not an answer: the app tries another kind of work
             log(mode, "Couldn’t do “\(shown.prefix(50))” as \(Agent.label(mode)): \(why.prefix(80))")
             return reply
         }
-        var text = reply.text
+        var text = reply.text, change: UUID?
         if reply.session != nil {
             lastMode = mode
-            if editing, let line = await recordEdits(since: started, existing: existing, by: mode, root: root) { text += "\n\n" + line }
+            if editing, let edits = await recordEdits(since: started, existing: existing, by: mode, root: root) { text += "\n\n" + edits.line; change = edits.item }
             if general { text += performMoves(in: reply.text, root: root) }
         }
-        chats[m, default: []].append(Message(fromAgent: true, text: text))
+        chats[m, default: []].append(Message(fromAgent: true, text: text, change: change))
         log(mode, reply.session == nil ? "Couldn’t answer “\(shown.prefix(60))”" : "Answered “\(shown.prefix(60))”")
         return reply
     }
@@ -572,7 +605,7 @@ struct Sidebar: View {
                     if !SideNav.isHidden(SideNav.pinned, hidden) {
                         NavRow(icon: "tray", title: "Unsorted", page: .inbox, meta: store.unsorted.count, on: { switch store.page { case .inbox, .folder("Unsorted"), .unsorted, .sortNow: true; default: false } }())
                     }
-                    NavRow(icon: "message", title: "Manager", page: .messages, on: { switch store.page { case .messages, .agent: true; default: false } }())
+                    NavRow(icon: "message", title: "Manager", page: .messages, meta: store.unreadNudges, on: { switch store.page { case .messages, .agent: true; default: false } }())
                     NavRow(icon: "number", title: "Tags", page: .tags)
 
                     NavSection("Plan") {
@@ -1188,6 +1221,7 @@ enum Check {
         Vault.checkEditing()
         EditorLogic.check()
         AgentFiles.check()
+        ChatCheck.run()
         Manager.check()
         let tags = TagsPage.build(notes); precondition(!tags.isEmpty, "tags are indexed from frontmatter")
         let week: (Date?) -> Int = { d in d.map { Int((Double(Calendar.current.dateComponents([.day], from: Vault.currentSemesterStart, to: $0).day ?? 0) / 7).rounded(.down)) + 1 } ?? 0 }
@@ -1230,6 +1264,10 @@ enum Check {
 struct AgentPage: View {
     @Environment(Store.self) private var store
     @State private var showLog = false
+    @AppStorage("showThreads") private var showThreads = true
+    @State private var listPopover = false   // the conversations, from the button, when the window is too narrow to show them beside the chat
+    @Environment(\.mainWidth) private var mainWidth
+    private var roomForList: Bool { mainWidth > 1150 }
     var role: Agent.Role { Agent.manager }
     var body: some View {
         let busy = store.thinking.contains(role.id) || !store.activeJobs.isEmpty
@@ -1245,11 +1283,16 @@ struct AgentPage: View {
                 }
                 Spacer()
                 ManagerMenu()
+                RoundButton(icon: "sidebar.left", label: "Conversations") { if roomForList { showThreads.toggle() } else { listPopover.toggle() } }
+                    .popover(isPresented: $listPopover, arrowEdge: .bottom) { ThreadList().environment(store).frame(width: 280, height: 420) }
                 RoundButton(icon: "list.bullet.rectangle", label: "Activity Log") { showLog.toggle() }
                     .popover(isPresented: $showLog, arrowEdge: .bottom) { ActivityLog().environment(store) }
             }.padding(.horizontal, 28).padding(.top, 20).padding(.bottom, 14)
             SplitPane(fixed: .second, width: 300, stacked: (520, 460)) {
-                AgentChatCard()
+                HStack(spacing: 10) {
+                    if showThreads && roomForList { Card { ThreadList() }.frame(width: 240) }
+                    AgentChatCard()
+                }
             } second: {
                 VStack(spacing: 12) {
                     ManagerCard()

@@ -287,6 +287,7 @@ extension Store {
             if (try? Vault.write(Vault.setField(text, kind == .lecture ? "date" : "due", to: "\(e.dayStr)T\(t)"), to: n.id)) != nil {
                 changed += 1; driftRels.append(Vault.rel(n.id))
                 log(Agent.manager.id, "The calendar moved \(n.display) from \(nowTime) to \(t); I updated the note.")
+                nudge("**Timetable change**\n\nThe calendar moved \(n.display) from \(nowTime) to \(t). I updated the note.")
             }
         }
         if changed > 0 {
@@ -322,7 +323,11 @@ extension Store {
             if left < 0 && left >= -14 { text = "At risk: “\(n.display)” was due \(-left) day\(left == -1 ? "" : "s") ago and isn’t done." }
             else if (0...3).contains(left), n.state == .notStarted { text = "At risk: “\(n.display)” is due in \(left == 0 ? "less than a day" : "\(left) day\(left == 1 ? "" : "s")") and hasn’t been started." }
             else { continue }
-            if once("risk:\(n.path):\(dayStamp)") { log(Agent.manager.id, text); if left <= 1 { Notify.post("Deadline at risk", text, id: "risk-" + n.path) } }
+            if once("risk:\(n.path):\(dayStamp)") {
+                log(Agent.manager.id, text); if left <= 1 { Notify.post("Deadline at risk", text, id: "risk-" + n.path) }
+                nudge("**Deadline at risk**\n\n" + text.replacingOccurrences(of: "At risk: ", with: ""),
+                      chips: [Message.Chip(label: left < 0 ? "What’s left on it?" : "Plan it with me", prompt: left < 0 ? "What is left to do on \(n.display)?" : "Plan \(n.display) from its brief: what to do first, and an outline.")])
+            }
         }
     }
 

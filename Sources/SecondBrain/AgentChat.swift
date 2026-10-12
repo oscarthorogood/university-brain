@@ -26,7 +26,7 @@ struct AgentChatCard: View {
                             let receipt = lastMine ? self.receipt(after: i, in: messages, replied: replied, busy: busy) : nil
                             if prev == nil || m.time.timeIntervalSince(prev!.time) > 600 { IMStamp(date: m.time).padding(.top, i == 0 ? 0 : 8) }
                             MessageRow(message: m, firstInRun: prev?.fromAgent != m.fromAgent, lastInRun: next?.fromAgent != m.fromAgent || next?.text.hasPrefix("→") == true,
-                                       receipt: receipt)
+                                       receipt: receipt, showChips: i == messages.count - 1 && !busy)
                                 .id(m.id).appearIn().padding(.top, prev?.fromAgent == m.fromAgent ? -12 : 0)
                         }
                         if busy {
@@ -34,6 +34,12 @@ struct AgentChatCard: View {
                             if let live = store.streaming[code], !live.senderAndBody.body.isEmpty {
                                 HStack { IMBubble(text: live.senderAndBody.body, mine: false); Spacer(minLength: 56) }.id("busy")
                             } else { HStack { IMTyping(); Spacer() }.id("busy") }
+                            // what it is doing right now, so a long wait isn't a mystery
+                            if let doing = store.workingOn {
+                                Text(doing + "…").font(.system(size: 11)).foregroundStyle(Color.ink2).padding(.leading, 6).transition(.opacity).id("doing")
+                            }
+                        } else if let job = store.activeJobs.first {
+                            Label(store.jobLine(job), systemImage: "gearshape").font(.system(size: 11)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity)
                         }
                         if store.pausedUntil != nil {   // like Messages' "notifications silenced" line
                             Label("The Manager is paused: no background jobs. Chats still work.", systemImage: "moon.fill")
@@ -41,7 +47,13 @@ struct AgentChatCard: View {
                         }
                     }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .onChange(of: messages.count) { withAnimation { proxy.scrollTo(busy ? AnyHashable("busy") : AnyHashable(messages.last?.id), anchor: .bottom) } }
+                .onChange(of: messages.count) { withAnimation { proxy.scrollTo(busy ? AnyHashable("busy") : AnyHashable(messages.last?.id), anchor: .bottom) }; store.markChatSeen() }
+                .onChange(of: store.chatFocus) {   // a search result: show the message it found
+                    guard let focus = store.chatFocus else { return }
+                    withAnimation { proxy.scrollTo(focus, anchor: .center) }
+                    store.chatFocus = nil
+                }
+                .onAppear { store.markChatSeen() }
                 .onChange(of: busy) { if busy { withAnimation { proxy.scrollTo("busy", anchor: .bottom) } } }
                 .onChange(of: store.streaming[code]) { if busy { proxy.scrollTo("busy", anchor: .bottom) } }
             }
@@ -53,7 +65,7 @@ struct AgentChatCard: View {
                     Image(systemName: "plus").font(.system(size: 13, weight: .semibold)).foregroundStyle(Color.ink2).frame(width: 30, height: 30).glassEffect(.regular.interactive(), in: .circle)
                 }.menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize().disabled(busy).help("Things to ask").accessibilityLabel("Ask something")
                 HStack(spacing: 8) {
-                    TextField("Message the Manager", text: $draft, axis: .vertical).textFieldStyle(.plain).lineLimit(1...4).onSubmit { send() }
+                    TextField("iMessage", text: $draft, axis: .vertical).textFieldStyle(.plain).lineLimit(1...4).onSubmit { send() }
                     let ready = !busy && !draft.trimmingCharacters(in: .whitespaces).isEmpty
                     if busy {
                         Button { store.stopChat(code) } label: {
