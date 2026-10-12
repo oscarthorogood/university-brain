@@ -6,8 +6,10 @@ import Foundation
 enum AgentFiles {
     /// The old files, one per kind of work and one per course, and the heading a file's learned rules go under.
     static var old: [(rel: String, heading: String)] {
-        Agent.roles.map { ("Agents/Helper Agents/\($0.name)/\($0.name) agent.md", $0.name) }
-            + Agent.courses.map { ("Agents/Course Agents/\($0.name)/\($0.name) course agent.md", $0.name) }
+        var out: [(rel: String, heading: String)] = []
+        for r in Agent.roles { out.append((rel: "Agents/Helper Agents/\(r.name)/\(r.name) agent.md", heading: r.name)) }
+        for c in Agent.courses { out.append((rel: "Agents/Course Agents/\(c.name)/\(c.name) course agent.md", heading: c.name)) }
+        return out
     }
     static let learnedHeader = """
     # Learned rules
