@@ -11,3 +11,4 @@ Agents/Helper Agents/Librarian/week-2-reading-script-20min.md
 Agents/Helper Agents/Librarian/Ellevenread/Exploring Strategy  Chapters 2 - 4.md
 Agents/Helper Agents/Librarian/next-week-reading-list.md
 Agents/Helper Agents/Librarian/Strategic Management - Podcast - Week 3 Strategy Formulation.md
+Agents/Manager Agent/Learned rules.md

@@ -2,6 +2,8 @@
 
 A macOS app (SwiftUI, macOS 26, Swift 6.2, one SwiftPM executable target, about 9,000 lines) that sits on top of an Obsidian vault of university notes. It shows the notes, and runs a team of AI agents that file, write up, research and check them. This document is for a reviewer who has not seen the project. Written 2026-10-02.
 
+> **Updated 2026-10-12: the agents are now one.** There is a single agent, the Manager; Sorter, Scribe and the rest are kinds of work (modes) of it, the course agents are gone (a job reads the course's briefing instead of consulting), and the library scene, characters and Group Chat are removed. Where this document says "helper", "course agent", `Agent.consult` or the library scene, read "kind of work", "course briefing" and nothing. See `PLAN.md` ("The agents combined into one").
+
 **Please review, don't rewrite.** The most useful output is a ranked list of real problems (bugs, data-loss risks, concurrency mistakes, security issues, misleading UI) with file and line, then smaller simplifications. `PLAN.md` is the project's running log of what is done and what is not; read its "Built 2026-10-02" section first.
 
 ---
