@@ -125,6 +125,23 @@ extension Store {
         return r
     }
 
+    /// Syncs the calendar when its turn has come. It is plain fetching and a rewrite of one managed section, so it does not wait for a job to finish or for the Manager
+    /// to be switched on. After a failed sync it tries again in five minutes (not a whole interval later), and says the same failure only once.
+    func syncCalendarIfDue() async {
+        guard !calendarSyncing else { return }   // the tick and the heartbeat can both come due together
+        calendarSyncing = true
+        defer { calendarSyncing = false }
+        let cfg = SyncConfig.load(), d = UserDefaults.standard
+        guard cfg.everyMinutes > 0, cfg.feeds.contains(where: \.enabled) else { return }
+        let before = d.string(forKey: "lastCalendarResult") ?? ""
+        let healthy = before.isEmpty || (before.hasPrefix("Synced") && !before.contains("unreachable"))
+        let wait = healthy ? Double(cfg.everyMinutes) * 60 : min(Double(cfg.everyMinutes) * 60, 300)
+        guard Date.now.timeIntervalSince1970 - d.double(forKey: "lastCalendarSync") > wait else { return }
+        let r = await syncCalendar()
+        if r.hasPrefix("Synced") && !r.contains("unreachable") { log("planner", r) }
+        else if healthy || r != before { log("planner", r.hasPrefix("Synced") ? r : "Calendar sync failed: \(r)") }
+    }
+
     // MARK: The tick
     func autopilotTick() async {
         guard !tickRunning else { return }   // the running tick schedules the next one when it ends
@@ -133,14 +150,9 @@ extension Store {
         await tick()
     }
     private func tick() async {
-        guard autopilotOn, !agentBusy else { return }
-        // The calendar is plain fetching and a rewrite of one managed section, so it just happens, as often as Settings → Sync says.
-        let cfg = SyncConfig.load()
-        if cfg.everyMinutes > 0, cfg.feeds.contains(where: \.enabled),
-           Date.now.timeIntervalSince1970 - UserDefaults.standard.double(forKey: "lastCalendarSync") > Double(cfg.everyMinutes) * 60 {
-            let r = await syncCalendar()
-            log("planner", r.hasPrefix("Synced") ? r : "Calendar sync failed: \(r)")
-        }
+        guard autopilotOn else { return }
+        await syncCalendarIfDue()
+        guard !agentBusy else { return }
         // Zotero: every 15 minutes while connected, both ways. Only changes and failures reach the log.
         if Zotero.Config.connected, Date.now.timeIntervalSince1970 - UserDefaults.standard.double(forKey: "lastZoteroSync") > 15 * 60 {
             let r = await syncZotero()

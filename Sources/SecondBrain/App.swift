@@ -243,6 +243,7 @@ struct SecondBrainApp: App {
     @ObservationIgnored var handled = Set(UserDefaults.standard.stringArray(forKey: "autopilotHandled") ?? [])
     @ObservationIgnored var agentBusy = false
     @ObservationIgnored var tickRunning = false   // one autopilot tick at a time (a tick can outlive the timer that started it)
+    @ObservationIgnored var calendarSyncing = false
     @ObservationIgnored var manualClaims = Set<String>()   // notes an open "plan this" sheet has marked Agent In Progress
     @ObservationIgnored var autopilotTimer: Task<Void, Never>?
     @ObservationIgnored var heartbeat: Task<Void, Never>?
@@ -381,6 +382,8 @@ struct SecondBrainApp: App {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(300))
                 guard !Task.isCancelled, let self else { return }
+                // the calendar keeps its own time: not behind a job that has the tick, and not only while the Manager is switched on
+                await self.syncCalendarIfDue()
                 if self.autopilotOn, !self.tickRunning { self.scheduleAutopilot(after: 2) }
             }
         }

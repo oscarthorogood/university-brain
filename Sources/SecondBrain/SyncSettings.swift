@@ -23,7 +23,7 @@ struct SyncSettings: View {
             LabeledContent("Calendars:") {
                 VStack(alignment: .leading, spacing: 8) {
                     if cfg.feeds.isEmpty { Text("None yet. Add a calendar link to read events and deadlines from it.").foregroundStyle(.secondary) }
-                    ForEach($cfg.feeds) { $feed in FeedRow(feed: $feed) { cfg.feeds.removeAll { $0.id == feed.id } } }
+                    ForEach($cfg.feeds) { $feed in FeedRow(feed: $feed) { SyncConfig.forget(feed); cfg.feeds.removeAll { $0.id == feed.id } } }
                     HStack {
                         Button("Add Calendar…") { adding = true }
                         if cfg.canImport { Button("Import from Obsidian") { let n = cfg.importFromObsidian(); note = n == 0 ? "Nothing new in Calendar Importer." : "Added \(n) calendar\(n == 1 ? "" : "s")." } }
