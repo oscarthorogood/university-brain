@@ -9,11 +9,7 @@ extension Store {
     func snapshotNotes(_ root: URL) async -> Set<String> {
         let urls = notes.map(\.id)
         return await Task.detached(priority: .utility) {
-            var all = Set(urls)
-            for top in ["Agents", "Templates"] {
-                guard let walk = FileManager.default.enumerator(at: root.appending(path: top), includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) else { continue }
-                for case let u as URL in walk where u.pathExtension == "md" { all.insert(u) }
-            }
+            let all = Set(urls).union(Review.markdown(under: ["Agents", "Templates"], root: root))
             for u in all { try? Vault.snapshot(u, root: root) }
             return Set(all.map { Vault.rel($0) })
         }.value
