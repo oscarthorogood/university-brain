@@ -28,6 +28,8 @@ enum NoteText {
 /// Lets the toolbar and the inspector act on the editor that is on screen.
 @MainActor final class EditorController {
     weak var textView: MDTextView?
+    /// Called with the target of a link that was Command-clicked in the text: a note's name, a file, or a web address.
+    var openLink: (@MainActor (String) -> Void)?
 
     func focus() { textView?.window?.makeFirstResponder(textView) }
     /// Gives focus once the editor exists (a brand-new note opens ready to type).
@@ -50,39 +52,25 @@ enum NoteText {
         tv.setSelectedRange(NSRange(location: r.location, length: 0))
     }
 
+    /// Puts an edit in and moves the selection to where the rules in `EditorLogic` say.
+    private func apply(_ result: (edit: EditorLogic.Edit, selection: NSRange)?) {
+        guard let result, let tv = textView else { return }
+        replace(result.edit.range, with: result.edit.text)
+        tv.setSelectedRange(result.selection)
+    }
+
     /// Wraps the selection in marks, takes them off again if they are already there, or drops a pair at the cursor to type into.
     func wrap(_ open: String, _ close: String? = nil) {
         guard let tv = textView else { return }
         focus()
-        let close = close ?? open
-        let ns = tv.string as NSString
-        let sel = tv.selectedRange()
-        let o = (open as NSString).length, c = (close as NSString).length
-        if sel.length > 0, sel.location >= o, NSMaxRange(sel) + c <= ns.length,
-           ns.substring(with: NSRange(location: sel.location - o, length: o)) == open,
-           ns.substring(with: NSRange(location: NSMaxRange(sel), length: c)) == close {
-            let outer = NSRange(location: sel.location - o, length: sel.length + o + c)
-            replace(outer, with: ns.substring(with: sel))
-            tv.setSelectedRange(NSRange(location: sel.location - o, length: sel.length))
-        } else {
-            replace(sel, with: open + ns.substring(with: sel) + close)
-            tv.setSelectedRange(NSRange(location: sel.location + o, length: sel.length))
-        }
+        apply(EditorLogic.wrap(tv.string, selection: tv.selectedRange(), open: open, close: close ?? open))
     }
 
-    /// Sets the current line's prefix (a heading, list or quote); choosing the same one again removes it.
+    /// Sets the prefix (a heading, list or quote) of every selected line; choosing the same one again removes it.
     func linePrefix(_ prefix: String) {
         guard let tv = textView else { return }
         focus()
-        let ns = tv.string as NSString
-        let sel = tv.selectedRange()
-        let lr = ns.lineRange(for: NSRange(location: sel.location, length: 0))
-        let line = ns.substring(with: lr)
-        let oldLen = MarkdownStyler.prefixRX.firstMatch(in: line, range: NSRange(location: 0, length: (line as NSString).length))?.range.length ?? 0
-        let old = ns.substring(with: NSRange(location: lr.location, length: oldLen))
-        let new = old == prefix ? "" : prefix
-        replace(NSRange(location: lr.location, length: oldLen), with: new)
-        tv.setSelectedRange(NSRange(location: max(lr.location, sel.location + (new as NSString).length - oldLen), length: 0))
+        apply(EditorLogic.linePrefix(tv.string, selection: tv.selectedRange(), prefix: prefix))
     }
 
     /// Puts text at the cursor, replacing any selection.
@@ -135,35 +123,73 @@ final class MDTextView: NSTextView {
 
     override func paste(_ sender: Any?) { pasteAsPlainText(sender) }
 
+    /// Bold, italic and link as in Notes; the paragraph styles use Notes' shortcuts too (Title, Heading, Subheading and Body are Shift-Command T, H, J and B;
+    /// Shift-Command 7 is a bulleted list and 9 a numbered one; Command ' is a block quote).
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command, let k = event.charactersIgnoringModifiers {
-            switch k {
-            case "b": controller?.wrap("**"); return true
-            case "i": controller?.wrap("*"); return true
-            case "k": controller?.wrap("[[", "]]"); return true
-            default: break
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if let k = event.charactersIgnoringModifiers?.lowercased() {
+            if flags == .command {
+                switch k {
+                case "b": controller?.wrap("**"); return true
+                case "i": controller?.wrap("*"); return true
+                case "k": controller?.wrap("[[", "]]"); return true
+                case "'": controller?.linePrefix("> "); return true
+                default: break
+                }
+            } else if flags == [.command, .shift] {
+                switch k {
+                case "t": controller?.linePrefix("# "); return true
+                case "h": controller?.linePrefix("## "); return true
+                case "j": controller?.linePrefix("### "); return true
+                case "b": controller?.linePrefix(""); return true
+                default: break
+                }
+                switch event.keyCode {      // the number row, whatever the keyboard layout calls the keys
+                case 26: controller?.linePrefix("- "); return true
+                case 25: controller?.linePrefix("1. "); return true
+                default: break
+                }
             }
         }
         return super.performKeyEquivalent(with: event)
     }
 
-    /// A click on a checkbox ticks it, anywhere else places the cursor as usual.
+    /// A click on a checkbox ticks it (in a callout too), Command-click on a link follows it, anywhere else places the cursor as usual.
     override func mouseDown(with event: NSEvent) {
-        let i = characterIndexForInsertion(at: convert(event.locationInWindow, from: nil))
-        let ns = string as NSString
-        if event.clickCount == 1, ns.length > 0 {
-            let lr = ns.lineRange(for: NSRange(location: min(i, ns.length - 1), length: 0))
-            let line = ns.substring(with: lr)
-            if let m = MarkdownStyler.checkRX.firstMatch(in: line, range: NSRange(location: 0, length: (line as NSString).length)) {
-                let box = NSRange(location: lr.location + m.range(at: 3).location, length: m.range(at: 3).length)
-                if i >= box.location - 1, i <= NSMaxRange(box) + 1 {
-                    let now = ns.substring(with: box) == "[ ]" ? "[x]" : "[ ]"
-                    if shouldChangeText(in: box, replacementString: now) { replaceCharacters(in: box, with: now); didChangeText() }
-                    return
-                }
+        let p = convert(event.locationInWindow, from: nil)
+        if event.clickCount == 1, let lm = layoutManager, let tc = textContainer {
+            if event.modifierFlags.contains(.command), let target = link(at: p) { controller?.openLink?(target); return }
+            let o = textContainerOrigin, ns = string as NSString
+            for d in decorations {
+                guard case .checkbox = d.kind, NSMaxRange(d.range) <= ns.length else { continue }
+                let gr = lm.glyphRange(forCharacterRange: d.range, actualCharacterRange: nil)
+                guard gr.length > 0 else { continue }
+                var b = lm.boundingRect(forGlyphRange: gr, in: tc)
+                b.origin.x += o.x; b.origin.y += o.y
+                guard NSRect(x: b.minX - 3, y: b.midY - 12, width: 27, height: 24).contains(p) else { continue }
+                let now = ns.substring(with: d.range) == "[ ]" ? "[x]" : "[ ]"
+                if shouldChangeText(in: d.range, replacementString: now) { replaceCharacters(in: d.range, with: now); didChangeText() }
+                return
             }
         }
         super.mouseDown(with: event)
+    }
+
+    /// The target of the `[[note]]` or `[text](address)` under the point, if there is one.
+    private func link(at p: NSPoint) -> String? {
+        guard let lm = layoutManager, let tc = textContainer else { return nil }
+        let o = textContainerOrigin
+        var fraction: CGFloat = 0
+        let i = lm.characterIndex(for: NSPoint(x: p.x - o.x, y: p.y - o.y), in: tc, fractionOfDistanceBetweenInsertionPoints: &fraction)
+        let ns = string as NSString
+        guard i >= 0, i < ns.length else { return nil }
+        let lr = ns.lineRange(for: NSRange(location: i, length: 0))
+        let line = ns.substring(with: lr) as NSString
+        let all = NSRange(location: 0, length: line.length), at = i - lr.location
+        for re in [MarkdownStyler.wikiRX, MarkdownStyler.linkRX] {
+            for m in re.matches(in: line as String, range: all) where NSLocationInRange(at, m.range) { return line.substring(with: m.range(at: 2)) }
+        }
+        return nil
     }
 
     // MARK: Drawing the things the marks stand for
@@ -222,6 +248,7 @@ final class MDTextView: NSTextView {
 }
 
 struct MarkdownEditor: NSViewRepresentable {
+    /// The whole note, frontmatter and all. The editor shows and changes only what comes after the frontmatter, and writes the rest back as it was.
     @Binding var text: String
     let controller: EditorController
 
@@ -247,21 +274,29 @@ struct MarkdownEditor: NSViewRepresentable {
         tv.isHorizontallyResizable = false
         tv.textContainer?.widthTracksTextView = true
         tv.insertionPointColor = MarkdownStyler.accent
-        tv.string = text
+        let (front, body) = NoteText.split(text)
+        context.coordinator.front = front
+        tv.string = body
         tv.restyle()
         controller.textView = tv
         return tv
     }
 
     func updateNSView(_ tv: MDTextView, context: Context) {
-        context.coordinator.parent = self
+        let c = context.coordinator
+        c.parent = self
         controller.textView = tv
-        if tv.string != text {
-            let sel = tv.selectedRange()
-            tv.string = text
-            tv.restyle()
-            tv.setSelectedRange(NSRange(location: min(sel.location, (text as NSString).length), length: 0))
-        }
+        guard c.front + tv.string != text else { return }      // that is what the editor itself last wrote
+        let (front, body) = NoteText.split(text)
+        c.front = front
+        guard tv.string != body else { return }                // only the frontmatter changed (a property in the side panel)
+        // The note changed under the editor (another version restored, an agent's edit, another note opened here). Its undo steps point into the old
+        // text, so they go too: undoing one would reach for characters that are no longer there.
+        let sel = tv.selectedRange()
+        tv.string = body
+        tv.undoManager?.removeAllActions()
+        tv.restyle()
+        tv.setSelectedRange(NSRange(location: min(sel.location, (body as NSString).length), length: 0))
     }
 
     /// The text view grows with its text, so the page's own scroll view scrolls the title and the text together.
@@ -276,6 +311,8 @@ struct MarkdownEditor: NSViewRepresentable {
 
     @MainActor final class Coordinator: NSObject, NSTextViewDelegate, @preconcurrency NSLayoutManagerDelegate {
         var parent: MarkdownEditor
+        /// The note's frontmatter (and the blank line after it), kept apart from the text view and put back in front of it on every change.
+        var front = ""
         init(_ parent: MarkdownEditor) { self.parent = parent }
 
         /// Up to this many characters the whole text is styled on every keystroke, which is exact and cheap. Past it, an edit inside one line restyles only
@@ -304,7 +341,7 @@ struct MarkdownEditor: NSViewRepresentable {
                     after(milliseconds: 700, tv)
                 } else { after(milliseconds: 150, tv) }
             }
-            parent.text = tv.string
+            parent.text = front + tv.string
         }
 
         private func after(milliseconds: Int, _ tv: MDTextView) {
@@ -357,19 +394,33 @@ struct MarkdownEditor: NSViewRepresentable {
         }
 
         /// The cursor never rests inside a hidden mark: the marks in front of a line's text (the `## ` of a heading, a bullet) are skipped,
-        /// and so are the marks around a word.
+        /// and so are the marks around a word. An arrow key pressed once has to move past something you can see: Left from the start of a line's
+        /// text goes to the end of the line above, and Left or Right next to a word's hidden marks goes over the marks and the letter beside them.
         func textView(_ tv: NSTextView, willChangeSelectionFromCharacterRange old: NSRange, toCharacterRange new: NSRange) -> NSRange {
             guard new.length == 0, let st = tv.textStorage, st.length > 0 else { return new }
             let ns = st.string as NSString
+            let movingBack = new.location < old.location
             var loc = min(new.location, st.length)
-            let movingBack = loc < old.location
-            let line = ns.lineRange(for: NSRange(location: min(loc, st.length - 1), length: 0))
-            if let lead = run(MarkdownStyler.leadingKey, at: line.location, in: st), lead.location == line.location, loc < NSMaxRange(lead), loc >= lead.location {
-                loc = movingBack && line.location > 0 ? line.location - 1 : NSMaxRange(lead)
-            } else if let h = run(MarkdownStyler.hiddenKey, at: loc, in: st), h.location < loc {
-                loc = movingBack ? h.location : NSMaxRange(h)
+            var step = old.length == 0 ? loc - old.location : 0        // -1 or 1 for one press of an arrow key; anything else is a click or a bigger jump
+            for _ in 0..<3 {
+                let settled = snap(loc, movingBack: movingBack, step: step, from: old.location, in: st, ns)
+                if settled == loc { break }
+                loc = settled; step = 0
             }
             return NSRange(location: loc, length: 0)
+        }
+
+        private func snap(_ loc: Int, movingBack: Bool, step: Int, from old: Int, in st: NSTextStorage, _ ns: NSString) -> Int {
+            let line = ns.lineRange(for: NSRange(location: min(loc, st.length - 1), length: 0))
+            if let lead = run(MarkdownStyler.leadingKey, at: line.location, in: st), lead.location == line.location, loc < NSMaxRange(lead) {
+                return step == -1 && old == NSMaxRange(lead) && line.location > 0 ? line.location - 1 : NSMaxRange(lead)
+            }
+            if let h = run(MarkdownStyler.hiddenKey, at: loc, in: st), h.location < loc {
+                if step == -1, old == NSMaxRange(h) { return h.location > 0 ? ns.rangeOfComposedCharacterSequence(at: h.location - 1).location : 0 }
+                if step == 1, old == h.location { return NSMaxRange(h) < ns.length ? NSMaxRange(ns.rangeOfComposedCharacterSequence(at: NSMaxRange(h))) : NSMaxRange(h) }
+                return movingBack ? h.location : NSMaxRange(h)
+            }
+            return loc
         }
 
         func textView(_ tv: NSTextView, doCommandBy sel: Selector) -> Bool {
@@ -395,6 +446,7 @@ struct MarkdownEditor: NSViewRepresentable {
             let ns = st.string as NSString
             let line = ns.lineRange(for: NSRange(location: sel.location, length: 0))
             if let lead = run(MarkdownStyler.leadingKey, at: line.location, in: st), lead.location == line.location, sel.location == NSMaxRange(lead) {
+                if ns.character(at: line.location) == 32, indent(tv, -1) { return true }       // a nested item steps out a level before its mark goes
                 remove(lead, in: tv); return true
             }
             if let h = run(MarkdownStyler.hiddenKey, at: sel.location - 1, in: st) {
@@ -402,9 +454,17 @@ struct MarkdownEditor: NSViewRepresentable {
                 let r = ns.rangeOfComposedCharacterSequence(at: h.location - 1)
                 remove(r, in: tv)
                 tv.setSelectedRange(NSRange(location: r.location, length: 0))
+                dropEmptyMarks(tv)
                 return true
             }
             return false
+        }
+
+        /// Taking the last letter out of a bold (or italic, highlighted, code) word takes its marks away too, so no bare `****` is left behind.
+        private func dropEmptyMarks(_ tv: NSTextView) {
+            guard let edit = EditorLogic.emptyMarks(in: tv.string, at: tv.selectedRange().location) else { return }
+            remove(edit.range, in: tv)
+            tv.setSelectedRange(NSRange(location: edit.range.location, length: 0))
         }
 
         func deleteForward(_ tv: NSTextView) -> Bool {
@@ -432,7 +492,7 @@ struct MarkdownEditor: NSViewRepresentable {
                 } else { addRow(tv, line: line, lineStart: lr.location, cut: row.cut, pipes: row.pipes) }
                 return true
             }
-            var prefix = "", next = ""
+            var prefix = "", next = "", numbered = false
             if let q = MarkdownStyler.quoteRX.firstMatch(in: line, range: all) {
                 // inside a quote or callout: keep the > marks, and carry on a list inside it
                 let inner = NSRange(location: q.range.length, length: all.length - q.range.length)
@@ -452,15 +512,27 @@ struct MarkdownEditor: NSViewRepresentable {
                 let digits = ls.substring(with: m.range(at: 2))
                 let n = (Int(digits.dropLast()) ?? 0) + 1
                 next = ls.substring(with: m.range(at: 1)) + "\(n)" + String(digits.last ?? ".") + " "
+                numbered = true
             } else { return false }
             let prefixLen = (prefix as NSString).length
             guard sel.location - lr.location >= prefixLen else { return false }       // the cursor is inside the mark itself
             if line.trimmingCharacters(in: .whitespaces).count == prefix.trimmingCharacters(in: .whitespaces).count {
+                if line.hasPrefix(" "), indent(tv, -1) { return true }                  // an empty nested item steps out a level first
                 remove(NSRange(location: lr.location, length: prefixLen), in: tv)      // nothing after the mark: end the list
                 return true
             }
             tv.insertText("\n" + next, replacementRange: sel)
+            if numbered { renumber(tv) }
             return true
+        }
+
+        /// The numbered items under the one just added count on from it.
+        private func renumber(_ tv: NSTextView) {
+            let line = (tv.string as NSString).lineRange(for: NSRange(location: tv.selectedRange().location, length: 0))
+            guard let edit = EditorLogic.renumber(tv.string, fromLine: line) else { return }
+            let keep = tv.selectedRange()
+            if tv.shouldChangeText(in: edit.range, replacementString: edit.text) { tv.replaceCharacters(in: edit.range, with: edit.text); tv.didChangeText() }
+            tv.setSelectedRange(keep)
         }
 
         // MARK: Tables
@@ -521,20 +593,15 @@ struct MarkdownEditor: NSViewRepresentable {
             return true
         }
 
-        /// Tab and Shift-Tab move between a table's cells, and nest and un-nest a list item.
+        /// Tab and Shift-Tab move between a table's cells, and nest and un-nest every selected list item.
         func indent(_ tv: NSTextView, _ dir: Int) -> Bool {
             if tableCell(tv, dir) { return true }
-            let ns = tv.string as NSString
-            let lr = ns.lineRange(for: tv.selectedRange())
-            let line = ns.substring(with: lr)
-            let all = NSRange(location: 0, length: (line as NSString).length)
-            let isList = MarkdownStyler.checkRX.firstMatch(in: line, range: all) != nil || MarkdownStyler.bulletRX.firstMatch(in: line, range: all) != nil
-                || MarkdownStyler.numberRX.firstMatch(in: line, range: all) != nil
-            guard isList else { return false }
-            if dir > 0 { tv.insertText("  ", replacementRange: NSRange(location: lr.location, length: 0)); return true }
-            let drop = min(line.prefix { $0 == " " }.count, 2)
-            if drop > 0 { tv.insertText("", replacementRange: NSRange(location: lr.location, length: drop)) }
-            return true
+            if let (edit, sel) = EditorLogic.indent(tv.string, selection: tv.selectedRange(), by: dir) {
+                if tv.shouldChangeText(in: edit.range, replacementString: edit.text) { tv.replaceCharacters(in: edit.range, with: edit.text); tv.didChangeText() }
+                tv.setSelectedRange(sel)
+                return true
+            }
+            return tv.selectedRange().length > 0       // Tab never replaces a selected passage with a tab character
         }
     }
 }
@@ -561,7 +628,6 @@ struct MarkdownEditor: NSViewRepresentable {
     })
 
     private static func rx(_ p: String) -> NSRegularExpression { try! NSRegularExpression(pattern: p) }
-    static let prefixRX = rx(#"^(#{1,6} |- \[[ xX]\] |[-*+] |\d+[.)] |> )"#)
     static let headingRX = rx(#"^(#{1,6})[ \t]+"#)
     static let ruleRX = rx(#"^\s*(-{3,}|\*{3,}|_{3,})\s*$"#)
     static let quoteRX = rx(#"^(\s*>[ \t]?)+"#)
@@ -570,12 +636,13 @@ struct MarkdownEditor: NSViewRepresentable {
     static let numberRX = rx(#"^(\s*)(\d+[.)])[ \t]"#)
     private static let calloutRX = rx(#"(\[!([A-Za-z]+)\][+-]?)[ \t]*"#)
     private static let codeRX = rx(#"`([^`\n]+)`"#)
+    private static let boldItalicRX = rx(#"\*\*\*([^*\n]+)\*\*\*"#)
     private static let boldRX = rx(#"\*\*([^*\n]+)\*\*"#)
     private static let italicRX = rx(#"(?<![*\w])\*([^*\n]+)\*(?![*\w])"#)
     private static let strikeRX = rx(#"~~([^~\n]+)~~"#)
     private static let markRX = rx(#"==([^=\n]+)=="#)
-    private static let wikiRX = rx(#"(!?)\[\[([^\]\n|]+)(\|([^\]\n]+))?\]\]"#)
-    private static let linkRX = rx(#"\[([^\]\n]+)\]\(([^)\n]+)\)"#)
+    static let wikiRX = rx(#"(!?)\[\[([^\]\n|]+)(\|([^\]\n]+))?\]\]"#)
+    static let linkRX = rx(#"\[([^\]\n]+)\]\(([^)\n]+)\)"#)
 
     static func font(_ size: CGFloat, _ weight: NSFont.Weight = .regular, mono: Bool = false) -> NSFont {
         mono ? NSFont.monospacedSystemFont(ofSize: size, weight: weight) : NSFont.systemFont(ofSize: size, weight: weight)
@@ -804,6 +871,7 @@ struct MarkdownEditor: NSViewRepresentable {
             s.addAttributes([.font: font(13, mono: true), .backgroundColor: NSColor.labelColor.withAlphaComponent(0.08)], range: at(m.range(at: 1)))
             around(m, 1)
         }
+        each(boldItalicRX) { m in trait(.boldFontMask, at(m.range(at: 1)), s); trait(.italicFontMask, at(m.range(at: 1)), s); around(m, 3) }
         each(boldRX) { m in trait(.boldFontMask, at(m.range(at: 1)), s); around(m, 2) }
         each(italicRX) { m in trait(.italicFontMask, at(m.range(at: 1)), s); around(m, 1) }
         each(strikeRX) { m in

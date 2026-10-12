@@ -1243,6 +1243,7 @@ enum Check {
         Zotero.check()
         CalendarSync.checkNotes()
         Vault.checkEditing()
+        EditorLogic.check()
         Manager.check()
         let tags = TagsPage.build(notes); precondition(!tags.isEmpty, "tags are indexed from frontmatter")
         let week: (Date?) -> Int = { d in d.map { Int((Double(Calendar.current.dateComponents([.day], from: Vault.currentSemesterStart, to: $0).day ?? 0) / 7).rounded(.down)) + 1 } ?? 0 }
