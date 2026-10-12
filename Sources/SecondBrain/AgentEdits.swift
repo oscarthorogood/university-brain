@@ -1,18 +1,27 @@
 import Foundation
 
-// When Oscar asks the agent to change his notes it may (see `Agent.editRules`), the app keeps the old versions, finds what changed, puts back anything that lost its
+// When Oscar asks the agent to change his notes (or anything in the vault) it may (see `Agent.editRules`), the app keeps the old versions, finds what changed, puts back anything that lost its
 // frontmatter and logs one Undo. A kind of work that can't do a request says `DELEGATE:`, and the app tries another; when none is left it is handled as general help.
 
 extension Store {
-    /// A snapshot of every note, so whatever an agent edits can be put back (the notes are the only thing a chat edit can reach).
-    func snapshotNotes(_ root: URL) async {
+    /// A snapshot of every Markdown file an edit can reach (the notes, and `Agents/` and `Templates/` too), so whatever the agent changes can be put back.
+    /// Returns their vault paths, so a file that already existed is never mistaken for one the agent created.
+    func snapshotNotes(_ root: URL) async -> Set<String> {
         let urls = notes.map(\.id)
-        await Task.detached(priority: .utility) { for u in urls { try? Vault.snapshot(u, root: root) } }.value
+        return await Task.detached(priority: .utility) {
+            var all = Set(urls)
+            for top in ["Agents", "Templates"] {
+                guard let walk = FileManager.default.enumerator(at: root.appending(path: top), includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) else { continue }
+                for case let u as URL in walk where u.pathExtension == "md" { all.insert(u) }
+            }
+            for u in all { try? Vault.snapshot(u, root: root) }
+            return Set(all.map { Vault.rel($0) })
+        }.value
     }
 
     /// What an agent changed since `started`: logs it with an Undo, and puts back any existing note that lost its frontmatter. Returns a line for the chat, or nil if nothing changed.
     func recordEdits(since started: Date, existing: Set<String>, by code: String, root: URL) async -> String? {
-        let touched = await Review.touchedInBackground(since: started, root: root).filter { $0.hasSuffix(".md") && !$0.hasPrefix("Agents/") && !$0.hasPrefix("Templates/") }
+        let touched = await Review.touchedInBackground(since: started, root: root).filter { $0.hasSuffix(".md") }
         guard !touched.isEmpty else { return nil }
         var changed: [String] = [], created: [String] = [], restored: [String] = [], snaps: [String: String] = [:]
         for rel in touched {

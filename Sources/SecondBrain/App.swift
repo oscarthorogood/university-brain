@@ -296,9 +296,9 @@ struct SecondBrainApp: App {
         let root = Vault.root
         let started = Date.now
         var existing = Set<String>()
-        if editing { await snapshotNotes(root); existing = Set(notes.map { Vault.rel($0.id) }) }
-        let writes = Agent.writeScopes(mode) + (editing ? Agent.noteScopes(root: root) : [])
-        let reply = await Agent.run(team.isEmpty ? prompt : prompt + "\n\n" + team, system: Agent.systemPrompt(Agent.role(mode), course: course), session: sessions[m], canEdit: false, root: root, tier: tier, writes: writes, web: ["librarian", "researcher"].contains(mode),
+        if editing { existing = await snapshotNotes(root) }
+        let writes = Agent.writeScopes(mode)
+        let reply = await Agent.run(team.isEmpty ? prompt : prompt + "\n\n" + team, system: Agent.systemPrompt(Agent.role(mode), course: course), session: sessions[m], canEdit: editing, root: root, tier: tier, writes: writes, web: ["librarian", "researcher"].contains(mode),
                                     onText: { [weak self] text in
                                         Task { @MainActor in
                                             guard let self, self.streamEpoch == epoch else { return }   // a late piece after the answer is in is ignored
