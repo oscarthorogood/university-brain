@@ -1,7 +1,7 @@
 import Foundation
 
-// When Oscar asks an agent to change his notes it may (see `Agent.editRules`), the app keeps the old versions, finds what changed, puts back anything that lost its
-// frontmatter and logs one Undo. An agent that can't do a request says `DELEGATE:`, and the Manager picks another; when no other agent is left the Manager does it itself.
+// When Oscar asks the agent to change his notes it may (see `Agent.editRules`), the app keeps the old versions, finds what changed, puts back anything that lost its
+// frontmatter and logs one Undo. A kind of work that can't do a request says `DELEGATE:`, and the app tries another; when none is left it is handled as general help.
 
 extension Store {
     /// A snapshot of every note, so whatever an agent edits can be put back (the notes are the only thing a chat edit can reach).
@@ -55,24 +55,23 @@ extension Store {
         return "\n\nMoved \(done.count) of \(moves.count) file\(moves.count == 1 ? "" : "s")." + (failed.isEmpty ? "" : " " + failed.prefix(2).joined(separator: " "))
     }
 
-    /// An agent said it couldn't do the request (`DELEGATE:`): the Manager picks another, up to three times; when no other agent fits, the Manager does it itself.
-    func passOn(_ text: String, tried: Set<String>, why: String, in chat: String, tier: Manager.Tier?) async {
+    /// The work said it couldn't do the request as that kind of work (`DELEGATE:`): the app tries another kind, up to three times; when none fits, it is handled as general help.
+    /// The chat is already marked busy by whoever is calling.
+    func passOn(_ text: String, tried: Set<String>, why: String, course: String?, tier: Manager.Tier?) async {
         var tried = tried, why = why
-        thinking.insert(chat)
-        defer { thinking.remove(chat) }
+        let m = Agent.manager.id
         for _ in 0..<3 {
             guard !Task.isCancelled else { return }
             let route = await Manager.decide(text, previous: nil, excluding: tried)
-            let from = tried.map { Agent.role($0).name }.sorted().joined(separator: ", ")
-            chats[chat, default: []].append(Message(fromAgent: true, text: "→ \(from) can’t do this (\(why.prefix(120))) · **\(Agent.role(route.agent).name)** · \(route.reason)"))
-            log(Agent.manager.id, "Passed “\(text.prefix(50))” on to \(Agent.role(route.agent).name): \(from) couldn’t (\(why.prefix(80)))")
-            let general = route.agent == Agent.manager.id
-            say(Agent.manager.id, general ? "Nobody else can take this one, so I'll do it: \(clipped(text, 100))" : "@\(Agent.role(route.agent).name) \(from) can't do this (\(clipped(why, 120))). Can you take it? Oscar says “\(clipped(text, 100))”")
-            let reply = await converse(route.agent, shown: text, prompt: text, tier: tier ?? route.tier, mirror: chat == route.agent || chat == Agent.manager.id ? nil : chat, echo: route.agent != chat && !general)
+            let from = tried.map { Agent.label($0) }.sorted().joined(separator: ", ")
+            let general = route.agent == m
+            chats[m, default: []].append(Message(fromAgent: true, text: "→ not \(from) work (\(why.prefix(120))) · **\(Agent.label(route.agent))** · \(route.reason)"))
+            log(m, "Tried “\(text.prefix(50))” as \(Agent.label(route.agent)) instead: \(from) didn’t fit (\(why.prefix(80)))")
+            let reply = await converse(route.agent, shown: text, prompt: text, tier: tier ?? route.tier, course: course ?? route.course, echo: false)
             guard let next = reply.delegation else { return }
             if general { break }
             tried.insert(route.agent); why = next
         }
-        chats[chat, default: []].append(Message(fromAgent: true, text: "Nothing could do this: " + why.prefix(160)))
+        chats[m, default: []].append(Message(fromAgent: true, text: "I couldn’t do this: " + why.prefix(160)))
     }
 }

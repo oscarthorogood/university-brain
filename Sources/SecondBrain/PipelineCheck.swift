@@ -2,7 +2,7 @@ import Foundation
 
 final class CheckFlag: @unchecked Sendable { var done = false }
 
-/// Part of `--check`: the consult → work → review pipeline run against a stand-in for Claude on a throwaway vault.
+/// Part of `--check`: the work → review pipeline run against a stand-in for Claude on a throwaway vault.
 /// Covers success, a review problem fixed on the retry, a job that fails twice and is undone, a job with nothing to do, the loop breaker, and the review's own rules.
 extension Store {
     @MainActor static func checkPipeline() async {
@@ -42,7 +42,6 @@ extension Store {
 
         var mode = "good", calls: [String] = [], workPrompts: [String] = []
         Agent.stub = { prompt, _, session, _, _ in
-            if prompt.contains("The Manager is about to give") { calls.append("consult"); return Agent.Reply(text: "Lectures are Mondays; this is worth 30%.", session: "c") }
             if mode == "sort" {   // the Sorter: plan, then (after the app's moves) edit the note it named
                 if prompt.contains("Plan how to file") { return Agent.Reply(text: "Link the new file in `Lectures/\(lecture(1))`.\nMOVE: Unsorted/new.txt -> Resources/SM/Documents/new.txt", session: "s") }
                 if prompt.contains("Now do the note changes") {
@@ -86,12 +85,12 @@ extension Store {
             func say(_ t: String) { FileHandle.standardError.write(Data(("pipeline: " + t + "\n").utf8)) }
             say("start")
             func expect(_ ok: Bool, _ msg: @autoclosure () -> String) { if !ok { say("FAILED: " + msg() + " | log: " + st.activity.prefix(4).map(\.text).joined(separator: " // ")); fatalError("pipeline check: " + msg()) } }
-            // 1. success: consulted the course agent, the helper did it, the Manager checked it, and it can be undone
+            // 1. success: the job is told where its course briefing is, does it, the Manager checks it, and it can be undone
             mode = "good"; calls = []
             await st.runJob(job(1, "k1"))
             var item = st.inbox.last { $0.key == "k1" }!
-            expect(calls == ["consult", "work"], "consult, then work: \(calls)")
-            expect(workPrompts.last!.contains("this is worth 30%"), "the course agent's advice reaches the helper")
+            expect(calls == ["work"], "no one is consulted, the work is done: \(calls)")
+            expect(workPrompts.last!.contains("Course briefing.md"), "the course briefing reaches the work")
             expect(item.state == .done && item.verdict == "Checked: fine", "done and checked: \(item.state) \(item.verdict ?? "")")
             expect(text(1).contains("slide 3") && status(1) == "Not started" && st.canUndo(item.id), "edited, status given back, undoable: \(text(1).contains("slide 3")) \(status(1)) \(st.canUndo(item.id)) state=\(item.state) undo=\(String(describing: item.undo))")
             st.undoJob(item.id)
@@ -102,7 +101,7 @@ extension Store {
             mode = "retryfix"; calls = []
             await st.runJob(job(2, "k2"))
             item = st.inbox.last { $0.key == "k2" }!
-            expect(calls == ["consult", "work", "retry"] && item.state == .done, "sent back once, then fine: \(calls) \(item.state)")
+            expect(calls == ["work", "retry"] && item.state == .done, "sent back once, then fine: \(calls) \(item.state)")
             expect(text(2).contains("my own line 2"), "Oscar's line is back")
 
             say("3. it fails twice")
@@ -110,7 +109,7 @@ extension Store {
             mode = "bad"; calls = []
             await st.runJob(job(3, "k3"))
             item = st.inbox.last { $0.key == "k3" }!
-            expect(calls == ["consult", "work", "retry"] && item.state == .rejected, "rejected after one retry: \(calls) \(item.state)")
+            expect(calls == ["work", "retry"] && item.state == .rejected, "rejected after one retry: \(calls) \(item.state)")
             expect(text(3).contains("my own line 3") && status(3) == "Not started", "the note is as it was")
 
             say("4. nothing to do")
@@ -181,6 +180,6 @@ extension Store {
             st.undoJob(item.id)
             expect(there("Unsorted/copy.txt") && there("Unsorted/new.txt") && !text(1).contains("(filed)"), "undo puts back both files and the note the Sorter edited")
         }
-        print("pipeline ok: consult → work → review, one retry, undo on rejection, loop breaker, checks, filing")
+        print("pipeline ok: work → review, one retry, undo on rejection, loop breaker, checks, filing")
     }
 }

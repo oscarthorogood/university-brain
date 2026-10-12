@@ -103,7 +103,7 @@ struct SecondBrainApp: App {
                 print(jobs.isEmpty ? "nothing to hand out" : jobs.map { "\(Int($0.score)) · \($0.job.label)" }.joined(separator: "\n")); exit(0)
             }
         }
-        // `--route "<request>"`: prints which agent the Manager would pick, at what effort and why (nothing is run).
+        // `--route "<request>"`: prints which kind of work the Manager would pick, at what effort and why (nothing is run).
         if let i = CommandLine.arguments.firstIndex(of: "--route"), i + 1 < CommandLine.arguments.count {
             let done = DispatchSemaphore(value: 0)
             Task.detached {
@@ -112,7 +112,7 @@ struct SecondBrainApp: App {
             }
             done.wait(); exit(0)
         }
-        // `--run-top`: runs the single best job the Manager would pick, through the real consult, work and review (use SECOND_BRAIN_VAULT for a copy).
+        // `--run-top`: runs the single best job the Manager would pick, through the real work and review (use SECOND_BRAIN_VAULT for a copy).
         if CommandLine.arguments.contains("--run-top") {
             let flagDone = CheckFlag()
             Task { @MainActor in
@@ -120,14 +120,14 @@ struct SecondBrainApp: App {
                 guard let top = st.scan().first else { print("nothing to hand out"); flagDone.done = true; return }
                 print("running: \(top.job.label)")
                 await st.manualJob(top.job)
-                if let item = st.activeJobs.first ?? st.inbox.last { print("\(item.state.rawValue) · \(item.title)\n\(item.verdict ?? "")\n\(item.advice.map { "Course agent: " + $0 + "\n" } ?? "")\(item.result ?? "")") }
+                if let item = st.activeJobs.first ?? st.inbox.last { print("\(item.state.rawValue) · \(item.title)\n\(item.verdict ?? "")\n\(item.advice.map { "Course context: " + $0 + "\n" } ?? "")\(item.result ?? "")") }
                 for a in st.activity.prefix(6) { print("log: " + a.text) }
                 flagDone.done = true
             }
             while !flagDone.done { RunLoop.main.run(mode: .default, before: Date(timeIntervalSinceNow: 0.05)) }
             exit(0)
         }
-        // `--work <note path in vault>` and `--file <path in vault>`: run the real consult, work and review pipeline once, headlessly (use SECOND_BRAIN_VAULT for a copy).
+        // `--work <note path in vault>` and `--file <path in vault>`: run the real work and review pipeline once, headlessly (use SECOND_BRAIN_VAULT for a copy).
         for (flag, isFile) in [("--work", false), ("--file", true)] {
             guard let i = CommandLine.arguments.firstIndex(of: flag), i + 1 < CommandLine.arguments.count else { continue }
             let url = Vault.root.appending(path: CommandLine.arguments[i + 1]), flagDone = CheckFlag()
@@ -136,7 +136,7 @@ struct SecondBrainApp: App {
                 if isFile { await st.manualJob(.sorting([url], key: key)) }
                 else if let n = st.notes.first(where: { $0.id.resolvingSymlinksInPath() == url.resolvingSymlinksInPath() }), let w = AgentWork.forNote(n) { await st.manualJob(.work(n, w, key: key, why: "run from the command line")) }
                 else { print("nothing for an agent to do on that note") }
-                if let item = st.inbox.last(where: { $0.key == key }) { print("\(item.state.rawValue) · \(item.title)\n\(item.verdict ?? "")\n\(item.advice.map { "Course agent: " + $0 + "\n" } ?? "")\(item.result ?? "")") }
+                if let item = st.inbox.last(where: { $0.key == key }) { print("\(item.state.rawValue) · \(item.title)\n\(item.verdict ?? "")\n\(item.advice.map { "Course context: " + $0 + "\n" } ?? "")\(item.result ?? "")") }
                 flagDone.done = true
             }
             while !flagDone.done { RunLoop.main.run(mode: .default, before: Date(timeIntervalSinceNow: 0.05)) }
@@ -188,16 +188,13 @@ struct SecondBrainApp: App {
                 ForEach(Array(Vault.courses.values.sorted()), id: \.self) { c in Button(c == "SM" ? "Strategy" : c) { store.page = .course(c) } }
                 Divider()
                 Button(Agent.manager.name) { store.page = .agent(Agent.manager.id) }.keyboardShortcut("m", modifiers: [.command, .option])
-                ForEach(Array(Agent.roles.enumerated()), id: \.1.id) { i, r in
-                    Button(r.name) { store.page = .agent(r.id) }.keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: [.command, .option])
-                }
                 Divider()
                 Button("Reload Vault") { store.reload() }.keyboardShortcut("r")
             }
         }
         MenuBarExtra(isInserted: $menuBarOn) {
             Button("Open University Brain") { NSApp.activate(); openWindow(id: "main") }
-            if let job = store.activeJobs.first { Text("\(Agent.role(job.agent).name): \(job.title)") } else { Text(store.blockedReason() ?? "The Manager is idle") }
+            if let job = store.activeJobs.first { Text("\(Agent.Label(job.agent)): \(job.title)") } else { Text(store.blockedReason() ?? "The Manager is idle") }
             if store.pausedUntil == nil { Button("Pause the Manager") { store.pause(for: nil) } } else { Button("Resume the Manager") { store.resume() } }
             Divider()
             Button("Quit University Brain") { NSApp.terminate(nil) }
@@ -228,19 +225,12 @@ struct SecondBrainApp: App {
     var recentNotes: [URL] = (UserDefaults.standard.stringArray(forKey: "recentNotes") ?? []).map { URL(fileURLWithPath: $0) }
     func visited(_ p: Page) {
         switch p {
-        case .agent(let id): touchAgent(id)
         case .note(let u), .unsorted(let u):
             guard u.pathExtension == "md" else { break }   // (a `where` after two patterns only applies to the last one)
             recentNotes = Array(([u] + recentNotes.filter { $0 != u }).prefix(10))
             UserDefaults.standard.set(recentNotes.map(\.path), forKey: "recentNotes")
         default: break
         }
-    }
-    /// Agents in the order they were last opened or asked, newest first (the dock shows the top three).
-    var recentAgents = UserDefaults.standard.stringArray(forKey: "recentAgents") ?? []
-    func touchAgent(_ id: String) {
-        recentAgents = ([id] + recentAgents.filter { $0 != id }).prefix(8).map { $0 }
-        UserDefaults.standard.set(recentAgents, forKey: "recentAgents")
     }
     var filter: String? = nil        // course filter on overview
     var error: String?
@@ -279,128 +269,101 @@ struct SecondBrainApp: App {
         try? FileManager.default.createDirectory(at: Self.chatFile.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? JSONEncoder().encode(SavedChats(chats: chats.mapValues { Array($0.suffix(200)) }, sessions: sessions)).write(to: Self.chatFile, options: .atomic)
     }
-    /// Every request gets its effort from the Manager. Asking the Manager itself lets it pick the agent too.
-    func ask(_ code: String, _ text: String, tier: Manager.Tier? = nil) {
+    /// The kind of work the last chat answer was, so a short follow-up ("start with what you know") goes to the same kind.
+    @ObservationIgnored var lastMode: String?
+    @ObservationIgnored private var streamEpoch = 0
+    /// Every request goes to the one agent, which picks the kind of work and its effort.
+    func ask(_ text: String, tier: Manager.Tier? = nil) {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !thinking.contains(code) else { return }
-        // "apply the MCQ template to the existing MCQ files": an agent does it a few notes at a time, and the app checks and tidies each one
-        if let folder = Self.templateRequest(text) { applyTemplates(folder, asked: text, in: code); return }
-        // "get me ready for Thursday's lecture": the Manager lines up the team's jobs for it and works through them
-        if code == Agent.manager.id, Manager.isPrepare(text) { prepare(text); return }
-        if code == Agent.manager.id { dispatch(text, tier: tier) } else { send(code, text, tier: tier ?? Manager.tier(text, role: code)) }
+        guard !text.isEmpty, !thinking.contains(Agent.manager.id) else { return }
+        // "apply the MCQ template to the existing MCQ files": done a few notes at a time, and the app checks and tidies each one
+        if let folder = Self.templateRequest(text) { applyTemplates(folder, asked: text); return }
+        // "get me ready for Thursday's lecture": lines up the jobs for it and works through them
+        if Manager.isPrepare(text) { prepare(text); return }
+        dispatch(text, tier: tier)
     }
-    /// The last few turns of the Manager's chat, so the agent it hands a follow-up to knows what "that" and "these" mean.
-    private func recentManagerChat() -> String {
-        (chats[Agent.manager.id] ?? []).filter { !$0.text.hasPrefix("→") }.dropLast().suffix(8)
-            .map { ($0.fromAgent ? "" : "Oscar: ") + String($0.text.prefix(600)) }.joined(separator: "\n\n")
-    }
-    /// One agent answers in its own chat (and in the Manager's chat when the Manager sent it). When the request is to change notes it may edit them (the edits are
-    /// checked and logged with an Undo); when it can't do the request it says `DELEGATE:` and nothing is shown, for `passOn` to give it to another agent.
-    /// The Manager itself (`code == Agent.manager.id`) is the general agent, the last resort. `echo`: show the request in this agent's chat too.
-    func converse(_ code: String, shown: String, prompt: String, tier: Manager.Tier, mirror: String?, echo: Bool = true) async -> Agent.Reply {
-        if echo { chats[code, default: []].append(Message(fromAgent: false, text: shown)) }
-        thinking.insert(code)
+    /// One kind of work answers in the chat (the one thread, and the one Claude session behind it). When the request is to change notes it may edit them (the edits
+    /// are checked and logged with an Undo); when it can't do the request it says `DELEGATE:` and nothing is shown, for `passOn` to try another kind of work.
+    /// The Manager's own id as `mode` is the general mode. `echo`: show the request in the chat.
+    func converse(_ mode: String, shown: String, prompt: String, tier: Manager.Tier, course: String? = nil, echo: Bool = true) async -> Agent.Reply {
+        let m = Agent.manager.id
+        if echo { chats[m, default: []].append(Message(fromAgent: false, text: shown)) }
+        streamEpoch += 1
+        let epoch = streamEpoch
         let team = Agent.teamLog(activity)
-        let general = code == Agent.manager.id
-        let editing = general || Agent.writesNotes(code) || Manager.isEdit(shown)
+        let general = mode == m
+        let editing = general || Agent.writesNotes(mode) || Manager.isEdit(shown)
         let root = Vault.root
         let started = Date.now
         var existing = Set<String>()
         if editing { await snapshotNotes(root); existing = Set(notes.map { Vault.rel($0.id) }) }
-        let writes = Agent.writeScopes(code) + (editing ? Agent.noteScopes(root: root) : [])
-        let reply = await Agent.run(team.isEmpty ? prompt : prompt + "\n\n" + team, system: general ? Agent.generalPrompt : Agent.systemPrompt(Agent.role(code)), session: sessions[code], canEdit: false, root: root, tier: tier, writes: writes, web: ["librarian", "researcher"].contains(code),
+        let writes = Agent.writeScopes(mode) + (editing ? Agent.noteScopes(root: root) : [])
+        let reply = await Agent.run(team.isEmpty ? prompt : prompt + "\n\n" + team, system: Agent.systemPrompt(Agent.role(mode), course: course), session: sessions[m], canEdit: false, root: root, tier: tier, writes: writes, web: ["librarian", "researcher"].contains(mode),
                                     onText: { [weak self] text in
                                         Task { @MainActor in
-                                            guard let self, self.thinking.contains(code) else { return }   // a late piece after the answer is in is ignored
-                                            self.streaming[code] = text
-                                            if let m = mirror, self.thinking.contains(m) { self.streaming[m] = "**\(Agent.role(code).name)**\n\n" + text }
+                                            guard let self, self.streamEpoch == epoch else { return }   // a late piece after the answer is in is ignored
+                                            self.streaming[m] = text
                                         }
                                     })
-        streaming[code] = nil
-        if let m = mirror { streaming[m] = nil }
-        if let s = reply.session { sessions[code] = s }
-        if let why = reply.delegation {   // not an answer: the Manager passes it on
-            thinking.remove(code)
-            log(code, "Couldn’t do “\(shown.prefix(50))”: \(why.prefix(80))")
+        streamEpoch += 1
+        streaming[m] = nil
+        if let s = reply.session { sessions[m] = s }
+        if let why = reply.delegation {   // not an answer: the app tries another kind of work
+            log(mode, "Couldn’t do “\(shown.prefix(50))” as \(Agent.label(mode)): \(why.prefix(80))")
             return reply
         }
         var text = reply.text
         if reply.session != nil {
-            if editing, let line = await recordEdits(since: started, existing: existing, by: code, root: root) { text += "\n\n" + line }
+            lastMode = mode
+            if editing, let line = await recordEdits(since: started, existing: existing, by: mode, root: root) { text += "\n\n" + line }
             if general { text += performMoves(in: reply.text, root: root) }
         }
-        chats[code, default: []].append(Message(fromAgent: true, text: text))
-        if let m = mirror { chats[m, default: []].append(Message(fromAgent: true, text: "**\(Agent.role(code).name)**\n\n" + text)) }
-        thinking.remove(code)
-        log(code, reply.session == nil ? "Couldn’t answer “\(shown.prefix(60))”" : "Answered “\(shown.prefix(60))”")
+        chats[m, default: []].append(Message(fromAgent: true, text: text))
+        log(mode, reply.session == nil ? "Couldn’t answer “\(shown.prefix(60))”" : "Answered “\(shown.prefix(60))”")
         return reply
     }
-    private func send(_ code: String, _ text: String, tier: Manager.Tier) {
-        thinking.insert(code)
-        chatTasks[code] = Task { [weak self] in
-            guard let self else { return }
-            let reply = await converse(code, shown: text, prompt: text, tier: tier, mirror: nil)
-            if let why = reply.delegation { await passOn(text, tried: [code], why: why, in: code, tier: nil) }
-            chatTasks[code] = nil
-        }
-    }
-    /// The Manager's chat: one agent, or a team working one after another. Each stage gets what the earlier ones handed over, and a course agent advises first.
+    /// The chat: one kind of work, or several one after another. Each stage gets what the earlier ones handed over, and a request about a course reads its briefing first.
     private func dispatch(_ text: String, tier: Manager.Tier? = nil) {
         let m = Agent.manager.id
         chats[m, default: []].append(Message(fromAgent: false, text: text))
         thinking.insert(m)
         chatTasks[m] = Task { [weak self] in
             guard let self else { return }
-            defer { chatTasks[m] = nil }
-            let earlier = recentManagerChat()
-            let previous = chats[m]?.last { $0.fromAgent && $0.text.hasPrefix("**") }.flatMap { msg in Agent.all.first { msg.text.hasPrefix("**\($0.name)**") }?.id }
+            defer { chatTasks[m] = nil; thinking.remove(m) }
             var steps = Manager.chain(text) ?? []
-            if steps.isEmpty { steps = [await Manager.decide(text, previous: previous)] }
-            let names = steps.map { Agent.role($0.agent).name }
-            if let busy = steps.first(where: { thinking.contains($0.agent) }) {
-                chats[m, default: []].append(Message(fromAgent: true, text: "\(Agent.role(busy.agent).name) is busy with something else. Ask again in a moment."))
-                thinking.remove(m); return
+            if steps.isEmpty { steps = [await Manager.decide(text, previous: lastMode)] }
+            let names = steps.map { Agent.label($0.agent) }
+            if let busy = steps.first(where: { $0.agent != m && thinking.contains($0.agent) }) {
+                chats[m, default: []].append(Message(fromAgent: true, text: "I’m busy with \(Agent.label(busy.agent)) work right now. Ask again in a moment."))
+                return
             }
             let first = steps[0], team = steps.count > 1
             chats[m, default: []].append(Message(fromAgent: true, text: team
-                ? "→ **\(names.joined(separator: " → "))** · working together, in that order"
+                ? "→ **\(names.joined(separator: " → "))** · one after another"
                 : "→ **\(names[0])** · \((tier ?? first.tier).rawValue) effort\(tier == nil ? "" : " (your choice)") · \(first.reason)"))
-            log(m, "Sent “\(text.prefix(50))” to \(names.joined(separator: ", then ")) (\(first.by))")
-            say(m, team
-                ? "\(names.map { "@" + $0 }.joined(separator: " then ")), can you take this one together, in that order? Oscar says “\(clipped(text, 140))”"
-                : "@\(names[0]) can you take this one? Oscar says “\(clipped(text, 140))”. \(first.reason)")
-            // the course agent says what matters in its course before the work starts
-            var advice = ""
-            if let c = Manager.course(text.lowercased()), Agent.role(first.agent).course == nil, first.tier != .quick, !thinking.contains(c) {
-                if Agent.briefingStale(c, root: Vault.root) { _ = await Agent.refreshBriefing(c, root: Vault.root) }
-                if let a = await Agent.consult(c, helper: first.agent, job: text, note: nil, root: Vault.root) {
-                    advice = "\n\nThe \(Agent.role(c).name) course agent advises:\n\(a)"
-                    say(c, "@\(names[0]) from the course side: \(clipped(a, 400))")
-                }
-            }
+            log(m, "Took “\(text.prefix(50))” as \(names.joined(separator: ", then ")) (\(first.by))")
+            // a course in the request: its briefing is read first, refreshed if it is from before today
+            let course = first.course ?? Manager.course(text.lowercased())
+            if let course, first.tier != .quick, Agent.briefingStale(course, root: Vault.root) { _ = await Agent.refreshBriefing(course, root: Vault.root) }
             var done: [(name: String, text: String)] = []
             for (i, r) in steps.enumerated() {
-                var prompt = text + advice + (earlier.isEmpty ? "" : "\n\n(Earlier in Oscar's chat with the Manager, newest last; it may be what he means:\n\(earlier))")
+                var prompt = text
                 if team {
-                    prompt += "\n\nThis is a team job: \(names.joined(separator: " then ")), in that order. You are \(names[i]), stage \(i + 1) of \(steps.count)."
-                    if !done.isEmpty { prompt += "\nWhat the earlier agents handed over:\n" + done.map { "[\($0.name)]\n\($0.text.prefix(6000))" }.joined(separator: "\n\n") }
+                    prompt += "\n\nThis is a job in stages: \(names.joined(separator: " then ")), in that order. You are on stage \(i + 1) of \(steps.count), \(names[i])."
+                    if !done.isEmpty { prompt += "\nWhat the earlier stages handed over:\n" + done.map { "[\($0.name)]\n\($0.text.prefix(6000))" }.joined(separator: "\n\n") }
                     prompt += i < steps.count - 1
-                        ? "\nDo only your stage; don't produce the final result. End with a `Handoff` section giving \(names[i + 1]) exactly what they need: sources actually read (note, PDF page range or URL), the facts, and any gaps."
-                        : "\nYou are the last stage: produce the finished result the request asks for from the handed-over material. If something it needed is missing, say so plainly instead of inventing it."
+                        ? "\nDo only this stage; don't produce the final result. End with a `Handoff` section giving the next stage (\(names[i + 1])) exactly what it needs: sources actually read (note, PDF page range or URL), the facts, and any gaps."
+                        : "\nThis is the last stage: produce the finished result the request asks for from the handed-over material. If something it needed is missing, say so plainly instead of inventing it."
                 }
-                if i == 0 { say(r.agent, team ? "On it. \(names[1]) is next after me." : "On it. I'll message Oscar directly when it's done.") }
-                let reply = await converse(r.agent, shown: team ? "\(text) (stage \(i + 1) of \(steps.count), from the Manager)" : text, prompt: prompt, tier: tier ?? r.tier, mirror: nil)   // the Manager only forwards: the agent answers in its own chat
-                if let why = reply.delegation { await passOn(text, tried: [r.agent], why: why, in: m, tier: tier); break }
-                if reply.session == nil { say(r.agent, reply.stopped ? "Stopped." : "I couldn't finish that one."); chats[m, default: []].append(Message(fromAgent: true, text: reply.stopped ? "Stopped." : "\(names[i]) couldn’t finish, so I stopped there.")); break }
-                say(r.agent, i < steps.count - 1 ? "@\(names[i + 1]) over to you. \(handoff(reply.text))" : "Done. I've messaged Oscar.")
-                if team, i == steps.count - 1, !done.isEmpty {   // a different agent checks the finished result against what was handed over
+                let reply = await converse(r.agent, shown: team ? "\(text) (stage \(i + 1) of \(steps.count))" : text, prompt: prompt, tier: tier ?? r.tier, course: course, echo: false)
+                if let why = reply.delegation { await passOn(text, tried: [r.agent], why: why, course: course, tier: tier); break }
+                if reply.session == nil { chats[m, default: []].append(Message(fromAgent: true, text: reply.stopped ? "Stopped." : "I couldn’t finish the \(names[i]) stage, so I stopped there.")); break }
+                if team, i == steps.count - 1, !done.isEmpty {   // the finished result is checked against what the earlier stages handed over
                     let problems = await Agent.verify(result: reply.text, handoff: done.map(\.text).joined(separator: "\n\n"), root: Vault.root)
-                    say(m, problems.map { "@\(names[i]) I checked your result against what the others handed over and found problems: \(clipped($0, 400))" } ?? "@\(names[i]) I checked your result against what the others handed over: every claim traces back.")
                     if let problems { chats[m, default: []].append(Message(fromAgent: true, text: "**Check found problems**\n\n" + problems)) }
                 }
                 done.append((names[i], reply.text))
             }
-            thinking.remove(m)
         }
     }
     @ObservationIgnored private var watcher: VaultWatcher?
@@ -408,6 +371,8 @@ struct SecondBrainApp: App {
     var activity: [Activity] = Activity.load()
     init() {
         // a new app version brings its Templates and Agents files into the vault (see AppFiles.swift)
+        let merged = AgentFiles.migrate()
+        if !merged.isEmpty { log("manager", "Folded \(merged.count) old agent file\(merged.count == 1 ? "" : "s") into the Manager’s one file. Any rules they had learned are in \(Agent.learned); the old files are in .trash.") }
         if AppFiles.installIfNeeded() != nil, let r = AppFiles.lastReport { log("manager", r.text) }
         rewatch(); computeNeeds(); scheduleAutopilot(after: 8)
         // A tick that finds nothing to do ends without scheduling another, and nothing else wakes a quiet vault: calendar and Zotero sync, the morning brief,
@@ -579,280 +544,7 @@ struct ContentView: View {
     }
 }
 
-enum Portrait {
-    static let hair = ["MSOA": "M26 30c-2-14 10-22 22-18 10-6 22 2 20 16-4-6-12-8-20-6-8-4-16 0-22 8z",
-                       "TEM": "M24 34c0-16 12-24 26-22 12 2 20 12 18 26-6-10-14-14-24-12-8 2-14 6-20 8z",
-                       "SM": "M22 40c-4-18 8-28 24-28 14 0 24 10 22 24-2 6-6 10-10 12 2-8-2-14-8-18-10 2-20 4-28 10z",
-                       "librarian": "M24 36c-2-16 10-26 24-24 14-2 24 8 22 22-8-8-18-10-26-8-8 2-14 6-20 10z M48 4a8 8 0 1 0 0.1 0z",
-                       "planner": "M22 34c0-14 12-22 26-22s26 8 26 22c-10-6-20-8-26-8s-16 2-26 8z M18 34h60"]
-    static let roleHair = ["sorter": "MSOA", "scribe": "SM", "librarian": "librarian", "planner": "planner", "tutor": "TEM", "writer": "MSOA", "manager": "SM", "researcher": "TEM", "analyst": "SM"]
-    static func image(_ c: String) -> Image {
-        let svg = """
-        <svg xmlns="http://www.w3.org/2000/svg" width="96" height="112" viewBox="0 0 96 112" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M30 40c0 18 8 30 18 30s18-12 18-30"/><path d="\(hair[roleHair[c] ?? c] ?? hair["MSOA"]!)" fill="#000"/>
-        \(["MSOA", "SM", "TEM"].contains(c) ? "<path d=\"M18 17l30-13 30 13-30 13z\" fill=\"#000\"/><path d=\"M35 26v9c8 5 18 5 26 0v-9\"/><path d=\"M76 17v16\"/><circle cx=\"76\" cy=\"36\" r=\"2.5\" fill=\"#000\"/>" : "")
-        \(c == "writer" ? "<path d=\"M64 34l9-13\" stroke-width=\"3.5\"/>" : "")
-        \(c == "manager" ? "<path d=\"M29 42c-5 0-5 12 0 12M29 54c0 8 8 10 14 8\"/>" : "")
-        \(c == "tutor" ? "<circle cx=\"41\" cy=\"46\" r=\"5\"/><circle cx=\"56\" cy=\"46\" r=\"5\"/><path d=\"M46 46h5\"/>" : "")
-        <circle cx="41" cy="46" r="1.8" fill="#000"/><circle cx="56" cy="46" r="1.8" fill="#000"/><path d="M48 50l-3 8h5"/><path d="M43 62c3 2 7 2 10 0"/>
-        \(c == "researcher" ? "<rect x=\"34\" y=\"41\" width=\"13\" height=\"10\" rx=\"2.5\"/><rect x=\"50\" y=\"41\" width=\"13\" height=\"10\" rx=\"2.5\"/><path d=\"M47 46h3\"/><circle cx=\"66\" cy=\"98\" r=\"7\"/><path d=\"M71 103l8 9\" stroke-width=\"4\"/>" : "")
-        \(c == "analyst" ? "<circle cx=\"41\" cy=\"46\" r=\"5\"/><circle cx=\"56\" cy=\"46\" r=\"5\"/><path d=\"M46 46h5\"/><path d=\"M64 96v-8M69 96v-14M74 96v-10\" stroke-width=\"4\"/>" : "")
-        <path d="M42 70v10M56 70v10"/><path d="M14 112c2-20 14-32 34-32s32 12 34 32"/><path d="M40 82l8 12 8-12"/></svg>
-        """
-        let img = NSImage(data: Data(svg.utf8)) ?? NSImage()
-        img.isTemplate = true
-        return Image(nsImage: img)
-    }
-}
-
-/// A pane of Liquid Glass: the sidebar, the main panel and the dock.
-struct GlassPane: ViewModifier {
-    func body(content: Content) -> some View { content.glassEffect(.regular, in: .rect(cornerRadius: DS.Radius.pane)) }
-}
-
-// MARK: - Sidebar
-/// Everything lives in the left sidebar: pages, courses, then the vault's three groups: Items (what you do), Files (documents and references) and Apps (study tools and research).
-struct Sidebar: View {
-    @Environment(Store.self) private var store
-    @AppStorage("dockHidden") private var hidden = ""
-    func entries(_ list: [SideNav.Entry]) -> some View {
-        ForEach(list.filter { !SideNav.isHidden($0.name, hidden) }, id: \.name) { e in
-            NavRow(icon: e.icon, title: SideNav.label(e.name), page: .folder(e.name), meta: SideNav.openCount(e.name, store))
-                .contextMenu { FolderMenu(name: e.name) }
-        }
-    }
-    var body: some View {
-        VStack(spacing: 10) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 1) {
-                    NavRow(icon: "house", title: "Home", page: .overview)
-                    if !SideNav.isHidden(SideNav.pinned, hidden) {
-                        NavRow(icon: "tray", title: "Unsorted", page: .inbox, meta: store.unsorted.count, on: { switch store.page { case .inbox, .folder("Unsorted"), .unsorted, .sortNow: true; default: false } }())
-                    }
-                    NavRow(icon: "message", title: "Messages", page: .messages, on: { switch store.page { case .messages, .agent: true; default: false } }())
-                    NavRow(icon: "number", title: "Tags", page: .tags)
-
-                    NavSection("Plan") {
-                        NavRow(icon: "chart.bar", title: "Week", page: .week)
-                        NavRow(icon: "calendar", title: "Month", page: .month)
-                        NavRow(icon: "graduationcap", title: "Semester", page: .semester)
-                    }
-                    NavSection("Courses") {
-                        ForEach([("MSOA", "circle.circle"), ("SM", "hexagon"), ("TEM", "triangle")], id: \.0) { c, shape in
-                            NavRow(icon: shape, title: c == "SM" ? "Strategy" : c, page: .course(c), iconTint: .course(c)).contextMenu { CourseMenu(code: c) }
-                        }
-                    }
-                    NavSection("Items") { entries(SideNav.items.filter { $0.name != SideNav.pinned }) }
-                    NavSection("Files") { entries(SideNav.files) }
-                    NavSection("Apps") { entries(SideNav.apps) }
-                }
-            }.scrollIndicators(.hidden)
-
-            NoticeButton()
-        }
-        .padding(.horizontal, 10).padding(.top, 14).padding(.bottom, 12)
-        .frame(maxHeight: .infinity, alignment: .top)
-    }
-}
-
-/// Notifications live behind one button at the foot of the sidebar, so the lists above keep the room.
-struct NoticeButton: View {
-    @Environment(Store.self) private var store
-    @State private var open = false
-    var body: some View {
-        let n = store.notices().count
-        Button { open.toggle() } label: {
-            HStack(spacing: 8) {
-                Image(systemName: n > 0 ? "bell.badge" : "bell").font(.system(size: 13))
-                Text("Notifications").font(.system(size: 13))
-                Spacer()
-                if n > 0 { Text("\(n)").font(.system(size: 11, weight: .semibold)).monospacedDigit().padding(.horizontal, 7).padding(.vertical, 2).background(Color.ink, in: .capsule).foregroundStyle(Color.card) }
-            }
-            .foregroundStyle(Color.ink).padding(.horizontal, 14).frame(maxWidth: .infinity).frame(height: DS.Height.control).contentShape(.capsule)
-        }
-        .buttonStyle(.glassAction(.control))
-        .popover(isPresented: $open, arrowEdge: .trailing) { NoticeBox().padding(10).frame(width: 300, height: 380) }
-        .accessibilityLabel(n > 0 ? "Notifications, \(n)" : "Notifications")
-    }
-}
-
-/// The three note groups the sidebar lists, and the folders in each. Page ids are the short folder names (see `Vault.places`).
-enum SideNav {
-    struct Entry { let name: String; let icon: String }
-    /// Unsorted is an Items page too, but it is pinned at the top of the sidebar instead of listed under Items.
-    static let pinned = "Unsorted"
-    static let items: [Entry] = [.init(name: "Unsorted", icon: "tray"), .init(name: "Lectures", icon: "play.rectangle"), .init(name: "Tutorials", icon: "person.2"), .init(name: "Readings", icon: "book"),
-                                 .init(name: "Essays", icon: "doc.text"), .init(name: "Projects", icon: "folder"), .init(name: "Exams", icon: "pencil.and.list.clipboard"),
-                                 .init(name: "Tasks", icon: "checkmark.circle")]
-    static let files: [Entry] = {
-        let documents: [Entry] = [Entry(name: "Resources", icon: "square.stack.3d.up"), Entry(name: "OneDrive", icon: "cloud"), Entry(name: "Zotero", icon: "text.book.closed")]
-        let study: [Entry] = Study.kinds.filter { Study.inFiles.contains($0.folder) }.map { Entry(name: $0.folder, icon: $0.icon) }
-        return documents + study + [Entry(name: "Research", icon: "magnifyingglass")]
-    }()
-    static let apps: [Entry] = Study.kinds.filter { !Study.inFiles.contains($0.folder) }.map { Entry(name: $0.folder, icon: $0.icon) }
-    static let folders = items + files + apps
-    /// Files and Apps pages show a browser instead of a plain list. Every Files page browses its folder on disk; Apps pages list their notes.
-    static let grouped = Set((files + apps).map(\.name))
-    static func isHidden(_ name: String, _ raw: String) -> Bool { raw.split(separator: ",").contains(Substring(name)) }
-    /// Tasks is shown as "Assignments"; its id stays "Tasks" (folder and page names).
-    static func label(_ name: String) -> String { name == "Tasks" ? "Assignments" : name }
-    /// Notes still to do in a folder; the document folders (Resources, OneDrive, Zotero) have none.
-    @MainActor static func openCount(_ name: String, _ store: Store) -> Int {
-        if name == pinned { return store.unsorted.count }
-        return ["Resources", "OneDrive", "Zotero"].contains(name) ? 0 : store.openCount(name == "Tasks" ? "TaskNotes/Tasks" : name)
-    }
-}
-
-/// A collapsible group in the sidebar (the open state is remembered).
-struct NavSection<Content: View>: View {
-    let title: String
-    @AppStorage private var open: Bool
-    @ViewBuilder var content: Content
-    init(_ title: String, @ViewBuilder content: () -> Content) {
-        self.title = title; self.content = content()
-        _open = AppStorage(wrappedValue: true, "navOpen.\(title)")
-    }
-    var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Button { withAnimation(.snappy(duration: 0.25)) { open.toggle() } } label: {
-                HStack(spacing: 4) {
-                    Text(title).font(.system(size: 12, weight: .semibold))
-                    Image(systemName: "chevron.right").font(.system(size: 8, weight: .bold)).rotationEffect(.degrees(open ? 90 : 0))
-                    Spacer()
-                }.foregroundStyle(Color.ink2).padding(.horizontal, 10).padding(.top, 16).padding(.bottom, 4).contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityLabel("\(title), \(open ? "expanded" : "collapsed")")
-            if open { content }
-        }
-    }
-}
-
-/// One row in the sidebar: a quiet icon and name; the open page gets a soft raised pill.
-struct NavRow: View {
-    @Environment(Store.self) private var store
-    let icon: String; let title: String; let page: Page
-    var iconTint: Color? = nil; var meta = 0; var on: Bool? = nil
-    var body: some View {
-        let selected = on ?? (store.page == page)
-        Button { store.page = page } label: {
-            HStack(spacing: 10) {
-                Image(systemName: icon).font(.system(size: 14)).frame(width: 20).foregroundStyle(iconTint ?? (selected ? Color.ink : Color.ink2))
-                Text(title).lineLimit(1).truncationMode(.tail)
-                Spacer(minLength: 4)
-                if meta > 0 { Text("\(meta)").font(.system(size: 11)).monospacedDigit().foregroundStyle(Color.ink2) }
-            }
-            .font(.system(size: 14, weight: selected ? .medium : .regular)).foregroundStyle(Color.ink)
-            .padding(.horizontal, 10).frame(height: 32).contentShape(.rect(cornerRadius: DS.Radius.row))
-        }
-        .buttonStyle(SideRowStyle(selected: selected))
-        .accessibilityLabel(meta > 0 ? "\(title), \(meta)" : title)
-    }
-}
-
-/// The cog opens the Settings window (same as ⌘,).
-struct SettingsButton: View {
-    @Environment(\.openSettings) private var openSettings
-    var body: some View {
-        Button { openSettings() } label: { Image(systemName: "gearshape").font(.system(size: 13)) }
-            .buttonStyle(.glassIcon(DS.Height.icon)).help("Settings (⌘,)").accessibilityLabel("Settings")
-    }
-}
-
-/// Collapses the left sidebar to an icon rail like the right one (⌃⌘S).
-struct CollapseButton: View {
-    @AppStorage("sidebarCollapsed") private var collapsed = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    var body: some View {
-        Button { withAnimation(reduceMotion ? nil : .spring(duration: 0.45, bounce: 0.15)) { collapsed.toggle() } } label: {
-            Image(systemName: "sidebar.left").font(.system(size: 13))
-        }
-        .buttonStyle(.glassIcon(DS.Height.icon))
-        .help(collapsed ? "Show Sidebar" : "Hide Sidebar").accessibilityLabel(collapsed ? "Show sidebar" : "Hide sidebar")
-    }
-}
-
-/// The collapsed left sidebar: icons with labels. Items, Files and Apps open as menus.
-struct SidebarRail: View {
-    @Environment(Store.self) private var store
-    @AppStorage("dockHidden") private var hidden = ""
-    func group(_ title: String, icon: String, _ list: [SideNav.Entry]) -> some View {
-        let open: Bool = { if case .folder(let f) = store.page { list.contains { $0.name == f } } else { false } }()
-        return Menu {
-            ForEach(list.filter { !SideNav.isHidden($0.name, hidden) }, id: \.name) { e in
-                Button { store.page = .folder(e.name) } label: { Label(SideNav.label(e.name), systemImage: e.icon) }
-            }
-        } label: { RailLabel(icon: icon, label: title, on: open) }
-            .menuStyle(.button).buttonStyle(.glass(radius: DS.Radius.tile, selected: open)).menuIndicator(.hidden).help(title)
-    }
-    var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: 2) {
-                    RailItem(icon: "house", label: "Home", on: store.page == .overview) { store.page = .overview }
-                    if !SideNav.isHidden(SideNav.pinned, hidden) {
-                        RailItem(icon: "tray", label: "Unsorted", badge: store.unsorted.count, on: { switch store.page { case .inbox, .folder("Unsorted"), .unsorted, .sortNow: true; default: false } }()) { store.page = .inbox }
-                    }
-                    RailItem(icon: "message", label: "Messages", on: { switch store.page { case .messages, .agent: true; default: false } }()) { store.page = .messages }
-                    RailItem(icon: "number", label: "Tags", on: store.page == .tags) { store.page = .tags }
-                    RailItem(icon: "chart.bar", label: "Week", on: store.page == .week) { store.page = .week }
-                    RailItem(icon: "calendar", label: "Month", on: store.page == .month) { store.page = .month }
-                    RailItem(icon: "graduationcap", label: "Semester", on: store.page == .semester) { store.page = .semester }
-                    Divider().padding(.vertical, 6).padding(.horizontal, 12)
-                    ForEach([("MSOA", "circle.circle"), ("SM", "hexagon"), ("TEM", "triangle")], id: \.0) { c, shape in
-                        RailItem(icon: shape, label: c == "SM" ? "Strategy" : c, tint: .course(c), on: store.page == .course(c)) { store.page = .course(c) }
-                    }
-                    Divider().padding(.vertical, 6).padding(.horizontal, 12)
-                    group("Items", icon: "tray.full", SideNav.items.filter { $0.name != SideNav.pinned })
-                    group("Files", icon: "doc.on.doc", SideNav.files)
-                    group("Apps", icon: "square.grid.2x2", SideNav.apps)
-                }
-            }.scrollIndicators(.hidden)
-            RailItem(icon: "square.and.pencil", label: "New Note") { store.newNote() }.padding(.top, 6)
-        }
-        .padding(.horizontal, 10).padding(.top, 14).padding(.bottom, 14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-struct RailLabel: View {
-    let icon: String; let label: String
-    var tint: Color = .ink2; var badge = 0; var on = false
-    var body: some View {
-        VStack(spacing: 3) {
-            Image(systemName: icon).font(.system(size: 17, weight: .medium)).foregroundStyle(on ? Color.ink : tint)
-                .frame(width: 44, height: 28)
-                .overlay(alignment: .topTrailing) {
-                    if badge > 0 {
-                        Text("\(badge)").font(.system(size: 9, weight: .bold)).monospacedDigit()
-                            .padding(.horizontal, 4).frame(minWidth: 16, minHeight: 16)
-                            .background(Color.ink, in: .capsule).foregroundStyle(Color.card).offset(x: 4, y: -2)
-                    }
-                }
-            Text(label).font(.system(size: 10, weight: on ? .semibold : .regular)).foregroundStyle(on ? Color.ink : Color.ink2).lineLimit(1).fixedSize()
-        }
-        .frame(width: 60, height: 46)
-    }
-}
-
-struct RailItem: View {
-    let icon: String; let label: String
-    var tint: Color = .ink2; var badge = 0; var on = false
-    let action: () -> Void
-    var body: some View {
-        Button(action: action) { RailLabel(icon: icon, label: label, tint: tint, badge: badge, on: on) }
-            .buttonStyle(.glass(radius: DS.Radius.tile, selected: on)).help(label).accessibilityLabel(badge > 0 ? "\(label), \(badge)" : label)
-    }
-}
-
-struct Heading: View {
-    let text: String; var trailing = ""
-    init(_ text: String, trailing: String = "") { self.text = text; self.trailing = trailing }
-    var body: some View {
-        HStack { Text(text).fontWeight(.semibold); Spacer(); Text(trailing) }
-            .font(.caption).foregroundStyle(Color.ink2).padding(.horizontal, 10).padding(.top, 14).padding(.bottom, 2)
-    }
-}
-
-/// Line-art portrait that pulses while its agent is working. (It used to breathe forever even when idle, which kept the whole window redrawing: about a quarter of a CPU core for a one-pixel movement.)
+/// A round badge for the one agent, or for a kind of work it does (its symbol), tinted and pulsing while it is working.
 struct AgentPortrait: View {
     @Environment(Store.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -860,8 +552,8 @@ struct AgentPortrait: View {
     @State private var breathe = false
     var body: some View {
         let busy = store.thinking.contains(id)
-        Portrait.image(id).resizable().scaledToFit().frame(width: size * 0.9).foregroundStyle(Color.ink)
-            .frame(width: size, height: size, alignment: .bottom).background(Agent.color(id).opacity(0.25)).clipShape(.circle)
+        Image(systemName: Agent.all.first { $0.id == id }?.symbol ?? "sparkles").font(.system(size: size * 0.42, weight: .medium)).foregroundStyle(Color.ink)
+            .frame(width: size, height: size).background(Agent.color(id).opacity(0.25)).clipShape(.circle)
             .overlay(Circle().strokeBorder(selected ? Color.ink : Color.line, lineWidth: selected ? 2 : 1))
             .overlay { if busy { Circle().strokeBorder(Color.warnFG, lineWidth: 2).scaleEffect(breathe ? 1.18 : 1).opacity(breathe ? 0 : 0.9) } }
             .scaleEffect(busy && breathe && !reduceMotion ? 1.04 : 1)
@@ -899,8 +591,8 @@ struct MainPanel: View {
         case .unsorted(let url): if url.pathExtension == "md" { NotePage(url: url).id(url) } else { UnsortedPage(url: url) }
         case .search: SearchPage()
         case .sortNow: SortNowPage()
-        case .agent(let c): AgentPage(code: c)
-        case .messages: MessagesPage()
+        case .agent: AgentPage()
+        case .messages: AgentPage()
         case .note(let url):
             if let kind = store.appKind(for: .note(url)) { AppSubPage(url: url, kind: kind).id(url) } else { NotePage(url: url).id(url) }
         case .file(let url): FilePage(url: url)
@@ -1071,7 +763,7 @@ struct OverviewPage: View {
                             }.padding(16)
                             NoteList(notes: today, empty: "Nothing scheduled today", timeColumn: true).frame(maxHeight: .infinity)
                             Rectangle().fill(Color.line.opacity(0.6)).frame(height: 1)
-                            AgentStage(id: Agent.manager.id, says: store.managerSays()).frame(height: g.size.height * 0.56)
+                            AgentSays(says: store.managerSays()).frame(height: g.size.height * 0.56)
                         }
                     }
                 }.appearIn(0)
@@ -1157,7 +849,7 @@ struct SortNowPage: View {
                 VStack(alignment: .leading, spacing: 12) {
                     if let key { JobProgress(key: key, finished: finished) }
                     else {
-                        Text(files.isEmpty ? "Nothing to sort." : "The Sorter files everything in Unsorted. The Manager asks the relevant course agents first and checks the result, and you can undo it afterwards.")
+                        Text(files.isEmpty ? "Nothing to sort." : "The Manager files everything in Unsorted, checks the result, and you can undo it afterwards.")
                             .font(.system(size: 13)).foregroundStyle(Color.ink2)
                         if !files.isEmpty { Button { run() } label: { Label("Sort Now", systemImage: "sparkle") }.buttonStyle(.glassAction(.control, prominent: true)) }
                     }
@@ -1244,6 +936,7 @@ enum Check {
         CalendarSync.checkNotes()
         Vault.checkEditing()
         EditorLogic.check()
+        AgentFiles.check()
         Manager.check()
         let tags = TagsPage.build(notes); precondition(!tags.isEmpty, "tags are indexed from frontmatter")
         let week: (Date?) -> Int = { d in d.map { Int((Double(Calendar.current.dateComponents([.day], from: Vault.currentSemesterStart, to: $0).day ?? 0) / 7).rounded(.down)) + 1 } ?? 0 }
@@ -1282,38 +975,38 @@ enum Check {
     }
 }
 
+/// The one agent's page: the conversation, what it does and what it needs from you.
 struct AgentPage: View {
     @Environment(Store.self) private var store
-    let code: String
     @State private var showLog = false
-    var role: Agent.Role { Agent.role(code) }
+    var role: Agent.Role { Agent.manager }
     var body: some View {
-        let messages = store.chats[code] ?? []
-        let busy = store.thinking.contains(code)
+        let busy = store.thinking.contains(role.id) || !store.activeJobs.isEmpty
         VStack(spacing: 0) {
             HStack(spacing: 14) {
-                AgentPortrait(id: code, size: 44)
+                AgentPortrait(id: role.id, size: 44)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(role.name).font(.system(size: 24, weight: .medium))
                     HStack(spacing: 6) {
                         Circle().fill(busy ? Color.warnFG : Color(light: 0x2F8467, dark: 0x5CC39A)).frame(width: 7, height: 7)
-                        Text(busy ? "Working…" : role.job + (code == Agent.manager.id ? " · decides on your Mac" : " · runs on Claude Code")).font(.system(size: 13)).foregroundStyle(Color.ink2)
+                        Text(busy ? "Working…" : "Picks the kind of work, does it on Claude Code, and checks it on your Mac").font(.system(size: 13)).foregroundStyle(Color.ink2)
                     }
                 }
                 Spacer()
-                RoundButton(icon: "message", label: "All messages") { store.page = .messages }
+                ManagerMenu()
                 RoundButton(icon: "list.bullet.rectangle", label: "Activity Log") { showLog.toggle() }
                     .popover(isPresented: $showLog, arrowEdge: .bottom) { ActivityLog().environment(store) }
             }.padding(.horizontal, 28).padding(.top, 20).padding(.bottom, 14)
             SplitPane(fixed: .second, width: 300, stacked: (520, 460)) {
-                AgentChatCard(code: code)
+                AgentChatCard()
             } second: {
                 VStack(spacing: 12) {
-                    if code == Agent.manager.id { ManagerCard() } else { NeedsCard(code: code) }
+                    ManagerCard()
+                    NeedsCard()
                     Card(title: "Try", trailing: "Edits only if you ask") {
                         VStack(spacing: 6) {
                             ForEach(role.actions, id: \.self) { a in
-                                Button { store.ask(code, a) } label: {
+                                Button { store.ask(a) } label: {
                                     HStack(spacing: 8) { Image(systemName: "sparkle"); Text(a).multilineTextAlignment(.leading); Spacer() }
                                         .font(.system(size: 13)).padding(.horizontal, 12).padding(.vertical, 9)
                                 }.buttonStyle(.glassRow).disabled(busy)

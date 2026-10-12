@@ -17,16 +17,16 @@ extension Store {
         var out: [AppNotice] = []
         for (id, list) in needs.sorted(by: { $0.key < $1.key }) {
             guard let n = list.first else { continue }
-            out.append(AppNotice(id: "need-\(id)-\(n.id)", source: "Agents", icon: "person.fill", tint: Agent.color(id), title: "\(Agent.role(id).name) needs you", body: n.title, time: list.count > 1 ? "+\(list.count - 1)" : "", go: n.open ?? .agent(id)))
+            out.append(AppNotice(id: "need-\(id)-\(n.id)", source: "Agents", icon: "person.fill", tint: Agent.color(id), title: "Needs you: \(Agent.label(id))", body: n.title, time: list.count > 1 ? "+\(list.count - 1)" : "", go: n.open ?? .agent(id)))
         }
         for j in activeJobs {
-            out.append(AppNotice(id: "job-\(j.id)", source: "Agents", icon: "sparkles", tint: Agent.color(j.agent), title: "\(Agent.role(j.agent).name) is working", body: j.title, time: "now", go: .messages))
+            out.append(AppNotice(id: "job-\(j.id)", source: "Agents", icon: "sparkles", tint: Agent.color(j.agent), title: "Working on \(Agent.label(j.agent))", body: j.title, time: "now", go: .messages))
         }
         for j in inbox.reversed() where [.done, .failed, .rejected].contains(j.state) && j.created > .now.addingTimeInterval(-12 * 3600) {
             let note = j.paths.first.flatMap { p in notes.first { Vault.rel($0.id) == p } }
             let verb = j.state == .done ? "finished" : j.state == .failed ? "couldn’t finish" : "was sent back"
             out.append(AppNotice(id: "done-\(j.id)", source: "Agents", icon: j.state == .done ? "checkmark" : "exclamationmark", tint: j.state == .done ? NoteColor.done : Color.redFG,
-                                 title: "\(Agent.role(j.agent).name) \(verb)", body: j.title, time: j.created.formatted(.relative(presentation: .numeric, unitsStyle: .narrow)), go: note.map { .note($0.id) } ?? .messages))
+                                 title: "\(Agent.Label(j.agent)) \(verb)", body: j.title, time: j.created.formatted(.relative(presentation: .numeric, unitsStyle: .narrow)), go: note.map { .note($0.id) } ?? .messages))
         }
         for h in headsUps().prefix(3) {
             out.append(AppNotice(id: "heads-\(h.gotIt ?? h.text)", source: "Manager", icon: "bell.fill", tint: Color(light: 0xC77A00, dark: 0xF0B366), title: h.text, go: h.go))

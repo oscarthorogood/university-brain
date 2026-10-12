@@ -97,7 +97,7 @@ struct AgentSettings: View {
                 }
             }.padding(.top, 8)
             LabeledContent("Permissions:") {
-                Text("In chat an agent edits your notes only when you ask it to (the app keeps every old version, puts back any note that loses its frontmatter, and logs an Undo); otherwise it writes only in its own folder. If an agent can’t do what you ask it passes it back to the Manager, who picks another and, as a last resort, does it as the general agent. A job lets a helper edit just the one note it is given, or add the one new note it is told to. Agents never delete; originals go to .trash. Helpers never ask for approval: the Manager checks the work and undoes it if it fails.")
+                Text("In chat the Manager edits your notes only when you ask it to (the app keeps every old version, puts back any note that loses its frontmatter, and logs an Undo); otherwise it writes only in its own folder. If one kind of work can’t do what you ask, it tries another and, as a last resort, handles it as general help. A job lets the Manager edit just the one note it is given, or add the one new note it is told to. The Manager never deletes; originals go to .trash. Helpers never ask for approval: the Manager checks the work and undoes it if it fails.")
                     .fixedSize(horizontal: false, vertical: true)
             }.padding(.top, 8)
         }
@@ -131,7 +131,7 @@ struct RulesSettings: View {
                     open("Open AGENTS.md", "Agents/Shared Agents/AGENTS.md")
                     open("Open Decision Log", "Agents/Shared Agents/memory.md")
                     open("Open Open Items", "Agents/Shared Agents/open-items.md")
-                    Text("Every agent follows these. They live in the vault’s Agents folder.").font(.caption).foregroundStyle(.secondary)
+                    Text("The Manager follows these. They live in the vault’s Agents folder.").font(.caption).foregroundStyle(.secondary)
                 }
             }
         }

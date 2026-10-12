@@ -75,7 +75,7 @@ struct VoiceMemoSheet: View {
             Text("Voice memo").font(.system(size: 16, weight: .semibold))
             switch rec.stage {
             case .idle:
-                Text("Records into Unsorted and writes what you said as a note beside it. Sorter files both when you sort.").font(.system(size: 12)).foregroundStyle(Color.ink2).multilineTextAlignment(.center)
+                Text("Records into Unsorted and writes what you said as a note beside it. Both are filed when you sort.").font(.system(size: 12)).foregroundStyle(Color.ink2).multilineTextAlignment(.center)
                 Button { Task { await rec.start() } } label: { Label("Start recording", systemImage: "mic.fill") }.buttonStyle(.glassAction(.control, prominent: true))
             case .recording:
                 Text(Duration.seconds(rec.elapsed).formatted(.time(pattern: .minuteSecond))).font(.system(size: 34, weight: .light)).monospacedDigit()

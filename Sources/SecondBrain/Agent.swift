@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import PDFKit
+import SwiftUI
 
 /// Set by the timeout on one queue and read by the reader on another, so it is locked.
 final class TimeoutFlag: @unchecked Sendable {
@@ -12,7 +13,7 @@ final class TimeoutFlag: @unchecked Sendable {
     }
 }
 
-/// Runs a course agent through the Claude Code CLI (uses the signed-in Claude subscription — no API key).
+/// Runs the Manager through the Claude Code CLI (uses the signed-in Claude subscription — no API key).
 enum Agent {
     static let cli: String = ["/opt/homebrew/bin/claude", "/usr/local/bin/claude",
                               FileManager.default.homeDirectoryForCurrentUser.appending(path: ".local/bin/claude").path]
@@ -33,62 +34,75 @@ enum Agent {
         var limited: Bool { session == nil && ["usage limit", "session limit", "rate limit", "limit reached", "hit your"].contains { text.localizedCaseInsensitiveContains($0) } }
     }
 
-    /// Five agents, split by job (how the vault actually gets worked), not by course.
+    /// There is one agent, the Manager. A `Role` is a kind of work it does (a mode): the model and effort, the web access, the daily limit and the checks
+    /// belong to the mode, and its working rules are its `## Mode: <name>` section in the Manager's file. Jobs, the Activity Log and the limits are
+    /// recorded under the mode's id.
     struct Role: Identifiable, Hashable, Sendable {
         let id: String; let name: String; let job: String; let focus: String; let actions: [String]
-        var course: String? = nil   // course code for a course agent, nil for a helper
+        /// What the work is called to Oscar ("write-up", "filing"): the one agent is never shown under a second name.
+        var label: String = ""
+        var symbol: String = "sparkles"
     }
     static let roles: [Role] = [
         Role(id: "sorter", name: "Sorter", job: "Files everything in Unsorted",
              focus: "You keep the intake tray (Unsorted/) clear: slides and documents go to Files/Resources/{Course}/…, raw lecture notes fold into their Lecture note, links become Readings. You also run File Now and Sort Now (all of Unsorted at once, after Oscar approves).",
-             actions: ["What’s waiting in Unsorted, and where would each item go?", "Anything in the inbox with conflicting dates?", "Which Unsorted items should I check by hand before Sort Now?"]),
+             actions: ["What’s waiting in Unsorted, and where would each item go?", "Anything in the inbox with conflicting dates?", "Which Unsorted items should I check by hand before Sort Now?"], label: "filing", symbol: "tray.full"),
         Role(id: "scribe", name: "Scribe", job: "Writes up lectures from slides",
              focus: "You write up Lectures and Tutorials from their slides and Oscar’s raw notes, following the templates and AGENTS.md §12 (slide numbers, his callout style, never rewriting his own lines).",
-             actions: ["Which past lectures still need writing up?", "Summarise this week’s lectures in a few bullets each", "Which notes link slides that are missing?"]),
+             actions: ["Which past lectures still need writing up?", "Summarise this week’s lectures in a few bullets each", "Which notes link slides that are missing?"], label: "write-up", symbol: "pencil.and.outline"),
         Role(id: "librarian", name: "Librarian", job: "Keeps readings in order",
              focus: "You look after Readings: sources still `To Find`, citations marked “Title To Confirm”, reading packs, and which readings are due for which session. Never invent a citation.",
-             actions: ["Which readings are due this week?", "List the readings still To Find, by course", "Which citations still need confirming?"]),
+             actions: ["Which readings are due this week?", "List the readings still To Find, by course", "Which citations still need confirming?"], label: "readings", symbol: "books.vertical"),
         Role(id: "planner", name: "Planner", job: "Deadlines, key dates and prep",
              focus: "You track deadlines, course Key dates and TaskNotes, flag conflicting dates, and prep Oscar for what’s next. Be concrete: dates, times, what to do first.",
-             actions: ["What’s due in the next 7 days?", "Prep me for tomorrow", "Any conflicting or missing dates I should check?"]),
+             actions: ["What’s due in the next 7 days?", "Prep me for tomorrow", "Any conflicting or missing dates I should check?"], label: "planning", symbol: "calendar"),
         Role(id: "tutor", name: "Tutor", job: "MCQs, flashcards and explanations",
              focus: "You turn Oscar’s notes and readings into study material: MCQs with answers, flashcards, summaries, glossaries, mind maps, podcast scripts and plain explanations, quoting the note, slide or page they come from. A podcast is a spoken-style script (Templates/Claude/Apps/Podcast Template.md) built only from sources you have actually read, using the PDF text copies.",
-             actions: ["Make 5 MCQs from this week’s lectures", "Explain the hardest idea from last week simply", "What should I revise first, and why?"]),
+             actions: ["Make 5 MCQs from this week’s lectures", "Explain the hardest idea from last week simply", "What should I revise first, and why?"], label: "revision", symbol: "graduationcap"),
         Role(id: "writer", name: "Writer", job: "Coaches essays and projects",
              focus: "You coach Oscar through essays and projects. Planner has already filled each note’s Brief, Question and Marking criteria; you work from those and from his lecture and reading notes: a thesis to consider, an outline with a word budget, an evidence plan citing note and slide, and a check of his draft against the rubric. You never write the submission for him or rewrite his own lines, and you never invent a source.",
-             actions: ["Which essays and projects are due soonest, and how far along are they?", "What from my notes could I use for my next essay?", "Check my draft against the marking criteria"]),
+             actions: ["Which essays and projects are due soonest, and how far along are they?", "What from my notes could I use for my next essay?", "Check my draft against the marking criteria"], label: "essay coaching", symbol: "text.book.closed"),
         Role(id: "researcher", name: "Researcher", job: "Finds evidence and sources",
              focus: "You answer open questions with a short sourced brief. You search the web and read the pages, then write one new note in Files/Research/ from Templates/Claude/Files/Research Template.md (named `<Course> - Research - <Topic>`): the short answer, findings with a link and a strength (strong / single / weak) for each, the sources, and the gaps. Every claim has a link you opened; anything you could not verify goes under gaps. You gather and summarise; you never write text for Oscar's submissions, and you never invent a source, figure or date.",
-             actions: ["What outside evidence does my next report need?", "Find out what's known about the company in my SM report", "What's the industry background for my case study?"]),
+             actions: ["What outside evidence does my next report need?", "Find out what's known about the company in my SM report", "What's the industry background for my case study?"], label: "research", symbol: "magnifyingglass"),
         Role(id: "analyst", name: "Analyst", job: "Does the maths and data work",
              focus: "You do the numbers: worked solutions for formative tutorials and workshops, and checks of Oscar's own answers against your own independent solution. Show every step, state formulas and units, and end each question with a line `**Answer:** …`. You never solve assessed questions, individual case studies or exam content, and you never run code or invent data; if a figure cannot be derived from the files, say so. Double-check every calculation before you reply.",
-             actions: ["Work through this week's tutorial sheet", "Check my answers to the MSOA tutorial", "Which formulas do I need for the break-even question?"]),
+             actions: ["Work through this week's tutorial sheet", "Check my answers to the MSOA tutorial", "Which formulas do I need for the break-even question?"], label: "maths", symbol: "function"),
     ]
-    /// The front door: every request can start here. Not a helper (no desk): it routes and sets effort.
-    static let manager = Role(id: "manager", name: "Manager", job: "Sends each request to the right agent",
-        focus: "You are the Manager: you read a request, pick the agent best placed to handle it and how much effort it deserves, and say why in one line. You do not do the work yourself.",
-        actions: ["What’s due this week, and what should I start on?", "Plan my next essay from its brief", "Make 5 MCQs from this week’s lectures", "Which readings still need finding?"])
-    /// One agent per course: knows that course's notes and nothing else.
-    static let courseRoles: [Role] = Vault.courses.sorted { $0.value < $1.value }.map { full, code in
-        let name = code == "SM" ? "Strategy" : code
-        return Role(id: code, name: name, job: "Course agent · \(full)",
-                    focus: "You are the course agent for \(full) (\(code)). You know every note in the vault whose course is [[\(full)]]: the course note, Lectures, Tutorials, Readings, Essays, Projects and Revision. Answer only about this course; if asked about another, say which course agent to ask.",
-                    actions: ["What’s due in \(name) in the next two weeks?", "Where are we in \(name), and what’s coming up?", "Which \(name) lectures still need writing up?", "What should I revise first for \(name)?"],
-                    course: code)
-    }
-    static var all: [Role] { [manager] + roles + courseRoles }
+    /// The one agent. It takes every request, chooses the kind of work and how much effort it deserves, does it, and the app checks the result. With no
+    /// kind of work that fits, it is also the general agent: it does any Markdown request itself.
+    static let manager = Role(id: "manager", name: "Manager", job: "Takes every request and does the work",
+        focus: "You are the Manager, the one agent in this app: you take each request, choose the kind of work it is and how much effort it deserves, and do it. The app checks what you change and keeps an Undo.",
+        actions: ["What’s due this week, and what should I start on?", "Plan my next essay from its brief", "Make 5 MCQs from this week’s lectures", "Which readings still need finding?"],
+        label: "general", symbol: "sparkles")
+    /// The courses it knows: a code (MSOA, SM, TEM) and the name shown for it. Each has a short briefing the Manager keeps up to date.
+    static var courses: [(code: String, name: String)] { Vault.courses.sorted { $0.value < $1.value }.map { ($0.value, courseName($0.value)) } }
+    static func courseName(_ code: String) -> String { code == "SM" ? "Strategy" : code }
+    static var all: [Role] { [manager] + roles }
     static func role(_ id: String) -> Role { all.first { $0.id == id } ?? roles[0] }
-    /// The agent's own instructions in the vault: its working rules, open items and the log entries that apply.
-    static func file(_ id: String) -> String {
-        let r = role(id)
-        if id == manager.id { return "Agents/Manager Agent/Manager agent.md" }   // outside Helper Agents: it routes work rather than being a helper
-        return r.course == nil ? "Agents/Helper Agents/\(r.name)/\(r.name) agent.md" : "Agents/Course Agents/\(r.name)/\(r.name) course agent.md"
+    /// What a kind of work is called ("write-up"); anything unknown (an old log entry) is just "work".
+    static func label(_ id: String) -> String { all.first { $0.id == id }?.label ?? "work" }
+    /// The label as a heading or the start of a sentence.
+    static func Label(_ id: String) -> String { let l = label(id); return l.prefix(1).uppercased() + l.dropFirst() }
+    /// The one instruction file, with a `## Mode: <name>` section for each kind of work, and the rules learned from Oscar's edits (kept apart because the
+    /// app replaces the instruction file with each new version but never the learned rules).
+    static let instructions = "Agents/Manager Agent/Manager agent.md"
+    static let learned = "Agents/Manager Agent/Learned rules.md"
+    /// Kept for the places that name "the agent's file": there is only one.
+    static func file(_ id: String) -> String { instructions }
+
+    /// The folder an agent's own notes live in: its working folder for a kind of work, the course folder for a course briefing, the Manager's folder otherwise.
+    static func ownFolder(_ id: String) -> String {
+        if let r = roles.first(where: { $0.id == id }) { return "Agents/Helper Agents/\(r.name)" }
+        if Vault.courses.values.contains(id) { return "Agents/Course Agents/\(courseName(id))" }
+        return "Agents/Manager Agent"
+    }
+    static func briefingFile(_ course: String) -> String { ownFolder(course) + "/Course briefing.md" }
+    /// What a job or chat is told about a course instead of a second agent's advice: where its briefing is.
+    static func briefingPointer(_ course: String) -> String {
+        "Course context (\(courseName(course))): read the course briefing `\(briefingFile(course))` first (where the course is now and what is due), then open notes only for specifics."
     }
 
-    /// The one folder an agent may write in: its own notes to itself, open items and the rules it has learned.
-    static func ownFolder(_ id: String) -> String {
-        id == manager.id ? "Agents/Manager Agent" : role(id).course == nil ? "Agents/Helper Agents/\(role(id).name)" : "Agents/Course Agents/\(role(id).name)"
-    }
     /// A permission pattern for one file (commas would split the list, so they become wildcards).
     /// What an agent may write besides its own folder: Researcher adds its briefs.
     static func writeScopes(_ id: String) -> [String] { [scope(folder: ownFolder(id))] + deliverables(id).map { scope(folder: Vault.dir($0)) } }
@@ -96,12 +110,12 @@ enum Agent {
     static func scope(file rel: String) -> String { String(rel.map { ",()*[]{}!".contains($0) ? "?" : $0 }) }
     static func scope(folder rel: String) -> String { scope(file: rel) + "/**" }
 
-    /// What the other agents did lately, so Planner knows Tutor made a podcast yesterday. `items` is newest first (the Activity Log); the Manager's own routing lines are noise.
+    /// What the Manager did lately, by kind of work, so planning knows a revision podcast was made yesterday. `items` is newest first (the Activity Log); the Manager's own routing lines are noise.
     static func teamLog(_ items: [Activity], limit: Int = 10) -> String {
         let lines = items.filter { $0.agent != manager.id && !$0.text.hasPrefix("Couldn’t") }.prefix(limit).reversed().map {
-            "- \(role($0.agent).name), \($0.time.formatted(.relative(presentation: .named))): \($0.text.prefix(140))"
+            "- \(label($0.agent)), \($0.time.formatted(.relative(presentation: .named))): \($0.text.prefix(140))"
         }
-        return lines.isEmpty ? "" : "What the team has done lately (oldest first; build on it, don't repeat it):\n" + lines.joined(separator: "\n")
+        return lines.isEmpty ? "" : "What you have done lately (oldest first; build on it, don't repeat it):\n" + lines.joined(separator: "\n")
     }
 
     /// A different agent's check of a team's finished result against what was handed over: anything unsupported comes back as lines, nil when it's fine or the check couldn't run.
@@ -119,9 +133,9 @@ enum Agent {
         return r.session == nil || r.text.uppercased().hasPrefix("OK") ? nil : r.text
     }
 
-    /// A briefing last written before today may carry last week's facts: a chat refreshes it before consulting.
+    /// A briefing last written before today may carry last week's facts: a chat refreshes it before it is read.
     static func briefingStale(_ course: String, root: URL) -> Bool {
-        let f = root.appending(path: ownFolder(course) + "/Course briefing.md")
+        let f = root.appending(path: briefingFile(course))
         guard let d = (try? f.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate else { return true }
         return !Calendar.current.isDateInToday(d)
     }
@@ -251,7 +265,7 @@ enum Agent {
             ? "Nothing is waiting in Unsorted, but the calendar sync found classes in the next two weeks that have no note yet. Read Agents/Helper Agents/Planner/Calendar Sync.md and the existing Lectures and Tutorials notes, and plan the notes (and any task) that are missing, in the vault's weekly sequence and templates. Skip anything already ticked or already filed."
             : "Plan how to file everything waiting in Unsorted (\(files.count) items). Read each item and the notes it relates to. Also check Agents/Helper Agents/Planner/Calendar Sync.md for new items that need a note or task (skip anything already ticked or already filed)."
         return await run("""
-        \(intro)\(advice.map { "\n\nCourse agent advice:\n\($0)" } ?? "")\n\n\(items)
+        \(intro)\(advice.map { "\n\n\($0)" } ?? "")\n\n\(items)
         Reply with a short plan: one or two lines per item naming its exact destination and which notes you'll link or update. Don't change anything yet.
         If an item is unclear, say so and leave it out rather than guessing.
         If there is genuinely nothing you can file without guessing, reply with a single line starting `NOTHING:` and the reason, and stop.
@@ -275,26 +289,17 @@ enum Agent {
     }
 
 
-    // MARK: The Manager-centred pipeline: consult a course agent, the helper does the work, the Manager reviews.
+    // MARK: The pipeline: the Manager does the work (reading the course briefing first), then reviews it.
 
     /// Replaced in tests, so the whole pipeline can run without spending any Claude usage.
     nonisolated(unsafe) static var stub: ((_ prompt: String, _ system: String, _ session: String?, _ writes: [String], _ tier: Manager.Tier) async -> Reply)?
 
-    /// The Manager asks a course agent what matters about a job in its course, before the helper starts. Cheap: Haiku, and it reads its short course briefing first.
-    static func consult(_ course: String, helper: String, job: String, note: String?, root: URL) async -> String? {
-        let r = await run("""
-        The Manager is about to give \(role(helper).name) this job: \(job).\(note.map { " The note is `\($0)`." } ?? "")
-        Read your Course briefing (\(ownFolder(course))/Course briefing.md) first, and only open notes for specifics. In under 120 words, tell the helper the course-specific facts and cautions that matter for this job: dates and weights, what the lecturer emphasises, related notes to read, mistakes to avoid. Don't do the job.
-        """, system: systemPrompt(role(course)), session: nil, canEdit: false, root: root, tier: .quick)
-        return r.session == nil || r.text.isEmpty ? nil : r.text
-    }
-
-    /// A course agent keeps a short briefing of where its course is, so consults are cheap. Haiku, writes only that file.
+    /// A short briefing of where each course is, so a job or a chat reads that instead of the whole course. Haiku, writes only that file.
     static func refreshBriefing(_ course: String, root: URL) async -> Reply {
-        let file = ownFolder(course) + "/Course briefing.md"
+        let file = briefingFile(course)
         return await run("""
-        Rewrite `\(file)` as your short Course briefing (under 40 lines, plain Markdown). Its first line is `Written <today's date>, teaching week <n>` from the date you were given. Then: where the course is now, the next dates, the assessments and their weights, the state of lectures, tutorials and readings, what the lecturer keeps emphasising, and the notes that need attention. Use only what is in the vault. Edit only that file, then reply with one line.
-        """, system: systemPrompt(role(course)), session: nil, canEdit: false, root: root, tier: .quick, writes: [scope(file: file)])
+        Rewrite `\(file)` as the short Course briefing for \(courseName(course)) (under 40 lines, plain Markdown). Its first line is `Written <today's date>, teaching week <n>` from the date you were given. Then: where the course is now, the next dates, the assessments and their weights, the state of lectures, tutorials and readings, what the lecturer keeps emphasising, and the notes that need attention. Use only what is in the vault. Edit only that file, then reply with one line.
+        """, system: systemPrompt(manager, course: course), session: nil, canEdit: false, root: root, tier: .quick, writes: [scope(file: file)])
     }
 
     /// One go at a job: the helper edits only the note it is given (or adds the one new note in `creating`), and may only change `sections` if the job names them.
@@ -308,7 +313,7 @@ enum Agent {
         } else {
             prompt = """
             \(task) The note is `\(rel)`.\(extra)
-            \(advice.map { "The course agent advises:\n\($0)\n" } ?? "")
+            \(advice.map { "\($0)\n" } ?? "")
             Do the work now, \(where_).\(sections.map { " You may change only these sections (and `summary`, `readings`, `references` in the frontmatter if the job needs them): \($0.joined(separator: ", ")). Leave every other line exactly as it is." } ?? "")
             If there is nothing you can do without inventing content, reply with a single line starting `NOTHING:` and the reason, and change nothing. Otherwise reply with one short line per change you made.
             """
@@ -491,4 +496,19 @@ final class LiveRuns: @unchecked Sendable {
     func blocked(background: Bool, button: Bool) -> Bool {
         lock.withLock { let now = Date(); return (background && now < refuseBackground) || (button && now < refuseButton) }
     }
+}
+
+// MARK: - Colours
+extension Agent {
+    /// Each kind of work has its own colour (the badges, the notices); the Manager itself is slate.
+    static func color(_ id: String) -> Color {
+        helperColors[id] ?? .ink2
+    }
+    static let helperColors: [String: Color] = [
+        "sorter": Color(light: 0xD9A21B, dark: 0xF0C75A), "scribe": Color(light: 0x3D86D6, dark: 0x79B4F0),
+        "librarian": Color(light: 0xCF4B58, dark: 0xF08A94), "planner": Color(light: 0x8C59CF, dark: 0xBE96F0),
+        "tutor": Color(light: 0x20A6A8, dark: 0x66D3D4), "writer": Color(light: 0xE0609F, dark: 0xF59AC8),
+        "researcher": Color(light: 0x6AA832, dark: 0xA6D96A), "analyst": Color(light: 0xE0702F, dark: 0xF5A878),
+        "manager": Color(light: 0x56606F, dark: 0xA3AEC0),
+    ]
 }

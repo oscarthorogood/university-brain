@@ -12,20 +12,10 @@ struct NoteMenu: View {
         Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([note.id]) }
         Divider()
         Menu("Status") { ForEach(TaskState.allCases, id: \.self) { s in Button { store.set(note, s) } label: { Label(s.label, systemImage: note.state == s ? "checkmark" : s.icon) } } }
-        Menu("Ask an Agent") {
-            ForEach(askable) { r in
-                Button(r.id == Agent.manager.id ? "Manager (picks for me)" : r.name) { ask(r) }
-            }
+        Button("Ask the Manager About It") {
+            store.page = .agent(Agent.manager.id)
+            store.ask("Tell me what matters in “\(note.display)” (\(note.id.lastPathComponent)) and what I should do next.")
         }
-    }
-    /// The Manager, this note's course agent, then the helpers. (Built as one long expression inside the ForEach, it timed out the type checker.)
-    private var askable: [Agent.Role] {
-        let course: [Agent.Role] = Agent.courseRoles.filter { $0.id == note.course }
-        return [Agent.manager] + course + Agent.roles
-    }
-    private func ask(_ r: Agent.Role) {
-        store.page = .agent(r.id)
-        store.ask(r.id, "Tell me what matters in “\(note.display)” (\(note.id.lastPathComponent)) and what I should do next.")
     }
 }
 
@@ -47,7 +37,7 @@ struct CourseMenu: View {
     var body: some View {
         Button("Open") { store.page = .course(code) }
         Button("New Note…") { store.newCourse = Vault.courses.first { $0.value == code }?.key; store.newStructured = true }
-        Button("Ask Planner What’s Due") { store.page = .agent("planner"); store.ask("planner", "What’s due for \(code) in the next two weeks?") }
+        Button("Ask What’s Due") { store.page = .agent(Agent.manager.id); store.ask("What’s due for \(code) in the next two weeks?") }
     }
 }
 
@@ -60,16 +50,6 @@ struct FolderMenu: View {
             Button("New \(kind.rawValue)…") { store.newKind = kind; store.newStructured = true }
         }
         Button("Show in Finder") { NSWorkspace.shared.open(Vault.root.appending(path: Vault.dir(name == "Tasks" ? "TaskNotes/Tasks" : name))) }
-    }
-}
-
-struct AgentMenu: View {
-    @Environment(Store.self) private var store
-    let role: Agent.Role
-    var body: some View {
-        Button("Open \(role.name)") { store.page = .agent(role.id) }
-        Divider()
-        ForEach(role.actions, id: \.self) { a in Button(a) { store.page = .agent(role.id); store.ask(role.id, a) } }
     }
 }
 

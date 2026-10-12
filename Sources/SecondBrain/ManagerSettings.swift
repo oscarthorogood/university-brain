@@ -1,7 +1,7 @@
 import SwiftUI
 import FoundationModels
 
-/// Settings → Manager: everything in the Manager menu on the Agents page, in one place.
+/// Settings → Manager: everything in the Manager menu on the Manager page, in one place.
 struct ManagerSettings: View {
     @Environment(Store.self) private var store
     @State private var managerOn = Manager.on
@@ -14,14 +14,14 @@ struct ManagerSettings: View {
         ScrollView { Form {
             LabeledContent("Manager:") {
                 VStack(alignment: .leading, spacing: 6) {
-                    Toggle("Looks for work and hands it to helpers", isOn: Binding(get: { store.autopilotOn }, set: { store.setAutopilot($0) }))
-                    Text(store.blockedReason().map { $0.replacingOccurrences(of: "switched off in Settings", with: "switched off") } ?? (store.activeJobs.first.map { "Working: \(Agent.role($0.agent).name), \($0.title)" } ?? "Idle, looking for work")).font(.caption).foregroundStyle(.secondary)
+                    Toggle("Looks for work and does it", isOn: Binding(get: { store.autopilotOn }, set: { store.setAutopilot($0) }))
+                    Text(store.blockedReason().map { $0.replacingOccurrences(of: "switched off in Settings", with: "switched off") } ?? (store.activeJobs.first.map { "Working: \(Agent.label($0.agent)), \($0.title)" } ?? "Idle, looking for work")).font(.caption).foregroundStyle(.secondary)
                     HStack(spacing: 8) {
                         if store.pausedUntil == nil { Button("Pause") { store.pause(for: nil) } } else { Button("Resume") { store.resume() } }
                         Button("Pause for an hour") { store.pause(for: 3600) }
                         Button("Until tomorrow") { store.pauseUntilTomorrow() }
                     }
-                    Text("The Manager is the only agent that looks for work, and it runs on your Mac. It picks a helper for each job and asks the relevant course agent what matters first; the helper does it without waiting for you, and the Manager checks the result and puts it back if it fails. Everything shows in the Activity Log with an Undo.")
+                    Text("The Manager is the one agent: it looks for work on your Mac, does each job as the kind of work it is (reading the course briefing first), without waiting for you, then checks the result and puts it back if it fails. Everything shows in the Activity Log with an Undo.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     Text(onDevice ? "Apple’s on-device model is available, so routing and review use it." : "Apple’s on-device model isn’t available, so the Manager uses rules and code checks only.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -67,7 +67,7 @@ struct ManagerSettings: View {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(["Jobs", "Checks"], id: \.self) { group in
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(group == "Jobs" ? "Jobs (a helper does the work)" : "Checks (on your Mac, free)").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                            Text(group == "Jobs" ? "Jobs (the Manager does the work)" : "Checks (on your Mac, free)").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                             ForEach(Store.jobKinds.filter { $0.group == group }, id: \.id) { k in
                                 Toggle(k.title, isOn: Binding(get: { store.jobOn(k.id) }, set: { store.setJob(k.id, $0) }))
                             }
@@ -75,12 +75,12 @@ struct ManagerSettings: View {
                     }
                 }
             }.padding(.top, 8)
-            LabeledContent("Agents:") {
+            LabeledContent("Kinds of work:") {
                 let usage = store.usageByAgent()   // once, not once per row (each call reads a week of counters)
                 VStack(alignment: .leading, spacing: 2) {
-                    ForEach(Agent.roles + Agent.courseRoles) { r in
+                    ForEach(Agent.roles) { r in
                         let u = usage.first { $0.agent == r.id }
-                        Toggle(r.name + (u.map { "  ·  \($0.today) of \(store.dailyCap(r.id)) today, \($0.week) this week" } ?? ""), isOn: Binding(get: { store.agentOn(r.id) }, set: { store.setAgentOn(r.id, $0) }))
+                        Toggle(Agent.Label(r.id) + (u.map { "  ·  \($0.today) of \(store.dailyCap(r.id)) today, \($0.week) this week" } ?? ""), isOn: Binding(get: { store.agentOn(r.id) }, set: { store.setAgentOn(r.id, $0) }))
                         if let until = store.breakerUntil(r.id) {
                             HStack(spacing: 8) {
                                 Text("Paused until \(until.formatted(date: .omitted, time: .shortened)) after failing the Manager’s review").font(.caption).foregroundStyle(.secondary)
@@ -88,7 +88,7 @@ struct ManagerSettings: View {
                             }.padding(.leading, 20)
                         }
                     }
-                    Text("A helper that fails the Manager’s review three times in a row is paused for a day.").font(.caption).foregroundStyle(.secondary).padding(.top, 4)
+                    Text("A kind of work that fails the Manager’s review three times in a row is paused for a day.").font(.caption).foregroundStyle(.secondary).padding(.top, 4)
                 }
             }.padding(.top, 8)
         }

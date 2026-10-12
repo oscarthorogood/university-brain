@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// One job the Manager is running for you (from Sort Now, File Now or a note's button): who is advising, who is working, the check, and the outcome with an Undo.
+/// One job the Manager is running for you (from Sort Now, File Now or a note's button): the work, the check, and the outcome with an Undo.
 struct JobProgress: View {
     @Environment(Store.self) private var store
     let key: String; let finished: Bool
@@ -13,7 +13,7 @@ struct JobProgress: View {
                     else { Image(systemName: item.state == .done ? "checkmark.circle.fill" : "exclamationmark.triangle").foregroundStyle(item.state == .done ? Color(light: 0x2F8467, dark: 0x5CC39A) : Color.redFG) }
                     Text(status(item)).font(.system(size: 13, weight: .medium))
                 }
-                if let a = item.advice { DisclosureGroup("What the course agent advised") { Text(a).font(.system(size: 12)).foregroundStyle(Color.ink2).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }.font(.system(size: 12)) }
+                if let a = item.advice { DisclosureGroup("Course context") { Text(a).font(.system(size: 12)).foregroundStyle(Color.ink2).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }.font(.system(size: 12)) }
                 if [.done, .rejected, .failed].contains(item.state), let r = item.result, !r.isEmpty {
                     ScrollView { Text(LocalizedStringKey(r)).font(.system(size: 13)).lineSpacing(3).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }.frame(maxHeight: 260)
                 }
@@ -27,15 +27,15 @@ struct JobProgress: View {
         }
     }
     func status(_ i: InboxItem) -> String {
-        let who = Agent.role(i.agent).name
+        let who = Agent.label(i.agent)
         switch i.state {
         case .planning: return "The Manager is picking it up…"
-        case .consulting: return "Asking the course agent what matters…"
-        case .working: return "\(who) is working on it…"
+        case .consulting: return "Getting the course context…"
+        case .working: return "Working on it (\(who))…"
         case .checking: return "The Manager is checking the result…"
         case .done: return "Done. " + (i.verdict ?? "")
         case .rejected: return "The Manager rejected it and put it back."
-        case .failed: return "\(who) didn’t finish."
+        case .failed: return "Didn’t finish the \(who) work."
         default: return ""
         }
     }

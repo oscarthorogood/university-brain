@@ -14,7 +14,7 @@ enum Support {
 
 struct InboxItem: Identifiable, Codable {
     enum Kind: String, Codable { case filing, work }
-    /// planning → consulting (a course agent advises) → working (the helper does it) → checking (the Manager reviews) → done, or rejected (undone).
+    /// planning → working (the Manager does it) → checking (the Manager reviews) → done, or rejected (undone). `consulting` only exists in older saved files, from when a course agent advised first.
     /// `ready` only exists in older saved files, from when a plan waited for a tick.
     enum State: String, Codable { case planning, ready, consulting, working, checking, done, failed, dismissed, rejected }
     var id = UUID()
@@ -34,7 +34,7 @@ struct InboxItem: Identifiable, Codable {
     var auto: Bool?
     var undo: Undo?              // what it changed, so one tap can put it back
     var outputs: [String: String]?   // note → copy of what the agent wrote there, to learn from your later edits
-    var advice: String?          // what the course agent(s) told the helper
+    var advice: String?          // old records only: what a course agent told the helper
     var verdict: String?         // what the Manager's review decided
     struct Undo: Codable { var restore: [String] = []; var created: [String] = []; var moves: [[String]] = []; var statuses: [String: String] = [:]; var snapshots: [String: String]? = nil }   // snapshots: the history file holding each restored note as it was before the job
     static func outputDir(_ id: UUID) -> URL { Support.dir.appending(path: "outputs/\(id.uuidString)") }
@@ -155,7 +155,7 @@ extension Store {
         notifyDueToday()
         // Paused, quiet hours, on battery: the Manager still keeps the calendar but starts nothing.
         guard blockedReason() == nil else { scheduleAutopilot(after: 600); return }
-        guard thinking.isEmpty else { scheduleAutopilot(after: 60); return }   // you are chatting with an agent: you go first
+        guard thinking.isEmpty else { scheduleAutopilot(after: 60); return }   // you are chatting with it: you go first
         await runChecks()
         await weekAhead()
         let jobs = scan()
@@ -209,7 +209,7 @@ extension Store {
         UserDefaults.standard.set(order, forKey: "autopilotHandled")
     }
 
-    /// The Manager's scan: everything a helper could usefully do right now, ranked, best first.
+    /// The Manager's scan: everything it could usefully do right now, ranked, best first.
     func scan(allowDeep: Bool = true) -> [(score: Double, job: Job)] {
         var found: [(score: Double, job: Job)] = []
         func add(_ id: String, _ score: Double, _ job: Job) { if jobOn(id) { found.append((score, job)) } }
@@ -306,18 +306,18 @@ extension Store {
         return found.filter { agentFree($0.job.agent) }.sorted { $0.score > $1.score }
     }
 
-    // MARK: The pipeline: consult, work, review
+    // MARK: The pipeline: work, review
 
-    /// Course agents to ask about a job: the note's course, or the courses the Unsorted files look like they belong to.
+    /// The courses a job is about, whose briefings it reads first: the note's course, or the courses the Unsorted files look like they belong to.
     func coursesFor(_ job: Job) -> [String] {
         switch job {
-        case .work(let n, _, _, _): return n.course.flatMap { agentOn($0) ? [$0] : nil } ?? []
+        case .work(let n, _, _, _): return n.course.map { [$0] } ?? []
         case .learn: return []
         case .sorting(let files, _):
             var out: [String] = []
             for f in files {
                 let rel = Vault.rel(f).lowercased()
-                for (full, code) in Vault.courses where !out.contains(code) && agentOn(code) && (rel.contains(full.lowercased()) || rel.range(of: "\\b\(code.lowercased())\\b", options: .regularExpression) != nil) { out.append(code) }
+                for (full, code) in Vault.courses where !out.contains(code) && (rel.contains(full.lowercased()) || rel.range(of: "\\b\(code.lowercased())\\b", options: .regularExpression) != nil) { out.append(code) }
             }
             return out
         }
@@ -342,36 +342,23 @@ extension Store {
         spendJob(agent)
         if agent == "writer" { spendDeep() }
         if agent == "researcher" { spendResearch() }
-        log(Agent.manager.id, "Assigned to \(Agent.role(agent).name) (\(Manager.workTier(agent).rawValue)): \(item.title) — \(item.reason ?? "")")
-        say(Agent.manager.id, "@\(Agent.role(agent).name) can you take “\(clipped(item.title, 70))”?" + (item.reason.map { " \($0)" } ?? ""))
+        log(Agent.manager.id, "Started \(Agent.label(agent)) work (\(Manager.workTier(agent).rawValue)): \(item.title) — \(item.reason ?? "")")
         inbox.append(item); saveInbox()
         let rel0 = item.paths.first
         if item.kind == .work, let p = rel0 { claim(p) }   // the note shows Agent In Progress while a helper has it
         agentBusy = true
-        defer { agentBusy = false; for a in Set([agent, Agent.manager.id] + coursesFor(job)) { thinking.remove(a) }; if item.kind == .work { release(rel0) } }
+        defer { agentBusy = false; thinking.remove(agent); if item.kind == .work { release(rel0) } }
         // so nothing a helper does is lost, and the review has the text from before (off the main thread: it reads every note)
         let noteURLs = notes.map(\.id)
         await Task.detached { for u in noteURLs { try? Vault.snapshot(u, root: root) } }.value
         let before = Set(notes.map { Vault.rel($0.id) }), started = Date().addingTimeInterval(-1)
         let prevStatus = item.kind == .work ? claims[rel0 ?? ""] : nil
 
-        // consult: a course agent tells the helper what matters in its course
-        var advice: String?
+        // course context: the job reads the briefing of its course first (no second agent is asked; the briefing is kept up to date once a day)
         let courses = coursesFor(job)
-        if !courses.isEmpty {
-            update { $0.state = .consulting }
-            var parts: [String] = []
-            for c in courses.prefix(2) {
-                thinking.insert(c)
-                let a = await Agent.consult(c, helper: agent, job: item.title, note: rel0, root: root)
-                thinking.remove(c)
-                if let a { parts.append("\(Agent.role(c).name): \(a)"); say(c, "@\(Agent.role(agent).name) on “\(clipped(item.title, 50))”: \(clipped(String(a.split(separator: "\n").first ?? ""), 220))"); log(c, "Advised \(Agent.role(agent).name) on “\(item.title)”: \(String(a.split(separator: "\n").first ?? "").prefix(140))") }
-            }
-            advice = parts.isEmpty ? nil : parts.joined(separator: "\n\n")
-            update { $0.advice = advice }
-        }
+        let advice: String? = courses.isEmpty ? nil : courses.prefix(2).map { Agent.briefingPointer($0) }.joined(separator: "\n")
 
-        // work: the helper does it, with no tick
+        // work: the Manager does it, with no tick
         update { $0.state = .working }
         thinking.insert(agent)
         var summary = "", planText = "", ok = true, nothing = false, stopped = false, session: String?, moved: [[String]] = [], work: AgentWork?
@@ -436,28 +423,24 @@ extension Store {
             if !retry { markHandled(item.key) }
             startCooling(agent, rel0 ?? item.key, hours: refused ? 1 : 6)
             log(agent, (byYou ? "Stopped: " : "Didn’t finish: ") + item.title + (refused ? " (its write was refused, so nothing changed)" : ""))
-            say(agent, byYou ? "Stopped “\(clipped(item.title, 60))”." : "I couldn't finish “\(clipped(item.title, 60))”.")
             return
         }
 
         // review: the Manager checks the result, on this Mac. Problems send it back once; if it still fails, the job is undone.
         update { $0.state = .checking }
-        thinking.insert(Agent.manager.id)
         reload()
         var verdict = Review.Verdict(problems: stopped ? ["you stopped it"] : [])
         if !stopped { verdict = await reviewJob(item, work: work, started: started, before: before, moved: moved, root: root) }
         if !stopped, (!verdict.ok || !verdict.flags.isEmpty), item.kind == .work, case .work(let n, let w, _, _) = job, let s = session {
             let why = (verdict.problems + verdict.flags).map { "- " + $0 }.joined(separator: "\n")
-            log(Agent.manager.id, "Sent “\(item.title)” back to \(Agent.role(agent).name): \(verdict.problems.first ?? verdict.flags.first ?? "")")
-            say(Agent.manager.id, "@\(Agent.role(agent).name) I'm sending “\(clipped(item.title, 50))” back: \(clipped(verdict.problems.first ?? verdict.flags.first ?? "", 200))")
-            update { $0.state = .working }; thinking.remove(Agent.manager.id); thinking.insert(agent)
+            log(Agent.manager.id, "Sent “\(item.title)” back for another go at the \(Agent.label(agent)) work: \(verdict.problems.first ?? verdict.flags.first ?? "")")
+            update { $0.state = .working }; thinking.insert(agent)
             let r = await Agent.doWork(role: w.role, task: w.task, note: n.id, extra: "", advice: advice, creating: w.creates, sections: w.sections, feedback: why, session: s, root: root)
-            thinking.remove(agent); thinking.insert(Agent.manager.id)
+            thinking.remove(agent)
             update { $0.state = .checking }
             if r.session != nil { summary = r.text; reload(); verdict = await reviewJob(item, work: work, started: started, before: before, moved: moved, root: root) }
             else { verdict.problems.append("the retry didn't finish") }
         }
-        thinking.remove(Agent.manager.id)
 
         // what changed, so one tap can put it back, and a copy of what the agent wrote, so it can learn from your later edits
         reload()
@@ -497,19 +480,17 @@ extension Store {
             update { $0.verdict = stopped ? "Stopped by you" : "Rejected: " + reasons }
             if hasUndo { undoJob(id) }
             update { $0.state = stopped ? .dismissed : .rejected }
-            if !stopped { recordReview(agent, passed: false) }   // a stop is your choice, not the helper failing
+            if !stopped { recordReview(agent, passed: false) }   // a stop is your choice, not the work failing
             log(Agent.manager.id, stopped ? "Stopped “\(item.title)” and put back what it had changed." : "Rejected “\(item.title)” and put it back: \(reasons)")
-            say(Agent.manager.id, stopped ? "@\(Agent.role(agent).name) you've been stopped, and I've put back what you changed." : "@\(Agent.role(agent).name) I've put “\(clipped(item.title, 50))” back: \(clipped(reasons, 200))")
         } else {
             let line = summary.split(separator: "\n").map { $0.trimmingCharacters(in: CharacterSet(charactersIn: " -*•#")) }.first { !$0.isEmpty }.map { String($0.prefix(150)) }
             let note = verdict.flags.isEmpty ? "checked" : "flagged: " + verdict.flags.joined(separator: "; ")
             update { $0.state = .done; $0.verdict = verdict.flags.isEmpty ? "Checked: fine" : "Flagged: " + verdict.flags.joined(separator: "; ") }
             recordReview(agent, passed: true)
-            log(agent, "\(item.title)\(line.map { " — " + $0 } ?? "") · Manager \(note)" + (advice == nil ? "" : " · \(courses.map { Agent.role($0).name }.joined(separator: ", ")) advised"), undo: hasUndo ? id : nil)
-            say(agent, "Done with “\(clipped(item.title, 60))”. I've messaged Oscar.")
-            // and the agent texts you, in your private chat with them
-            chats[agent, default: []].append(Message(fromAgent: true, text: "I've finished “\(item.title)”\(line.map { ": " + $0 } ?? "")." + (verdict.flags.isEmpty ? "" : " The Manager flagged: \(verdict.flags.joined(separator: "; "))") + (hasUndo ? " Undo is in the Activity Log." : "")))
-            scheduleAutopilot(after: 3)   // what it just did may be what the next helper was waiting for (Sorter files slides → Scribe; Planner fills a brief → Writer)
+            log(agent, "\(item.title)\(line.map { " — " + $0 } ?? "") · Manager \(note)" + (advice == nil ? "" : " · read the \(courses.map { Agent.courseName($0) }.joined(separator: ", ")) briefing"), undo: hasUndo ? id : nil)
+            // and it texts you in the chat
+            chats[Agent.manager.id, default: []].append(Message(fromAgent: true, text: "I've finished “\(item.title)”\(line.map { ": " + $0 } ?? "")." + (verdict.flags.isEmpty ? "" : " My check flagged: \(verdict.flags.joined(separator: "; "))") + (hasUndo ? " Undo is in the Activity Log." : "")))
+            scheduleAutopilot(after: 3)   // what it just did may be what the next job was waiting for (filing slides → a write-up; a filled brief → an outline)
         }
     }
 
@@ -630,24 +611,25 @@ extension Store {
         }
         return out.sorted { $0.0 < $1.0 }.prefix(160).map(\.1).joined(separator: "\n")
     }
-    /// One run, no review: the agent reads what you changed and may add a few rules to its own file. Old text stays in history.
+    /// One run, no review: the Manager reads what you changed and may add a few rules to the part of its learned rules for that kind of work. Old text stays in history.
     func runLearn(_ item: InboxItem, _ rel: String, _ key: String) async {
         markHandled(key)   // whatever comes of it, the same edit isn't looked at twice
         guard let file = item.outputs?[rel], let was = try? String(contentsOf: InboxItem.outputDir(item.id).appending(path: file), encoding: .utf8),
               let now = try? String(contentsOf: Vault.root.appending(path: rel), encoding: .utf8) else { return }
-        let diff = Self.lineDiff(was, now), mine = Agent.file(item.agent)
+        let diff = Self.lineDiff(was, now), mine = Agent.learned, mode = Agent.role(item.agent)
         guard !diff.isEmpty else { return }
         spendJob(item.agent)
         agentBusy = true; thinking.insert(item.agent)
         defer { agentBusy = false; thinking.remove(item.agent) }
+        AgentFiles.ensureLearnedFile(in: Vault.root)
         try? Vault.snapshot(Vault.root.appending(path: mine))
         let r = await Agent.run("""
-        Earlier you wrote text into `\(rel)`. Oscar has since edited it. This is a line diff (`-` is something you wrote that he removed or changed, `+` is what he put instead):
+        Earlier you wrote text into `\(rel)` (\(mode.label) work). Oscar has since edited it. This is a line diff (`-` is something you wrote that he removed or changed, `+` is what he put instead):
         \(diff)
         Decide whether his edits show a lasting preference about how you should work (tone, length, structure, what to include or leave out). Content fixes that only apply to this note are not rules.
         If there is no lasting preference, reply with one line starting `NOTHING:` and stop.
-        Otherwise add at most 3 short, general, imperative rules to your own file `\(mine)` under the heading `## Learned from Oscar's edits` (add the heading at the end if it is missing). Don't repeat a rule that is already there, merge similar ones, and keep the section under 12 rules. Edit only that file. Reply with the rules you added, one per line.
-        """, system: Agent.systemPrompt(Agent.role(item.agent)), session: nil, canEdit: false, root: Vault.root, tier: .standard, writes: [Agent.scope(file: mine)])
+        Otherwise add at most 3 short, general, imperative rules to `\(mine)` under the heading `## \(mode.name)` (add the heading at the end if it is missing). Don't repeat a rule that is already there, merge similar ones, and keep each heading under 12 rules. Edit only that file. Reply with the rules you added, one per line.
+        """, system: Agent.systemPrompt(mode), session: nil, canEdit: false, root: Vault.root, tier: .standard, writes: [Agent.scope(file: mine)])
         guard r.session != nil else { if r.limited { pauseForLimit() }; return }
         if !r.text.hasPrefix("NOTHING") {
             let rules = r.text.split(separator: "\n").map { $0.trimmingCharacters(in: CharacterSet(charactersIn: " -*•")) }.filter { !$0.isEmpty }.prefix(3).joined(separator: "; ")

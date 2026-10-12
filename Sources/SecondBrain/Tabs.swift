@@ -45,7 +45,7 @@ extension Store {
         switch p {
         case .newTab: ("New Tab", "plus.square.dashed")
         case .overview: ("Home", "house")
-        case .messages: ("Messages", "message")
+        case .messages: ("Manager", "message")
         case .inbox, .sortNow: ("Unsorted", "tray")
         case .week: ("Week", "chart.bar")
         case .month: ("Month", "calendar")
@@ -54,7 +54,7 @@ extension Store {
         case .folder(let f): (SideNav.label(f), SideNav.folders.first { $0.name == f }?.icon ?? "folder")
         case .unsorted(let u): (Vault.label(u), "tray")
         case .search: ("Search", "magnifyingglass")
-        case .agent(let id): (Agent.role(id).name, "sparkles")
+        case .agent: ("Manager", "sparkles")
         case .note(let u): (notes.first { $0.id == u }?.display ?? u.deletingPathExtension().lastPathComponent, "doc.text")
         case .file(let u): (u.deletingPathExtension().lastPathComponent, "doc.richtext")
         case .tags: ("Tags", "number")

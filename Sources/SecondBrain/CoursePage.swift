@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A course page: lectures and tutorials in the top half beside the course agent's stage; below, the week-by-week outline,
+/// A course page: lectures and tutorials in the top half beside what the Manager has to say; below, the week-by-week outline,
 /// a map of how the course's notes relate, and the assessment timeline.
 struct CoursePage: View {
     @Environment(Store.self) private var store
@@ -21,7 +21,7 @@ struct CoursePage: View {
             GeometryReader { g in
                 let lecturesCard = Card(title: "Lectures", trailing: "\(lectures.filter(\.done).count)/\(lectures.count)") { ClassList(notes: lectures, empty: "No lectures") }
                 let tutorialsCard = Card(title: "Tutorials", trailing: "\(tutorials.filter(\.done).count)/\(tutorials.count)") { ClassList(notes: tutorials, empty: "No tutorials") }
-                let stage = Card { AgentStage(id: code, says: store.courseSays(code)) }
+                let stage = Card { AgentSays(says: store.courseSays(code), chat: false) }
                 if mainWidth >= 840 && g.size.height >= 540 {
                     let half = (g.size.height - 12) / 2, w = g.size.width
                     VStack(spacing: 12) {
@@ -143,7 +143,7 @@ struct CourseOutline: View {
                     NoteList(notes: reads, empty: "No readings set")
                 } else {
                     VStack(spacing: 0) {
-                        NoteList(notes: revision.sorted { $0.title < $1.title }, empty: "No MCQs, flashcards or exams yet. Ask the course agent for MCQs.")
+                        NoteList(notes: revision.sorted { $0.title < $1.title }, empty: "No MCQs, flashcards or exams yet. Ask the Manager for MCQs.")
                         Button { store.filter = code; store.page = .folder("MCQ") } label: { Label("Open Study", systemImage: "arrow.right") }
                             .buttonStyle(.glassRow).padding(8)
                     }

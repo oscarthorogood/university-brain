@@ -146,7 +146,7 @@ struct QuizLibraryPage: View {
                         StatTile(value: bests.isEmpty ? "—" : "\(Int(bests.reduce(0, +) / Double(bests.count) * 100))%", label: "Average best score", tint: NoteColor.done)
                         StatTile(value: "\(bests.count) of \(shown.count)", label: "Attempted")
                     }
-                    if shown.isEmpty { Text("No quizzes yet. The Tutor makes one from a lecture note.").font(.system(size: 13)).foregroundStyle(Color.ink2) }
+                    if shown.isEmpty { Text("No quizzes yet. Ask the Manager to make one from a lecture note.").font(.system(size: 13)).foregroundStyle(Color.ink2) }
                     else {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 270), spacing: 14)], spacing: 14) {
                             ForEach(shown, id: \.note.id) { QuizCard(note: $0.note, course: $0.course, count: $0.count) }
@@ -215,7 +215,7 @@ struct DeckLibraryPage: View {
                         StatTile(value: "\(mastered)", label: "Cards you know", tint: NoteColor.done)
                         StatTile(value: "\(total - mastered)", label: "Still to learn")
                     }
-                    if shown.isEmpty { Text("No decks yet. The Tutor makes one from a lecture note.").font(.system(size: 13)).foregroundStyle(Color.ink2) }
+                    if shown.isEmpty { Text("No decks yet. Ask the Manager to make one from a lecture note.").font(.system(size: 13)).foregroundStyle(Color.ink2) }
                     else {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 18)], spacing: 22) {
                             ForEach(shown, id: \.note.id) { DeckCard(note: $0.note, course: $0.course, cards: $0.cards) }

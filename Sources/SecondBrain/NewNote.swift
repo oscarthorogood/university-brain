@@ -167,7 +167,7 @@ struct AgentWorkSheet: View {
     @State private var finished = false
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) { AgentPortrait(id: work.role, size: 28); Text(Agent.role(work.role).name).font(.system(size: 16, weight: .semibold)); Spacer(); Text("Run by the Manager · \(Manager.workTier(work.role).rawValue) effort").font(.caption).foregroundStyle(Color.ink2) }
+            HStack(spacing: 8) { AgentPortrait(id: work.role, size: 28); Text(Agent.Label(work.role)).font(.system(size: 16, weight: .semibold)); Spacer(); Text("Done by the Manager · \(Manager.workTier(work.role).rawValue) effort").font(.caption).foregroundStyle(Color.ink2) }
             JobProgress(key: key, finished: finished)
             HStack { Spacer(); Button(finished ? "Done" : "Close") { dismiss() }.keyboardShortcut(.defaultAction) }
             Text("The old version is kept in the note’s history.").font(.caption).foregroundStyle(Color.ink2)

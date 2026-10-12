@@ -11,7 +11,7 @@ enum IM {
 }
 
 extension String {
-    /// The Manager mirrors an answer as "**Planner**\n\n…": that is the sender's name, then what they said.
+    /// A message that starts "**Check found problems**\n\n…": the bold heading, then what it says.
     var senderAndBody: (sender: String?, body: String) {
         guard hasPrefix("**"), let end = range(of: "**\n\n", range: index(startIndex, offsetBy: 2)..<endIndex) else { return (nil, self) }
         return (String(self[index(startIndex, offsetBy: 2)..<end.lowerBound]), String(self[end.upperBound...]))
@@ -44,7 +44,7 @@ struct MessageRow: View {
     var receipt: String? = nil     // "**Read** 13:06" or "**Delivered**", under your latest message
     var body: some View {
         let mine = !message.fromAgent
-        if !mine && message.text.hasPrefix("→") {   // the Manager saying where it sent your request
+        if !mine && message.text.hasPrefix("→") {   // which kind of work it took your request as
             Text(LocalizedStringKey(message.text)).font(.system(size: 11)).foregroundStyle(Color.ink2).multilineTextAlignment(.center).frame(maxWidth: .infinity)
         } else {
             let (sender, text) = mine ? (nil, message.text) : message.text.senderAndBody
@@ -71,155 +71,10 @@ struct IMStamp: View {
     }
 }
 
-/// The Messages app, for agents: every conversation in a list on the left (latest first), the open chat on the right.
-struct MessagesInbox: View {
-    @Environment(Store.self) private var store
-    static let group = "group"   // the pinned Group Chat: not an agent, so it can't clash with an agent id
-    @State private var selected = MessagesInbox.group
-
-    private func last(_ id: String) -> Message? { store.chats[id]?.last { !$0.text.hasPrefix("→") } }
-    /// Agents you have talked to come first, newest on top; the rest follow in roster order.
-    private var order: [String] {
-        let latest = Agent.all.map { ($0.id, last($0.id)?.time) }   // each chat scanned once, not once per comparison
-        return latest.compactMap { id, t in t.map { (id, $0) } }.sorted { $0.1 > $1.1 }.map(\.0) + latest.filter { $0.1 == nil }.map(\.0)
-    }
-
-    var body: some View {
-        HStack(spacing: 12) {
-            ScrollView {
-                LazyVStack(spacing: 2) { groupRow; ForEach(order, id: \.self) { row($0) } }.padding(8)
-            }
-            .frame(width: 280).glassEffect(.regular, in: .rect(cornerRadius: DS.Radius.card))
-            if selected == Self.group { GroupChat() } else {
-            let role = Agent.role(selected)
-            VStack(spacing: 10) {
-                VStack(spacing: 3) {
-                    AgentPortrait(id: selected, size: 46)
-                    HStack(spacing: 3) {
-                        Text(role.name).font(.system(size: 12, weight: .semibold))
-                        Image(systemName: "chevron.right").font(.system(size: 7, weight: .bold)).foregroundStyle(Color.ink2)
-                    }
-                    Text(store.thinking.contains(selected) ? "Working…" : role.job).font(.system(size: 10)).foregroundStyle(Color.ink2).lineLimit(1)
-                }
-                AgentChatCard(code: selected, suggest: true).id(selected)
-            } }
-        }
-    }
-
-    private func row(_ id: String) -> some View {
-        let r = Agent.role(id), m = last(id)
-        return Button { selected = id } label: {
-            HStack(spacing: 10) {
-                AgentPortrait(id: id, size: 38)
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack {
-                        Text(r.name).font(.system(size: 13, weight: .semibold)).lineLimit(1)
-                        Spacer(minLength: 4)
-                        if let m { Text(Calendar.current.isDateInToday(m.time) ? m.time.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)) : m.time.formatted(.dateTime.weekday(.abbreviated)))
-                            .font(.system(size: 11)).foregroundStyle(Color.ink2) }
-                    }
-                    Text(store.thinking.contains(id) ? "Working…" : m.map { $0.text.senderAndBody.body.replacingOccurrences(of: "\n", with: " ") } ?? r.job)
-                        .font(.system(size: 12)).foregroundStyle(Color.ink2).lineLimit(2).multilineTextAlignment(.leading)
-                }
-            }
-            .padding(8).frame(maxWidth: .infinity, alignment: .leading)
-            .background(selected == id ? Color.ink.opacity(0.1) : .clear, in: .rect(cornerRadius: DS.Radius.row))
-            .contentShape(.rect)
-        }.buttonStyle(.plain)
-    }
-}
-
-extension MessagesInbox {
-    /// Pinned at the top: everything the agents say to each other.
-    /// "Tutor: On it." for the list.
-    fileprivate static func preview(_ m: Message) -> String { let (sender, body) = m.text.senderAndBody; return (sender.map { $0 + ": " } ?? "") + body.replacingOccurrences(of: "\n", with: " ") }
-    fileprivate var groupRow: some View {
-        let m = store.chats[Self.group]?.last
-        return Button { selected = Self.group } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "person.3.fill").font(.system(size: 16)).foregroundStyle(Color.ink).frame(width: 38, height: 38).background(Color.ink.opacity(0.1), in: .circle)
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack {
-                        Text("Group Chat").font(.system(size: 13, weight: .semibold)).lineLimit(1)
-                        Spacer(minLength: 4)
-                        if let m { Text(m.time.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))).font(.system(size: 11)).foregroundStyle(Color.ink2) }
-                    }
-                    Text(m.map(Self.preview) ?? "Everyone, in one place")
-                        .font(.system(size: 12)).foregroundStyle(Color.ink2).lineLimit(2).multilineTextAlignment(.leading)
-                }
-            }
-            .padding(8).frame(maxWidth: .infinity, alignment: .leading)
-            .background(selected == Self.group ? Color.ink.opacity(0.1) : .clear, in: .rect(cornerRadius: DS.Radius.row))
-            .contentShape(.rect)
-        }.buttonStyle(.plain)
-    }
-}
-
 extension Store {
-    /// One text in the Group Chat, as iMessage shows a group: the sender's name over the bubble. The Group Chat is where agents talk to each other
-    /// ("@Tutor can you take this one?"); what the agent has to say to you goes to your private chat with them.
-    func say(_ agent: String, _ text: String) {
-        chats[MessagesInbox.group, default: []].append(Message(fromAgent: true, text: "**\(Agent.role(agent).name)**\n\n" + text))
-    }
     /// Short enough for a text.
     func clipped(_ s: String, _ n: Int) -> String {
         let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
         return t.count > n ? String(t.prefix(n)).trimmingCharacters(in: .whitespacesAndNewlines) + "…" : t
-    }
-    /// What one agent tells the next: the `Handoff` section of its answer, or its opening lines.
-    func handoff(_ text: String) -> String {
-        if let r = text.range(of: "handoff", options: .caseInsensitive) { return clipped(String(text[r.upperBound...]).trimmingCharacters(in: CharacterSet(charactersIn: " :*#-\n")), 500) }
-        return clipped(text, 300)
-    }
-}
-
-/// The agents talking to each other, like a group in Messages: the Manager hands a job to an agent by name, the course agent adds what matters,
-/// the agent says it is on it, hands over to the next one, and says when it has texted you.
-struct GroupChat: View {
-    @Environment(Store.self) private var store
-    var body: some View {
-        let talk = store.chats[MessagesInbox.group] ?? [], ids = Agent.all.map(\.id)
-        VStack(spacing: 10) {
-            VStack(spacing: 3) {
-                HStack(spacing: -8) { ForEach(ids.prefix(6), id: \.self) { AgentPortrait(id: $0, size: 30) } }
-                Text("Group Chat").font(.system(size: 12, weight: .semibold))
-                Text("\(ids.count) agents · what they say to each other").font(.system(size: 10)).foregroundStyle(Color.ink2)
-            }
-            Card {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 10) {
-                            if talk.isEmpty { Text("Nothing yet. When you message the Manager or a job starts, the agents will talk about it here.").font(.system(size: 13)).foregroundStyle(Color.ink2).padding(.top, 8) }
-                            ForEach(Array(talk.enumerated()), id: \.element.id) { i, m in
-                                let (sender, text) = m.text.senderAndBody
-                                let who = Agent.all.first { $0.name == sender }?.id ?? Agent.manager.id
-                                let prev = i > 0 ? talk[i - 1] : nil
-                                if prev == nil || m.time.timeIntervalSince(prev!.time) > 600 { IMStamp(date: m.time).padding(.top, i == 0 ? 0 : 8) }
-                                VStack(alignment: .leading, spacing: 2) {
-                                    if prev?.text.senderAndBody.sender != sender { Text(sender ?? "").font(.system(size: 11)).foregroundStyle(Color.ink2).padding(.leading, 40) }
-                                    HStack(alignment: .bottom, spacing: 6) {
-                                        AgentPortrait(id: who, size: 28)
-                                        IMBubble(text: text, mine: false)
-                                        Spacer(minLength: 56)
-                                    }
-                                }.id(m.id)
-                            }
-                        }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .onAppear { proxy.scrollTo(talk.last?.id, anchor: .bottom) }
-                    .onChange(of: talk.count) { withAnimation { proxy.scrollTo(talk.last?.id, anchor: .bottom) } }
-                }
-            }
-        }
-    }
-}
-
-/// Every agent's chat in one inbox, with the Manager's menu.
-struct MessagesPage: View {
-    var body: some View {
-        VStack(spacing: 0) {
-            PageHeader(title: "Messages", subtitle: "\(Agent.courseRoles.count) course agents · \(Agent.roles.count) helpers · Manager") { ManagerMenu() }
-            MessagesInbox().padding([.horizontal, .bottom], 12)
-        }
     }
 }

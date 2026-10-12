@@ -336,12 +336,12 @@ extension Store {
         }
     }
 
-    /// 21. Work a helper finished that still looks unfinished: the helper is allowed back on that note straight away.
+    /// 21. Work that was finished but still looks unfinished: it is allowed back on that note straight away.
     func qualitySweep() {
         for item in inbox where item.state == .done && item.kind == .work && item.created > .now.addingTimeInterval(-7 * 86400) && ["scribe", "librarian"].contains(item.agent) {
             guard let rel = item.paths.first, let n = notes.first(where: { Vault.rel($0.id) == rel }), ["Lectures", "Tutorials", "Readings"].contains(n.folder), n.unfilled, once("sweep:\(item.id)") else { continue }
             UserDefaults.standard.removeObject(forKey: "cool-\(item.agent)|\(n.path)")
-            log(Agent.manager.id, "Quality sweep: “\(n.display)” still has no summary after \(Agent.role(item.agent).name)'s work, so it goes back to \(Agent.role(item.agent).name).")
+            log(Agent.manager.id, "Quality sweep: “\(n.display)” still has no summary after my \(Agent.label(item.agent)) work, so it gets another go.")
         }
     }
 
@@ -363,7 +363,7 @@ extension Store {
         let key = "week:" + Date.now.formatted(.iso8601.year().weekOfYear())
         guard once(key) else { return }
         let start = today, end = start.addingTimeInterval(7 * 86400)
-        for (code, name) in Vault.courses.map({ ($0.value, Agent.role($0.value).name) }).sorted(by: { $0.0 < $1.0 }) {
+        for (code, name) in Agent.courses {
             let mine = notes.filter { $0.course == code && !$0.done && ($0.when.map { $0 >= start && $0 < end } ?? false) }
             func list(_ folders: Set<String>) -> String { mine.filter { folders.contains($0.folder) }.sorted { $0.whenOrFar < $1.whenOrFar }.map { "\($0.display) (\($0.whenOrFar.formatted(.dateTime.weekday(.abbreviated).hour().minute())))" }.joined(separator: ", ") }
             var parts: [String] = []
@@ -371,20 +371,20 @@ extension Store {
             if !classes.isEmpty { parts.append("Classes: \(classes).") }
             if !due.isEmpty { parts.append("Due: \(due).") }
             if reads > 0 { parts.append("\(reads) reading\(reads == 1 ? "" : "s") due.") }
-            log(code, "This week in \(name): " + (parts.isEmpty ? "nothing scheduled." : parts.joined(separator: " ")))
+            log(Agent.manager.id, "This week in \(name): " + (parts.isEmpty ? "nothing scheduled." : parts.joined(separator: " ")))
         }
     }
 
-    /// Each course agent keeps a short briefing of where its course is, once a day, so a consult can read that instead of the whole course. Haiku; one a tick.
+    /// A short briefing of where each course is, once a day, so a job or a chat can read that instead of the whole course. Haiku; one a tick.
     func maintainBriefings(hasJobs: Bool) async {
         // a manual job may have started while this tick awaited; taking agentBusy here would clear it under that job when the briefing ends
         guard !agentBusy, budgetLeft(deep: false) else { return }
-        for code in Agent.courseRoles.map(\.id) where agentOn(code) {
+        for code in Agent.courses.map(\.code) {
             let key = "briefing-\(code)-\(dayStamp)"
             guard !handled.contains(key) else { continue }
             markHandled(key)
-            agentBusy = true; thinking.insert(code)
-            defer { agentBusy = false; thinking.remove(code) }
+            agentBusy = true
+            defer { agentBusy = false }
             let r = await Agent.refreshBriefing(code, root: Vault.root)
             if r.limited { pauseForLimit() }
             return

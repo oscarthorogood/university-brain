@@ -2,9 +2,9 @@ import Foundation
 import FoundationModels
 import SwiftUI
 
-/// The front door: decides which agent takes a request and how much effort it deserves.
+/// The front door of the one agent: decides which kind of work a request is and how much effort it deserves.
 /// Keyword rules first (instant, free), the on-device model when the rules are unsure, then a safe default.
-/// It only routes and sets effort; what an agent may do (read-only chat, edits after a tick) is unchanged.
+/// It only routes and sets effort; what the agent may do (read-only chat, edits after a tick) is unchanged.
 enum Manager {
     /// quick = lookups; standard = explaining, planning, write-ups; deep = writing help and rubric checks.
     enum Tier: String, Sendable, Comparable, CaseIterable {
@@ -20,7 +20,8 @@ enum Manager {
             }
         }
     }
-    struct Route: Sendable { let agent: String; let tier: Tier; let reason: String; let by: String }
+    /// `agent` is the kind of work (a mode's id; the Manager's own id is the general mode). `course` is set when the request is about one course.
+    struct Route: Sendable { let agent: String; let tier: Tier; let reason: String; let by: String; var course: String? = nil }
 
     /// Settings → Agents. Off: every run is plain `claude -p`, as before.
     static var on: Bool { UserDefaults.standard.object(forKey: "managerOn") as? Bool ?? true }
@@ -95,8 +96,8 @@ enum Manager {
             && !text.contains("Paste the exact essay question") && !text.contains("Paste the exact task, case question")
     }
 
-    static func route(_ agent: String, _ text: String, why: String, by: String) -> Route {
-        Route(agent: agent, tier: tier(text, role: agent), reason: why, by: by)
+    static func route(_ agent: String, _ text: String, why: String, by: String, course: String? = nil) -> Route {
+        Route(agent: agent, tier: tier(text, role: agent), reason: why, by: by, course: course)
     }
 
     /// The rules alone: a route when they settle it, nil when the request is unclear or fits several agents.
@@ -131,35 +132,35 @@ enum Manager {
         // Naming an agent ("hand off to the tutor", "ask the writer") settles it
         // (a bare "tutor", "writer" or "planner" is often a person, so those need a verb; the other names are only ever the agent)
         if let m = t.firstMatch(of: /\b(?:hand|pass|send|give|ask|tell|get|over to)\b.*?\b(sorter|scribe|librarian|planner|tutor|writer|researcher|analyst)\b/) ?? t.firstMatch(of: /\b(sorter|scribe|librarian|researcher|analyst)\b/) {
-            return route(String(m.1), text, why: "You asked for \(Agent.role(String(m.1)).name).", by: "rules")
+            return route(String(m.1), text, why: "You asked for \(Agent.label(String(m.1))).", by: "rules")
         }
         let found = hits(t)
         if found.count == 1 { return route(found[0].agent, text, why: Agent.role(found[0].agent).job + ".", by: "rules") }
-        if found.isEmpty, let c = course(t) { return route(c, text, why: "It’s about \(Agent.role(c).name).", by: "rules") }
+        if found.isEmpty, let c = course(t) { return route(Agent.manager.id, text, why: "It’s about \(Agent.courseName(c)).", by: "rules", course: c) }
         return nil
     }
-    /// When neither the rules nor the on-device model can say: the closest rule match, the course agent, or Planner.
+    /// When neither the rules nor the on-device model can say: the closest rule match, the course, or planning.
     static func fallback(_ text: String) -> Route {
         let t = text.lowercased()
-        if let first = groups.first(where: { g in g.words.contains { t.contains($0) } }) { return route(first.agent, text, why: "Fits several agents; \(Agent.role(first.agent).name) is the closest.", by: "rules") }
-        if let c = course(t) { return route(c, text, why: "It’s about \(Agent.role(c).name).", by: "rules") }
-        return route("planner", text, why: "Couldn’t tell, so Planner will look at it.", by: "default")
+        if let first = groups.first(where: { g in g.words.contains { t.contains($0) } }) { return route(first.agent, text, why: "Fits several kinds of work; \(Agent.label(first.agent)) is the closest.", by: "rules") }
+        if let c = course(t) { return route(Agent.manager.id, text, why: "It’s about \(Agent.courseName(c)).", by: "rules", course: c) }
+        return route("planner", text, why: "Couldn’t tell, so it’s treated as planning.", by: "default")
     }
     /// A request to change notes, not just to read or answer: the run is allowed to edit the note folders (and the edits are checked and can be undone).
     static func isEdit(_ text: String) -> Bool {
         text.lowercased().range(of: #"\b(edit|rewrite|reword|rephrase|change|update|fix|correct|add|insert|append|remove|delete|replace|rename|merge|split|combine|reformat|restructure|reorgani[sz]e|convert|clean ?up|tidy|shorten|expand|translate|proofread|format|fill( in| out)?|complete|tick|untick|apply|move|write|write[- ]?up|writing up|enrich|flesh out|populate|backfill|finish)\b"#, options: .regularExpression) != nil
     }
 
-    /// `previous` is who last answered in this chat: a short message with no clues ("start with what you know") is a follow-up to them.
-    /// `excluding` are agents that already said they couldn't do it; when none is left, the Manager does it itself, as the general agent.
+    /// `previous` is the kind of work last done in this chat: a short message with no clues ("start with what you know") is a follow-up to it.
+    /// `excluding` are kinds of work that already said they couldn't do it; when none is left, it is handled as general help.
     static func decide(_ text: String, previous: String? = nil, excluding: Set<String> = []) async -> Route {
         if let r = byRules(text), !excluding.contains(r.agent) { return r }
         if !excluding.isEmpty, let other = hits(text.lowercased()).first(where: { !excluding.contains($0.agent) }) { return route(other.agent, text, why: Agent.role(other.agent).job + ".", by: "rules") }
-        if let previous, !excluding.contains(previous), text.count < 80 { return route(previous, text, why: "Following on from \(Agent.role(previous).name).", by: "follow-up") }
+        if let previous, !excluding.contains(previous), text.count < 80 { return route(previous, text, why: "Following on from the \(Agent.label(previous)).", by: "follow-up") }
         if let r = await onDevice(text, excluding: excluding) { return r }
         let f = fallback(text)
         if !excluding.contains(f.agent) { return f }
-        return Route(agent: Agent.manager.id, tier: .standard, reason: "No other agent fits, so the Manager does it itself.", by: "last resort")
+        return Route(agent: Agent.manager.id, tier: .standard, reason: "No kind of work fits, so it is handled as general help.", by: "last resort")
     }
 
     /// Part of `--check`: routing the rules settle must keep going where it should, at the effort it should.
@@ -167,9 +168,9 @@ enum Manager {
         let cases: [(String, String, Tier)] = [
             ("What's due this week?", "planner", .quick), ("Plan my Strategy individual report from its brief", "writer", .deep),
             ("Make 5 MCQs from this week's lectures", "tutor", .standard), ("Which readings still need finding?", "librarian", .quick),
-            ("What's in Unsorted?", "sorter", .quick), ("Where are we in TEM?", "TEM", .standard),
+            ("What's in Unsorted?", "sorter", .quick), ("Where are we in TEM?", "manager", .standard),
             ("Check my draft against the rubric", "writer", .deep), ("what's due for my essay", "planner", .quick),
-            ("Where are we in Strategy, and what's coming up?", "SM", .standard), ("What's due and what should I start on?", "planner", .standard),
+            ("Where are we in Strategy, and what's coming up?", "manager", .standard), ("What's due and what should I start on?", "planner", .standard),
             ("quiz me on MSOA L04", "tutor", .standard), ("Write up lecture 3 from the slides", "scribe", .standard), ("Look into the market data for electric vehicles", "researcher", .standard), ("Solve question 3 on the queueing sheet", "analyst", .careful)]
         for (text, agent, tier) in cases {
             guard let r = byRules(text) else { preconditionFailure("rules should settle “\(text)”") }
@@ -183,8 +184,9 @@ enum Manager {
                              ("Make 5 MCQs with answers from L04, quoting the slides", [])] {
             precondition((chain(text)?.map(\.agent) ?? []) == team, "“\(text)” should be the team \(team), not \(chain(text)?.map(\.agent) ?? [])")
         }
+        precondition(byRules("Where are we in TEM?")?.course == "TEM" && byRules("Where are we in Strategy, and what's coming up?")?.course == "SM", "a course question carries its course")
         let log = Agent.teamLog([Activity(time: .now, agent: "manager", text: "Sent x"), Activity(time: .now, agent: "tutor", text: "Made an MCQ set")])
-        precondition(log.contains("Tutor") && log.contains("MCQ") && !log.contains("Sent x") && Agent.teamLog([]) == "", "team log: \(log)")
+        precondition(log.contains("revision") && log.contains("MCQ") && !log.contains("Sent x") && Agent.teamLog([]) == "", "team log: \(log)")
         precondition(byRules("hello there") == nil, "an unclear request is left to the on-device model")
         precondition(Manager.hasRoom(five: 0.3, week: 0.3, deep: true) && !Manager.hasRoom(five: 0.5, week: 0.3, deep: true) && Manager.hasRoom(five: 0.5, week: 0.3, deep: false) && !Manager.hasRoom(five: 0.7, week: 0.1, deep: false) && !Manager.hasRoom(five: 0.1, week: 0.8, deep: false) && Manager.hasRoom(five: 0.7, week: 0.3, deep: false, preset: "generous"), "budget thresholds")
         precondition(Manager.needsBrief("Paste the exact essay question") && !Manager.needsBrief("The question: why?"), "blank brief")
@@ -197,7 +199,7 @@ enum Manager {
     }
 
     @Generable struct Choice {
-        @Guide(description: "The agent best placed to handle the request", .anyOf(["sorter", "scribe", "librarian", "planner", "tutor", "writer", "researcher", "analyst", "MSOA", "SM", "TEM"]))
+        @Guide(description: "The kind of work the request is", .anyOf(["sorter", "scribe", "librarian", "planner", "tutor", "writer", "researcher", "analyst", "manager"]))
         var agent: String
         @Guide(description: "quick for a simple lookup, standard for explaining, planning or summarising, deep for essay or project writing help, marking against a rubric or combining many notes", .anyOf(["quick", "standard", "deep"]))
         var effort: String
@@ -208,16 +210,16 @@ enum Manager {
     /// Free and offline (Apple Intelligence). nil when it isn't available or fails.
     static func onDevice(_ text: String, excluding: Set<String> = []) async -> Route? {
         guard case .available = SystemLanguageModel.default.availability else { return nil }
-        let team = (Agent.roles + Agent.courseRoles).filter { !excluding.contains($0.id) }.map { "\($0.course ?? $0.id) = \($0.name): \($0.job)" }.joined(separator: "\n")
+        let team = (Agent.roles + [Agent.manager]).filter { !excluding.contains($0.id) }.map { "\($0.id) = \($0.label): \($0.job)" }.joined(separator: "\n")
         let prompt = """
-        You route requests from a university student to one agent. Agents:
+        You sort requests from a university student into one kind of work. The kinds:
         \(team)
-        Course agents (MSOA, SM, TEM) answer questions about one course only. Pick a helper when the request is about a kind of work, a course agent when it is only about that course.
+        Pick "manager" (general) when the request is only a question about one course, or fits no kind of work.
         Request: \(text)
         """
         guard let c = try? await LanguageModelSession().respond(to: prompt, generating: Choice.self).content,
               Agent.all.contains(where: { $0.id == c.agent }), !excluding.contains(c.agent) else { return nil }
-        return Route(agent: c.agent, tier: tier(text, role: c.agent), reason: c.reason.trimmingCharacters(in: .whitespaces), by: "on-device")
+        return Route(agent: c.agent, tier: tier(text, role: c.agent), reason: c.reason.trimmingCharacters(in: .whitespaces), by: "on-device", course: course(text.lowercased()))
     }
 }
 

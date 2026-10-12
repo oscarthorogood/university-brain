@@ -17,7 +17,7 @@ extension Store {
     }
     private func hidden(_ key: String) -> Bool { (gotItDates[key] ?? .distantPast) > .now.addingTimeInterval(-86400) }
 
-    /// Things worth a nudge now. `course` limits them to one course (for a course agent's stage).
+    /// Things worth a nudge now. `course` limits them to one course (for a course page).
     func headsUps(course c: String? = nil) -> [Say] {
         var out: [Say] = []
         let current = notes.filter { $0.course != nil && (c == nil || $0.course == c) }
@@ -39,11 +39,11 @@ extension Store {
             return Vault.rawItems(text, "resources").allSatisfy { $0.trimmingCharacters(in: .whitespaces).isEmpty }
         }.sorted { $0.whenOrFar > $1.whenOrFar }
         for n in slideless.prefix(2) {
-            add("noslides:\(n.path)", "\(n.display) was \(-days(n.whenOrFar)) day\(days(n.whenOrFar) == -1 ? "" : "s") ago and still has no slides. Drop them in Unsorted and Scribe will write it up.", go: .note(n.id))
+            add("noslides:\(n.path)", "\(n.display) was \(-days(n.whenOrFar)) day\(days(n.whenOrFar) == -1 ? "" : "s") ago and still has no slides. Drop them in Unsorted and I will write it up.", go: .note(n.id))
         }
         // an agent the loop breaker has paused (it is easy to miss, and nothing else says why its jobs stopped)
         if c == nil {
-            for r in Agent.roles { if let until = breakerUntil(r.id) { add("paused:\(r.id)", "\(r.name) is paused until \(whenText(until)) after failing the Manager’s review three times. Resume it in Settings → Agents.") } }
+            for r in Agent.roles { if let until = breakerUntil(r.id) { add("paused:\(r.id)", "My \(r.label) jobs are paused until \(whenText(until)) after failing my review three times. Resume them in Settings → Manager.") } }
         }
         // essays and projects due within a week that haven't been started
         for n in current where ["Essays", "Projects"].contains(n.folder) && !n.done && n.status == "Not started" {
@@ -100,7 +100,7 @@ enum Triage {
         guard available else { return true }
         for f in files {
             let text = Detect.excerpt(f)
-            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return true }   // can't read it (a PDF scan, audio): let Sorter judge
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return true }   // can't read it (a PDF scan, audio): let the filing judge
             let prompt = "A student dropped this file into their university inbox. Filename: \(f.lastPathComponent)\nStart of it: \(text.prefix(800))"
             guard let v = try? await LanguageModelSession().respond(to: prompt, generating: Verdict.self).content.verdict else { return true }
             if v == "file" { return true }
