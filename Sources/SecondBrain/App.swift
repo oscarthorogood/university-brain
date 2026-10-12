@@ -272,8 +272,6 @@ struct SecondBrainApp: App {
     var chatFocus: UUID?
     /// What the agent is doing right now ("Reading SM L05.md"), under the typing dots.
     var workingOn: String?
-    /// When the chat was last in front of you, so the Manager's own messages since then can be counted.
-    var chatSeenAt = UserDefaults.standard.double(forKey: "chatSeenAt")
     var thinking: Set<String> = []
     /// What an agent has written so far of the answer it is still working on, for its chat to show growing.
     var streaming: [String: String] = [:]
@@ -284,7 +282,7 @@ struct SecondBrainApp: App {
     private struct SavedChats: Codable {
         var chats: [String: [Message]] = [:]; var sessions: [String: String] = [:]
         var threads: [ChatThread]?; var open: UUID?   // optional: older files have one chat and no threads
-        var startThreads: [ChatThread] { (threads?.isEmpty ?? true) ? [.general] : threads ?? [.general] }
+        var startThreads: [ChatThread] { (threads?.isEmpty ?? true) ? [.first] : threads ?? [] }
         var openID: UUID { open.flatMap { id in startThreads.contains { $0.id == id } ? id : nil } ?? startThreads[0].id }
     }
     private static var chatFile: URL { Support.dir.appending(path: "chats.json") }
@@ -1295,7 +1293,10 @@ struct AgentPage: View {
                 }
             } second: {
                 VStack(spacing: 12) {
-                    ManagerCard()
+                    let notices = store.notices().count
+                    Card(title: "Notifications", trailing: notices == 0 ? "" : "\(notices)") {
+                        NoticeBox().padding(.horizontal, 10).padding(.bottom, 10).frame(height: 240)
+                    }.fixedSize(horizontal: false, vertical: true)
                     NeedsCard()
                     Card(title: "Try", trailing: "Edits only if you ask") {
                         VStack(spacing: 6) {
