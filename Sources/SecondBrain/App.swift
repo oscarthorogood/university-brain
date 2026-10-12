@@ -544,6 +544,254 @@ struct ContentView: View {
     }
 }
 
+
+/// A pane of Liquid Glass: the sidebar, the main panel and the dock.
+struct GlassPane: ViewModifier {
+    func body(content: Content) -> some View { content.glassEffect(.regular, in: .rect(cornerRadius: DS.Radius.pane)) }
+}
+
+// MARK: - Sidebar
+/// Everything lives in the left sidebar: pages, courses, then the vault's three groups: Items (what you do), Files (documents and references) and Apps (study tools and research).
+struct Sidebar: View {
+    @Environment(Store.self) private var store
+    @AppStorage("dockHidden") private var hidden = ""
+    func entries(_ list: [SideNav.Entry]) -> some View {
+        ForEach(list.filter { !SideNav.isHidden($0.name, hidden) }, id: \.name) { e in
+            NavRow(icon: e.icon, title: SideNav.label(e.name), page: .folder(e.name), meta: SideNav.openCount(e.name, store))
+                .contextMenu { FolderMenu(name: e.name) }
+        }
+    }
+    var body: some View {
+        VStack(spacing: 10) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 1) {
+                    NavRow(icon: "house", title: "Home", page: .overview)
+                    if !SideNav.isHidden(SideNav.pinned, hidden) {
+                        NavRow(icon: "tray", title: "Unsorted", page: .inbox, meta: store.unsorted.count, on: { switch store.page { case .inbox, .folder("Unsorted"), .unsorted, .sortNow: true; default: false } }())
+                    }
+                    NavRow(icon: "message", title: "Manager", page: .messages, on: { switch store.page { case .messages, .agent: true; default: false } }())
+                    NavRow(icon: "number", title: "Tags", page: .tags)
+
+                    NavSection("Plan") {
+                        NavRow(icon: "chart.bar", title: "Week", page: .week)
+                        NavRow(icon: "calendar", title: "Month", page: .month)
+                        NavRow(icon: "graduationcap", title: "Semester", page: .semester)
+                    }
+                    NavSection("Courses") {
+                        ForEach([("MSOA", "circle.circle"), ("SM", "hexagon"), ("TEM", "triangle")], id: \.0) { c, shape in
+                            NavRow(icon: shape, title: c == "SM" ? "Strategy" : c, page: .course(c), iconTint: .course(c)).contextMenu { CourseMenu(code: c) }
+                        }
+                    }
+                    NavSection("Items") { entries(SideNav.items.filter { $0.name != SideNav.pinned }) }
+                    NavSection("Files") { entries(SideNav.files) }
+                    NavSection("Apps") { entries(SideNav.apps) }
+                }
+            }.scrollIndicators(.hidden)
+
+            NoticeButton()
+        }
+        .padding(.horizontal, 10).padding(.top, 14).padding(.bottom, 12)
+        .frame(maxHeight: .infinity, alignment: .top)
+    }
+}
+
+/// Notifications live behind one button at the foot of the sidebar, so the lists above keep the room.
+struct NoticeButton: View {
+    @Environment(Store.self) private var store
+    @State private var open = false
+    var body: some View {
+        let n = store.notices().count
+        Button { open.toggle() } label: {
+            HStack(spacing: 8) {
+                Image(systemName: n > 0 ? "bell.badge" : "bell").font(.system(size: 13))
+                Text("Notifications").font(.system(size: 13))
+                Spacer()
+                if n > 0 { Text("\(n)").font(.system(size: 11, weight: .semibold)).monospacedDigit().padding(.horizontal, 7).padding(.vertical, 2).background(Color.ink, in: .capsule).foregroundStyle(Color.card) }
+            }
+            .foregroundStyle(Color.ink).padding(.horizontal, 14).frame(maxWidth: .infinity).frame(height: DS.Height.control).contentShape(.capsule)
+        }
+        .buttonStyle(.glassAction(.control))
+        .popover(isPresented: $open, arrowEdge: .trailing) { NoticeBox().padding(10).frame(width: 300, height: 380) }
+        .accessibilityLabel(n > 0 ? "Notifications, \(n)" : "Notifications")
+    }
+}
+
+/// The three note groups the sidebar lists, and the folders in each. Page ids are the short folder names (see `Vault.places`).
+enum SideNav {
+    struct Entry { let name: String; let icon: String }
+    /// Unsorted is an Items page too, but it is pinned at the top of the sidebar instead of listed under Items.
+    static let pinned = "Unsorted"
+    static let items: [Entry] = [.init(name: "Unsorted", icon: "tray"), .init(name: "Lectures", icon: "play.rectangle"), .init(name: "Tutorials", icon: "person.2"), .init(name: "Readings", icon: "book"),
+                                 .init(name: "Essays", icon: "doc.text"), .init(name: "Projects", icon: "folder"), .init(name: "Exams", icon: "pencil.and.list.clipboard"),
+                                 .init(name: "Tasks", icon: "checkmark.circle")]
+    static let files: [Entry] = {
+        let documents: [Entry] = [Entry(name: "Resources", icon: "square.stack.3d.up"), Entry(name: "OneDrive", icon: "cloud"), Entry(name: "Zotero", icon: "text.book.closed")]
+        let study: [Entry] = Study.kinds.filter { Study.inFiles.contains($0.folder) }.map { Entry(name: $0.folder, icon: $0.icon) }
+        return documents + study + [Entry(name: "Research", icon: "magnifyingglass")]
+    }()
+    static let apps: [Entry] = Study.kinds.filter { !Study.inFiles.contains($0.folder) }.map { Entry(name: $0.folder, icon: $0.icon) }
+    static let folders = items + files + apps
+    /// Files and Apps pages show a browser instead of a plain list. Every Files page browses its folder on disk; Apps pages list their notes.
+    static let grouped = Set((files + apps).map(\.name))
+    static func isHidden(_ name: String, _ raw: String) -> Bool { raw.split(separator: ",").contains(Substring(name)) }
+    /// Tasks is shown as "Assignments"; its id stays "Tasks" (folder and page names).
+    static func label(_ name: String) -> String { name == "Tasks" ? "Assignments" : name }
+    /// Notes still to do in a folder; the document folders (Resources, OneDrive, Zotero) have none.
+    @MainActor static func openCount(_ name: String, _ store: Store) -> Int {
+        if name == pinned { return store.unsorted.count }
+        return ["Resources", "OneDrive", "Zotero"].contains(name) ? 0 : store.openCount(name == "Tasks" ? "TaskNotes/Tasks" : name)
+    }
+}
+
+/// A collapsible group in the sidebar (the open state is remembered).
+struct NavSection<Content: View>: View {
+    let title: String
+    @AppStorage private var open: Bool
+    @ViewBuilder var content: Content
+    init(_ title: String, @ViewBuilder content: () -> Content) {
+        self.title = title; self.content = content()
+        _open = AppStorage(wrappedValue: true, "navOpen.\(title)")
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Button { withAnimation(.snappy(duration: 0.25)) { open.toggle() } } label: {
+                HStack(spacing: 4) {
+                    Text(title).font(.system(size: 12, weight: .semibold))
+                    Image(systemName: "chevron.right").font(.system(size: 8, weight: .bold)).rotationEffect(.degrees(open ? 90 : 0))
+                    Spacer()
+                }.foregroundStyle(Color.ink2).padding(.horizontal, 10).padding(.top, 16).padding(.bottom, 4).contentShape(Rectangle())
+            }.buttonStyle(.plain).accessibilityLabel("\(title), \(open ? "expanded" : "collapsed")")
+            if open { content }
+        }
+    }
+}
+
+/// One row in the sidebar: a quiet icon and name; the open page gets a soft raised pill.
+struct NavRow: View {
+    @Environment(Store.self) private var store
+    let icon: String; let title: String; let page: Page
+    var iconTint: Color? = nil; var meta = 0; var on: Bool? = nil
+    var body: some View {
+        let selected = on ?? (store.page == page)
+        Button { store.page = page } label: {
+            HStack(spacing: 10) {
+                Image(systemName: icon).font(.system(size: 14)).frame(width: 20).foregroundStyle(iconTint ?? (selected ? Color.ink : Color.ink2))
+                Text(title).lineLimit(1).truncationMode(.tail)
+                Spacer(minLength: 4)
+                if meta > 0 { Text("\(meta)").font(.system(size: 11)).monospacedDigit().foregroundStyle(Color.ink2) }
+            }
+            .font(.system(size: 14, weight: selected ? .medium : .regular)).foregroundStyle(Color.ink)
+            .padding(.horizontal, 10).frame(height: 32).contentShape(.rect(cornerRadius: DS.Radius.row))
+        }
+        .buttonStyle(SideRowStyle(selected: selected))
+        .accessibilityLabel(meta > 0 ? "\(title), \(meta)" : title)
+    }
+}
+
+/// The cog opens the Settings window (same as ⌘,).
+struct SettingsButton: View {
+    @Environment(\.openSettings) private var openSettings
+    var body: some View {
+        Button { openSettings() } label: { Image(systemName: "gearshape").font(.system(size: 13)) }
+            .buttonStyle(.glassIcon(DS.Height.icon)).help("Settings (⌘,)").accessibilityLabel("Settings")
+    }
+}
+
+/// Collapses the left sidebar to an icon rail like the right one (⌃⌘S).
+struct CollapseButton: View {
+    @AppStorage("sidebarCollapsed") private var collapsed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body: some View {
+        Button { withAnimation(reduceMotion ? nil : .spring(duration: 0.45, bounce: 0.15)) { collapsed.toggle() } } label: {
+            Image(systemName: "sidebar.left").font(.system(size: 13))
+        }
+        .buttonStyle(.glassIcon(DS.Height.icon))
+        .help(collapsed ? "Show Sidebar" : "Hide Sidebar").accessibilityLabel(collapsed ? "Show sidebar" : "Hide sidebar")
+    }
+}
+
+/// The collapsed left sidebar: icons with labels. Items, Files and Apps open as menus.
+struct SidebarRail: View {
+    @Environment(Store.self) private var store
+    @AppStorage("dockHidden") private var hidden = ""
+    func group(_ title: String, icon: String, _ list: [SideNav.Entry]) -> some View {
+        let open: Bool = { if case .folder(let f) = store.page { list.contains { $0.name == f } } else { false } }()
+        return Menu {
+            ForEach(list.filter { !SideNav.isHidden($0.name, hidden) }, id: \.name) { e in
+                Button { store.page = .folder(e.name) } label: { Label(SideNav.label(e.name), systemImage: e.icon) }
+            }
+        } label: { RailLabel(icon: icon, label: title, on: open) }
+            .menuStyle(.button).buttonStyle(.glass(radius: DS.Radius.tile, selected: open)).menuIndicator(.hidden).help(title)
+    }
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: 2) {
+                    RailItem(icon: "house", label: "Home", on: store.page == .overview) { store.page = .overview }
+                    if !SideNav.isHidden(SideNav.pinned, hidden) {
+                        RailItem(icon: "tray", label: "Unsorted", badge: store.unsorted.count, on: { switch store.page { case .inbox, .folder("Unsorted"), .unsorted, .sortNow: true; default: false } }()) { store.page = .inbox }
+                    }
+                    RailItem(icon: "message", label: "Manager", on: { switch store.page { case .messages, .agent: true; default: false } }()) { store.page = .messages }
+                    RailItem(icon: "number", label: "Tags", on: store.page == .tags) { store.page = .tags }
+                    RailItem(icon: "chart.bar", label: "Week", on: store.page == .week) { store.page = .week }
+                    RailItem(icon: "calendar", label: "Month", on: store.page == .month) { store.page = .month }
+                    RailItem(icon: "graduationcap", label: "Semester", on: store.page == .semester) { store.page = .semester }
+                    Divider().padding(.vertical, 6).padding(.horizontal, 12)
+                    ForEach([("MSOA", "circle.circle"), ("SM", "hexagon"), ("TEM", "triangle")], id: \.0) { c, shape in
+                        RailItem(icon: shape, label: c == "SM" ? "Strategy" : c, tint: .course(c), on: store.page == .course(c)) { store.page = .course(c) }
+                    }
+                    Divider().padding(.vertical, 6).padding(.horizontal, 12)
+                    group("Items", icon: "tray.full", SideNav.items.filter { $0.name != SideNav.pinned })
+                    group("Files", icon: "doc.on.doc", SideNav.files)
+                    group("Apps", icon: "square.grid.2x2", SideNav.apps)
+                }
+            }.scrollIndicators(.hidden)
+            RailItem(icon: "square.and.pencil", label: "New Note") { store.newNote() }.padding(.top, 6)
+        }
+        .padding(.horizontal, 10).padding(.top, 14).padding(.bottom, 14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct RailLabel: View {
+    let icon: String; let label: String
+    var tint: Color = .ink2; var badge = 0; var on = false
+    var body: some View {
+        VStack(spacing: 3) {
+            Image(systemName: icon).font(.system(size: 17, weight: .medium)).foregroundStyle(on ? Color.ink : tint)
+                .frame(width: 44, height: 28)
+                .overlay(alignment: .topTrailing) {
+                    if badge > 0 {
+                        Text("\(badge)").font(.system(size: 9, weight: .bold)).monospacedDigit()
+                            .padding(.horizontal, 4).frame(minWidth: 16, minHeight: 16)
+                            .background(Color.ink, in: .capsule).foregroundStyle(Color.card).offset(x: 4, y: -2)
+                    }
+                }
+            Text(label).font(.system(size: 10, weight: on ? .semibold : .regular)).foregroundStyle(on ? Color.ink : Color.ink2).lineLimit(1).fixedSize()
+        }
+        .frame(width: 60, height: 46)
+    }
+}
+
+struct RailItem: View {
+    let icon: String; let label: String
+    var tint: Color = .ink2; var badge = 0; var on = false
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) { RailLabel(icon: icon, label: label, tint: tint, badge: badge, on: on) }
+            .buttonStyle(.glass(radius: DS.Radius.tile, selected: on)).help(label).accessibilityLabel(badge > 0 ? "\(label), \(badge)" : label)
+    }
+}
+
+struct Heading: View {
+    let text: String; var trailing = ""
+    init(_ text: String, trailing: String = "") { self.text = text; self.trailing = trailing }
+    var body: some View {
+        HStack { Text(text).fontWeight(.semibold); Spacer(); Text(trailing) }
+            .font(.caption).foregroundStyle(Color.ink2).padding(.horizontal, 10).padding(.top, 14).padding(.bottom, 2)
+    }
+}
+
 /// A round badge for the one agent, or for a kind of work it does (its symbol), tinted and pulsing while it is working.
 struct AgentPortrait: View {
     @Environment(Store.self) private var store
