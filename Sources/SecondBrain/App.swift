@@ -654,7 +654,7 @@ struct NavSection<Content: View>: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
-            Button { withAnimation(.snappy(duration: 0.25)) { open.toggle() } } label: {
+            Button { withAnimation(DS.Motion.move) { open.toggle() } } label: {
                 HStack(spacing: 4) {
                     Text(title).font(.system(size: 12, weight: .semibold))
                     Image(systemName: "chevron.right").font(.system(size: 8, weight: .bold)).rotationEffect(.degrees(open ? 90 : 0))

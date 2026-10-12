@@ -429,7 +429,7 @@ struct NotePage: View {
         }
     }
     var infoButton: some View {
-        Button { withAnimation(.snappy(duration: 0.25)) { showInspector.toggle() } } label: { Image(systemName: "info.circle").font(.system(size: 15)) }
+        Button { withAnimation(DS.Motion.move) { showInspector.toggle() } } label: { Image(systemName: "info.circle").font(.system(size: 15)) }
             .buttonStyle(.glassIcon(prominent: showInspector)).help("Inspector: contents, tasks, attachments, find, properties, agent").accessibilityLabel("Inspector")
     }
     @ViewBuilder var toolbarTrailing: some View {

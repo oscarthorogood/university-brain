@@ -38,7 +38,7 @@ struct AgentSays: View {
             if let ex { reply(ex) }
             if chat { inputBar }
         }
-        .animation(.spring(duration: 0.4, bounce: 0.2), value: ex?.answer?.id)
+        .animation(DS.Motion.move, value: ex?.answer?.id)
     }
 
     private func activate(_ say: Say) {

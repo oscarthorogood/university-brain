@@ -5,6 +5,8 @@ struct MonthPage: View {
     @Environment(Store.self) private var store
     @State private var month = Calendar.current.dateInterval(of: .month, for: .now)!.start
     @AppStorage("monthView") private var mode = ScheduleView.calendar
+    @State private var forward = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let cal = Calendar.current
 
     var mondays: [Date] {
@@ -16,7 +18,8 @@ struct MonthPage: View {
         let first = cal.dateInterval(of: .month, for: store.semesterStart)!.start
         return (0..<9).map { cal.date(byAdding: .month, value: $0, to: first)! }
     }
-    func step(_ by: Int) { withAnimation(.spring(duration: 0.3)) { month = cal.date(byAdding: .month, value: by, to: month)! } }
+    func step(_ by: Int) { go(cal.date(byAdding: .month, value: by, to: month)!) }
+    func go(_ m: Date) { forward = m >= month; withAnimation(DS.Motion.move) { month = m } }
 
     var body: some View {
         @Bindable var store = store
@@ -27,7 +30,7 @@ struct MonthPage: View {
                     Pills(options: [(nil, "All"), ("MSOA", "MSOA"), ("SM", "SM"), ("TEM", "TEM")] as [(String?, String)], selection: $store.filter)
                     ViewMenu(selection: $mode)
                     StepControls(label: month.formatted(.dateTime.month(.wide).year()), previous: "Previous month", next: "Next month", onPrevious: { step(-1) }, onNext: { step(1) }) {
-                        ForEach(months, id: \.self) { m in Button(m.formatted(.dateTime.month(.wide).year())) { withAnimation(.spring(duration: 0.3)) { month = m } } }
+                        ForEach(months, id: \.self) { m in Button(m.formatted(.dateTime.month(.wide).year())) { go(m) } }
                     }
                 }
             }
@@ -43,7 +46,7 @@ struct MonthPage: View {
                                 WeekBlock(monday: m)
                             }
                         }
-                    }.id(month).transition(.opacity)
+                    }.id(month).transition(.step(forward: forward, reduceMotion: reduceMotion))
                 }.padding([.horizontal, .bottom], 12)
             }
         }

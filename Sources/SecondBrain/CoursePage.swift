@@ -61,7 +61,7 @@ struct ClassList: View {
                     if let next { label("Up next"); NoteRow(note: next).background(Color.ink.opacity(0.04), in: .rect(cornerRadius: DS.Radius.row)).padding(.horizontal, 6) }
                     if todo.count > 1 { label("Later"); ForEach(todo.dropFirst()) { NoteRow(note: $0) } }
                     if !done.isEmpty {
-                        Button { withAnimation(.snappy) { showDone.toggle() } } label: {
+                        Button { withAnimation(DS.Motion.move) { showDone.toggle() } } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold)).rotationEffect(.degrees(showDone ? 90 : 0))
                                 Text("Done · \(done.count)").font(.system(size: 11, weight: .semibold))
@@ -159,7 +159,7 @@ struct CourseOutline: View {
         switch n.folder { case "Lectures": "play.rectangle"; case "Tutorials": "person.2"; case "Essays": "doc.text"; default: "flag" }
     }
     private func tabButton(_ title: String, _ i: Int) -> some View {
-        Button { withAnimation(.snappy) { tab = i } } label: {
+        Button { withAnimation(DS.Motion.move) { tab = i } } label: {
             Text(title).font(.system(size: 12, weight: tab == i ? .semibold : .regular)).foregroundStyle(tab == i ? Color.ink : Color.ink2).lineLimit(1).fixedSize()
         }.buttonStyle(.plain)
     }

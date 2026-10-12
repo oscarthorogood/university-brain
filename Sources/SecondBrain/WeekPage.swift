@@ -97,6 +97,8 @@ struct StepControls<Items: View>: View {
 struct WeekPage: View {
     @Environment(Store.self) private var store
     @State private var week = 0   // 0 = current week (set on appear)
+    @State private var forward = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("weekView") private var mode = ScheduleView.calendar
     let cal = Calendar.current
     static let weeks = 13         // ponytail: Semester 1 runs to mid-December; make it a setting if Semester 2 needs it
@@ -123,12 +125,12 @@ struct WeekPage: View {
             if mode != .calendar {
                 ScheduleBody(mode: mode, notes: all, days: (0..<7).map { cal.date(byAdding: .day, value: $0, to: monday(max(week, 1)))! }).padding([.horizontal, .bottom], 12)
             } else {
-                ScheduleCard { _ in WeekBlock(monday: monday(max(week, 1))).id(week).transition(.opacity) }.padding([.horizontal, .bottom], 12)
+                ScheduleCard { _ in WeekBlock(monday: monday(max(week, 1))).id(week).transition(.step(forward: forward, reduceMotion: reduceMotion)) }.padding([.horizontal, .bottom], 12)
             }
         }
         .onAppear { if week == 0 { week = min(max(store.semesterWeek, 1), Self.weeks) } }
     }
-    func go(_ w: Int) { withAnimation(.spring(duration: 0.3)) { week = min(max(w, 1), Self.weeks) } }
+    func go(_ w: Int) { forward = w >= week; withAnimation(DS.Motion.move) { week = min(max(w, 1), Self.weeks) } }
 }
 
 struct WeekRow: View {

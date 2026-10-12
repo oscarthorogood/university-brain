@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 // MARK: - Design system
 //
@@ -14,6 +15,20 @@ enum DS {
         static let card: CGFloat = 20
         static let tile: CGFloat = 14
         static let row: CGFloat = 12
+    }
+    /// One set of springs, so everything moves alike. Nothing here bounces unless a gesture gave it momentum: a press answers at once and
+    /// settles back with a little life, hover and moves are critically damped. SwiftUI animations start from what is on screen, so any of them can be
+    /// interrupted and turned round mid-way.
+    enum Motion {
+        /// Press-in: fast, no overshoot, so a control answers the instant it is pressed.
+        static let press = Animation.spring(response: 0.16, dampingFraction: 1)
+        /// Release: back to rest with a small spring.
+        static let release = Animation.spring(response: 0.32, dampingFraction: 0.72)
+        static func pressing(_ down: Bool) -> Animation { down ? press : release }
+        /// Hover highlights.
+        static let hover = Animation.spring(response: 0.2, dampingFraction: 1)
+        /// Moving and resizing: panes, the inspector, switching weeks and tabs.
+        static let move = Animation.spring(response: 0.38, dampingFraction: 1)
     }
     /// One control-height scale.
     enum Height {
@@ -38,8 +53,8 @@ struct GlassHover: ViewModifier {
             .contentShape(shape)
             .glassEffect(glass, in: shape)
             .scaleEffect(pressed && !reduceMotion ? 0.97 : 1)
-            .animation(reduceMotion ? nil : .spring(duration: 0.25, bounce: 0.35), value: pressed)
-            .animation(.easeOut(duration: 0.15), value: hover)
+            .animation(reduceMotion ? nil : DS.Motion.pressing(pressed), value: pressed)
+            .animation(DS.Motion.hover, value: hover)
             .onHover { hover = $0 }
     }
     private var glass: Glass {
@@ -73,7 +88,8 @@ struct SideRowStyle: ButtonStyle {
                         .shadow(color: .black.opacity(selected ? 0.07 : 0), radius: 3, y: 1)
                 }
                 .onHover { hover = $0 }
-                .animation(.easeOut(duration: 0.12), value: hover)
+                .animation(DS.Motion.hover, value: hover)
+                .animation(DS.Motion.pressing(pressed), value: pressed)
         }
     }
 }
@@ -84,6 +100,7 @@ struct GlassActionStyle: ButtonStyle {
     var size = Size.control
     var prominent = false
     @Environment(\.isEnabled) private var enabled
+    @Environment(\.colorSchemeContrast) private var contrast   // Increase Contrast: glass alone is too faint an edge, so the button gets an outline
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration: Configuration) -> some View {
         let h: CGFloat = size == .header ? DS.Height.header : size == .control ? DS.Height.control : size == .compact ? DS.Height.compact : 26
@@ -93,9 +110,10 @@ struct GlassActionStyle: ButtonStyle {
             .padding(.horizontal, size == .header ? 18 : size == .chip ? 12 : 16).frame(minHeight: h)
             .contentShape(.capsule)
             .glassEffect(prominent ? .regular.tint(Color.ink.opacity(0.9)).interactive() : .regular.interactive(), in: .capsule)
+            .overlay { if contrast == .increased { Capsule().strokeBorder(Color.ink.opacity(0.55), lineWidth: 1) } }
             .opacity(enabled ? 1 : 0.45)
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1)
-            .animation(reduceMotion ? nil : .spring(duration: 0.25, bounce: 0.4), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : DS.Motion.pressing(configuration.isPressed), value: configuration.isPressed)
     }
 }
 
@@ -104,6 +122,7 @@ struct GlassIconStyle: ButtonStyle {
     var size: CGFloat = DS.Height.header
     var prominent = false
     @Environment(\.isEnabled) private var enabled
+    @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -111,9 +130,10 @@ struct GlassIconStyle: ButtonStyle {
             .frame(width: size, height: size)
             .contentShape(.circle)
             .glassEffect(prominent ? .regular.tint(Color.ink.opacity(0.9)).interactive() : .regular.interactive(), in: .circle)
+            .overlay { if contrast == .increased { Circle().strokeBorder(Color.ink.opacity(0.55), lineWidth: 1) } }
             .opacity(enabled ? 1 : 0.45)
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.92 : 1)
-            .animation(reduceMotion ? nil : .spring(duration: 0.25, bounce: 0.4), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : DS.Motion.pressing(configuration.isPressed), value: configuration.isPressed)
     }
 }
 
@@ -183,19 +203,27 @@ struct PressScaleStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.94 : 1)
-            .animation(reduceMotion ? nil : .spring(duration: 0.25, bounce: 0.4), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : DS.Motion.pressing(configuration.isPressed), value: configuration.isPressed)
     }
 }
 extension ButtonStyle where Self == PressScaleStyle { static var pressScale: PressScaleStyle { PressScaleStyle() } }
 
-/// Fades and lifts content in once, staggered by `delay`. Skipped with Reduce Motion.
+/// Fades and lifts content in once, staggered by `delay`. With Reduce Motion it only fades, quickly: a gentler version, not no feedback.
 struct AppearIn: ViewModifier {
     var delay: Double = 0
     @State private var shown = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func body(content: Content) -> some View {
-        content.opacity(shown || reduceMotion ? 1 : 0).offset(y: shown || reduceMotion ? 0 : 10)
-            .onAppear { withAnimation(.spring(duration: 0.5, bounce: 0.2).delay(delay)) { shown = true } }
+        content.opacity(shown ? 1 : 0).offset(y: shown || reduceMotion ? 0 : 10)
+            .onAppear { withAnimation(reduceMotion ? .easeOut(duration: 0.2) : DS.Motion.move.delay(delay)) { shown = true } }
+    }
+}
+
+extension AnyTransition {
+    /// Stepping to the next or previous week or month: the new one slides in a little from the side you are heading to, the old one just fades,
+    /// so the motion says which way you went. Reduce Motion cross-fades.
+    static func step(forward: Bool, reduceMotion: Bool) -> AnyTransition {
+        reduceMotion ? .opacity : .asymmetric(insertion: .offset(x: forward ? 36 : -36).combined(with: .opacity), removal: .opacity)
     }
 }
 extension View { func appearIn(_ delay: Double = 0) -> some View { modifier(AppearIn(delay: delay)) } }
@@ -204,7 +232,12 @@ extension View { func appearIn(_ delay: Double = 0) -> some View { modifier(Appe
 /// Behind the glass panes: a soft wash of morning colour, so the window reads warm rather than grey.
 struct WindowBackdrop: View {
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     var body: some View {
+        if reduceTransparency { Rectangle().fill(Color(nsColor: .windowBackgroundColor)) }   // Reduce Transparency: solid, nothing shows through
+        else { wash }
+    }
+    private var wash: some View {
         ZStack {
             Rectangle().fill(.ultraThinMaterial)
             LinearGradient(colors: [Color(light: 0xFFC9A3, dark: 0x8A4B2A), Color(light: 0xF6E7D8, dark: 0x3A2C25), Color(light: 0xBFD6EE, dark: 0x1F3550)],

@@ -139,7 +139,7 @@ private struct ChromeButton: View {
                 .background(Capsule().fill(Color.ink.opacity(on ? 0.1 : hover ? 0.06 : 0)))
         }
         .buttonStyle(.plain).onHover { hover = $0 }
-        .animation(.easeOut(duration: 0.12), value: hover)
+        .animation(DS.Motion.hover, value: hover)
         .help(help).accessibilityLabel(help)
     }
 }
@@ -264,6 +264,6 @@ private struct NewTabCard: View {
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
-        .animation(.easeOut(duration: 0.15), value: hover)
+        .animation(DS.Motion.hover, value: hover)
     }
 }
