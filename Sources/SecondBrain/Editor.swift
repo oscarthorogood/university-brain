@@ -124,6 +124,7 @@ final class MDTextView: NSTextView {
             return nil
         }
         decorations = kept + MarkdownStyler.apply(to: storage, in: window)
+        if !tableViews.isEmpty { tableBlocks = MarkdownStyler.tableBlocks(in: string as NSString) }      // the tables moved with the text
         needsDisplay = true
     }
 
@@ -132,6 +133,7 @@ final class MDTextView: NSTextView {
     /// Bold, italic and link as in Notes; the paragraph styles use Notes' shortcuts too (Title, Heading, Subheading and Body are Shift-Command T, H, J and B;
     /// Shift-Command 7 is a bulleted list and 9 a numbered one; Command ' is a block quote).
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if window?.firstResponder is TableCellView { return super.performKeyEquivalent(with: event) }      // the cell formats its own text
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         if let k = event.charactersIgnoringModifiers?.lowercased() {
             if flags == .command {

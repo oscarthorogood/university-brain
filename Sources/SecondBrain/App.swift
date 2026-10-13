@@ -270,6 +270,8 @@ struct SecondBrainApp: App {
     var openThread: UUID = Store.savedChats.openID { didSet { saveChats() } }
     /// A message to scroll to once its conversation is open (from a search result).
     var chatFocus: UUID?
+    /// Open notes' autosaves, so quitting saves what was typed in the last moment.
+    @ObservationIgnored var flushOnQuit: [URL: @MainActor () -> Void] = [:]
     /// What the agent is doing right now ("Reading SM L05.md"), under the typing dots.
     var workingOn: String?
     var thinking: Set<String> = []
@@ -419,7 +421,11 @@ struct SecondBrainApp: App {
             }
         }
         // Quitting ends every Claude process the app started; without this a job in progress keeps editing its note, with no review and no Undo.
-        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in Agent.stopAllRuns() }
+        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
+            // what was typed in the last moments is saved first: the note's own autosave waits for a pause in typing
+            MainActor.assumeIsolated { self?.flushOnQuit.values.forEach { $0() } }
+            Agent.stopAllRuns()
+        }
     }
     func rewatch() {
         watcher = VaultWatcher(path: Vault.root.path) { [weak self] in MainActor.assumeIsolated { self?.reloadInBackground() } }

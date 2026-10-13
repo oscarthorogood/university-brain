@@ -200,12 +200,38 @@ final class TableCellView: NSTextView {
         return out
     }
 
-    /// How tall the text is at `width`, at least one line.
+    private var measured: (width: CGFloat, text: String, height: CGFloat)?
+    /// How tall the text is at `width`, at least one line. Remembered until the width or the text changes, so a keystroke in one cell doesn't lay out them all.
     func fittingHeight(width: CGFloat) -> CGFloat {
+        let w = max(width, 20), text = string
+        if let m = measured, m.width == w, m.text == text { return m.height }
         guard let lm = layoutManager, let tc = textContainer else { return 18 }
-        tc.containerSize = NSSize(width: max(width, 20), height: .greatestFiniteMagnitude)
+        tc.containerSize = NSSize(width: w, height: .greatestFiniteMagnitude)
         lm.ensureLayout(for: tc)
-        return ceil(max(lm.usedRect(for: tc).height, lm.defaultLineHeight(for: Self.baseFont(header))))
+        let h = ceil(max(lm.usedRect(for: tc).height, lm.defaultLineHeight(for: Self.baseFont(header))))
+        measured = (w, text, h)
+        return h
+    }
+
+    /// Undo in a cell undoes the edit to the note's text, which is where the table really lives.
+    override var undoManager: UndoManager? { grid?.host?.undoManager ?? super.undoManager }
+
+    /// Bold, italic and link in a cell, like the shortcuts in the text around it.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if window?.firstResponder === self, event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command, let k = event.charactersIgnoringModifiers?.lowercased() {
+            switch k {
+            case "b": wrap("**", "**"); return true
+            case "i": wrap("*", "*"); return true
+            case "k": wrap("[[", "]]"); return true
+            default: break
+            }
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+    private func wrap(_ open: String, _ close: String) {
+        guard let r = EditorLogic.wrap(string, selection: selectedRange(), open: open, close: close) else { return }
+        if shouldChangeText(in: r.edit.range, replacementString: r.edit.text) { replaceCharacters(in: r.edit.range, with: r.edit.text); didChangeText() }
+        setSelectedRange(r.selection)
     }
 
     override func becomeFirstResponder() -> Bool {
@@ -281,6 +307,7 @@ final class TableGridView: NSView {
     var onExit: ((TableGridView, Int) -> Void)?       // -1: the caret leaves above the table, 1: below
     var onDelete: ((TableGridView) -> Void)?
     weak var contextCell: TableCellView?
+    weak var host: MDTextView?        // the text view the table is part of
 
     private var cellViews: [[TableCellView]] = []
     private var colWidths: [CGFloat] = [], rowHeights: [CGFloat] = []
@@ -535,6 +562,7 @@ extension MDTextView {
             g.onChange = { [weak self] grid, text in self?.tableEdited(grid, text) }
             g.onExit = { [weak self] grid, dir in self?.tableExit(grid, dir) }
             g.onDelete = { [weak self] grid in self?.tableDelete(grid) }
+            g.host = self
             addSubview(g)
             tableViews.append(g)
         }
