@@ -3,12 +3,14 @@ import SwiftUI
 /// One conversation with the Manager. The open one is `Store.chats` and `Store.sessions` (under the Manager's id), so everything that already talks to the chat keeps
 /// working on whichever is open; the others keep their messages and their Claude session here. `messages` and `session` of the open one are always empty.
 struct ChatThread: Identifiable, Codable {
-    static let generalID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
-    /// The first conversation: the one the Manager's own messages (the morning brief, heads-ups) go to.
-    static var general: ChatThread { ChatThread(id: generalID, title: "Manager") }
+    /// The empty conversation a fresh install (or one with every conversation deleted) starts with. Its id is fixed so the saved "open" id and the list agree.
+    static let firstID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    static let newTitle = "New message"
+    static var first: ChatThread { ChatThread(id: firstID, title: newTitle) }
     var id = UUID()
     var title: String
     var pinned = false
+    var unread: Bool?    // the Manager started this one and you haven't opened it yet (optional, so older chats.json still loads)
     var created = Date.now
     var messages: [Message] = []
     var session: String?
@@ -22,7 +24,7 @@ struct ThreadHit: Identifiable {
 }
 
 extension Store {
-    static let newChatTitle = "New message"
+    static let newChatTitle = ChatThread.newTitle
 
     /// Messages of any conversation (the open one's are in `chats`).
     func messages(of t: ChatThread) -> [Message] { t.id == openThread ? chats[Agent.manager.id] ?? [] : t.messages }
@@ -64,7 +66,7 @@ extension Store {
             openThread = id; lastMode = nil; streaming[m] = nil; workingOn = nil
         }
         chatFocus = focus
-        if id == ChatThread.generalID { markChatSeen() }
+        markChatSeen()
     }
 
     /// A new, empty conversation (the compose button). An empty one that is already open is reused.
@@ -79,10 +81,13 @@ extension Store {
 
     func togglePin(_ id: UUID) { if let i = threads.firstIndex(where: { $0.id == id }) { threads[i].pinned.toggle() } }
 
-    /// Removes a conversation (never the first). If it is the open one, the first is opened instead.
+    /// Removes a conversation. If it is the open one, another is opened instead (a new one when it was the last).
     func deleteChat(_ id: UUID) {
-        guard id != ChatThread.generalID, !thinking.contains(Agent.manager.id) else { return }
-        if id == openThread { openChat(ChatThread.generalID) }
+        guard !thinking.contains(Agent.manager.id) else { return }
+        if id == openThread {
+            if let other = threads.first(where: { $0.id != id }) { openChat(other.id) }
+            else { let t = ChatThread(title: Self.newChatTitle); threads.append(t); openChat(t.id) }
+        }
         threads.removeAll { $0.id == id }
     }
 
@@ -94,22 +99,21 @@ extension Store {
 
     // MARK: The Manager starts a conversation
 
-    /// The Manager texts you first. It goes to the first conversation, wherever you are, with quick replies under it.
+    /// The Manager texts you first. Each message is a new conversation of its own (named after its heading), unread until you open it, with quick replies under it.
     func nudge(_ text: String, chips: [Message.Chip] = []) {
         let msg = Message(fromAgent: true, text: text, proactive: true, chips: chips.isEmpty ? nil : chips)
-        if openThread == ChatThread.generalID { chats[Agent.manager.id, default: []].append(msg) }
-        else if let i = threads.firstIndex(where: { $0.id == ChatThread.generalID }) { threads[i].messages.append(msg) }
+        let (heading, body) = text.senderAndBody
+        var t = ChatThread(title: clipped(heading ?? body, 34))
+        t.messages = [msg]; t.unread = true
+        threads.append(t)
     }
 
-    /// The Manager's messages in the first conversation since you last looked at it.
-    var unreadNudges: Int {
-        guard let general = threads.first(where: { $0.id == ChatThread.generalID }) else { return 0 }
-        return messages(of: general).filter { $0.proactive == true && $0.time.timeIntervalSince1970 > chatSeenAt }.count
-    }
+    /// The Manager's conversations you haven't opened yet.
+    var unreadNudges: Int { threads.filter { $0.unread == true }.count }
+    /// Opening a conversation reads it.
     func markChatSeen() {
-        guard openThread == ChatThread.generalID else { return }
-        chatSeenAt = Date.now.timeIntervalSince1970
-        UserDefaults.standard.set(chatSeenAt, forKey: "chatSeenAt")
+        guard let i = threads.firstIndex(where: { $0.id == openThread }), threads[i].unread == true else { return }
+        threads[i].unread = nil
     }
 
     // MARK: Tapbacks and quick replies
@@ -174,18 +178,21 @@ struct ThreadList: View {
     }
 
     private func row(_ h: ThreadHit, busy: Bool) -> some View {
-        let selected = h.thread.id == store.openThread
+        let selected = h.thread.id == store.openThread, unread = h.thread.unread == true
+        let fromManager = store.messages(of: h.thread).first?.fromAgent == true   // the Manager started it
         return Button { store.openChat(h.thread.id, focus: h.message) } label: {
             HStack(alignment: .top, spacing: 8) {
                 ZStack {
-                    Circle().fill(h.thread.id == ChatThread.generalID ? IM.blue : IM.grey).frame(width: 30, height: 30)
-                    Image(systemName: h.thread.id == ChatThread.generalID ? "sparkles" : "bubble.left.fill").font(.system(size: 12))
-                        .foregroundStyle(h.thread.id == ChatThread.generalID ? Color.white : Color.ink2)
+                    Circle().fill(fromManager ? IM.blue : IM.grey.opacity(0.6)).frame(width: 30, height: 30)
+                        .glassEffect(fromManager ? .regular.tint(IM.blue.opacity(0.85)) : .regular, in: .circle)
+                    Image(systemName: fromManager ? "sparkles" : "bubble.left.fill").font(.system(size: 12))
+                        .foregroundStyle(fromManager ? Color.white : Color.ink2)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 4) {
+                        if unread { Circle().fill(IM.blue).frame(width: 7, height: 7).accessibilityLabel("Unread") }
                         if h.thread.pinned { Image(systemName: "pin.fill").font(.system(size: 9)).foregroundStyle(Color.ink2) }
-                        Text(h.thread.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                        Text(h.thread.title).font(.system(size: 13, weight: unread ? .bold : .semibold)).lineLimit(1)
                         Spacer(minLength: 4)
                         Text(Calendar.current.isDateInToday(h.at) ? h.at.formatted(.dateTime.hour().minute()) : h.at.formatted(.dateTime.day().month(.abbreviated)))
                             .font(.system(size: 10)).foregroundStyle(Color.ink2)
@@ -194,14 +201,13 @@ struct ThreadList: View {
                 }
             }
             .padding(.horizontal, 8).padding(.vertical, 7).frame(maxWidth: .infinity, alignment: .leading)
-            .background(selected ? Color.primary.opacity(0.08) : Color.clear, in: .rect(cornerRadius: 10)).contentShape(.rect)
+            .background { if selected { Color.clear.glassEffect(.regular.tint(IM.blue.opacity(0.14)), in: .rect(cornerRadius: 12)) } }
+            .contentShape(.rect)
         }
         .buttonStyle(.plain).opacity(busy && !selected ? 0.5 : 1)
         .contextMenu {
             Button { store.togglePin(h.thread.id) } label: { Label(h.thread.pinned ? "Unpin" : "Pin", systemImage: h.thread.pinned ? "pin.slash" : "pin") }
-            if h.thread.id != ChatThread.generalID {
-                Button(role: .destructive) { store.deleteChat(h.thread.id) } label: { Label("Delete", systemImage: "trash") }
-            }
+            Button(role: .destructive) { store.deleteChat(h.thread.id) } label: { Label("Delete", systemImage: "trash") }
         }
     }
 }

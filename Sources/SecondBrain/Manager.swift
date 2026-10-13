@@ -222,19 +222,3 @@ enum Manager {
         return Route(agent: c.agent, tier: tier(text, role: c.agent), reason: c.reason.trimmingCharacters(in: .whitespaces), by: "on-device", course: course(text.lowercased()))
     }
 }
-
-/// On the Manager's page: how it decides, and what it sent where lately.
-struct ManagerCard: View {
-    @Environment(Store.self) private var store
-    var body: some View {
-        let recent = Array(store.activity.filter { $0.agent == Agent.manager.id }.prefix(5))
-        Card(title: "How I decide", trailing: Manager.on ? "On" : "Off in Settings") {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Keywords first, then your Mac’s own model when I’m unsure, so most requests cost nothing to route. Lookups run quick, explaining and planning standard, essay and project help deep. I also scan the vault myself and hand out work: Unsorted files, essays nearing a deadline, write-ups, readings.")
-                    .foregroundStyle(Color.ink2)
-                if recent.isEmpty { Text("Nothing sent yet.").foregroundStyle(Color.ink2) }
-                ForEach(recent) { Text($0.text).lineLimit(2) }
-            }.font(.system(size: 12)).padding(.horizontal, 16).padding(.bottom, 14).frame(maxWidth: .infinity, alignment: .leading)
-        }.fixedSize(horizontal: false, vertical: true)
-    }
-}

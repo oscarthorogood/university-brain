@@ -28,14 +28,18 @@ extension CalendarSync {
         var made = Set((try? String(contentsOf: ledgerURL, encoding: .utf8))?.split(separator: "\n").map(String.init) ?? [])
         var created: [String] = [], newKeys: [String] = []
 
-        let section = doc.components(separatedBy: heading).last?.components(separatedBy: completed).first ?? ""
-        for raw in section.split(separator: "\n") where raw.hasPrefix("- [ ]") {
-            guard let m = raw.firstMatch(of: /^- \[ \] (?:<span[^>]*>■<\/span> )?(.*) 📅 (\d{4}-\d{2}-\d{2})/), let date = Vault.parseDate(String(m.2)), date >= today else { continue }
+        // A deadline the filing routine ticked without ever making a task (it sits under Completed) still has to appear in Assignments, so those lines are read too.
+        let parts = (doc.components(separatedBy: heading).last ?? "").components(separatedBy: completed)
+        let ticked = parts.dropFirst().joined(separator: "\n"), taskDays = tasks.map { day($0.f) }
+        for raw in ((parts.first ?? "") + "\n" + ticked).split(separator: "\n") where raw.hasPrefix("- [ ]") || raw.hasPrefix("- [x]") {
+            let filed = raw.hasPrefix("- [x]")
+            guard let m = raw.firstMatch(of: /^- \[[ x]\] (?:<span[^>]*>■<\/span> )?(.*) 📅 (\d{4}-\d{2}-\d{2})/), let date = Vault.parseDate(String(m.2)), date >= today else { continue }
             let text = String(m.1).replacingOccurrences(of: "&amp;", with: "&"), dayStr = String(m.2)
             let segs = text.components(separatedBy: " - ")
             let time = segs.compactMap { $0.firstMatch(of: /^(\d{2}:\d{2})/)?.1 }.first.map(String.init)
             let start = Vault.parseDate(time.map { "\(dayStr)T\($0)" } ?? dayStr)
 
+            if filed, segs.contains(where: { classTypes[$0.split(separator: "/").first.map(String.init) ?? ""] != nil }) { continue }   // a ticked class already had its note; only deadlines are revisited
             if let name = Vault.courses.keys.first(where: { segs[0] == $0 }), segs.count > 1,
                let type = segs[1].split(separator: "/").first.map(String.init), let kind = classTypes[type] {
                 let key = [name, dayStr, type, time ?? ""].joined(separator: "|"), folder = kind.folder
@@ -52,7 +56,7 @@ extension CalendarSync {
             }
 
             let lower = text.lowercased()
-            guard deadlineWords.contains(where: lower.contains), !notDeadlines.contains(where: lower.contains), !handIns.contains(dayStr) else { continue }
+            guard deadlineWords.contains(where: lower.contains), !notDeadlines.contains(where: lower.contains), !handIns.contains(dayStr), !(filed && taskDays.contains(dayStr)) else { continue }
             let head = segs.prefix { !weekdays.contains($0) }.joined(separator: " - ")
             let title = head.replacingOccurrences(of: #"\s*-?\s*(Turnitin|TURNITIN|LEARN)?\s*Submission [Ll]ink\s*"#, with: " submission", options: [.regularExpression, .caseInsensitive]).trimmingCharacters(in: .whitespaces)
             let key = "task|\(title)|\(dayStr)"
@@ -88,10 +92,13 @@ extension CalendarSync {
             "Individual Report - TURNITIN Submission Link  - Friday - 14:00 📅 2026-12-18",                  // the essay covers it
             "Individual Assignment - 4-day extension Turnitin submission link - Saturday - 14:00 📅 2026-12-12",
             "Please register to attend - Intro to the Award - Wednesday - 13:30-15:00 📅 2026-10-07"]
-        try! (heading + "\n\n" + lines.map { "- [ ] " + sw + $0 }.joined(separator: "\n") + "\n\n" + completed + "\n").write(to: box.appending(path: file), atomically: true, encoding: .utf8)
+        // ticked without a task ever being made: the deadline still gets one, the ticked class does not
+        let done = ["- [x] " + sw + "Team Groupwork Charter Submission box - Tuesday - 14:00 📅 2026-10-13",
+                    "- [x] " + sw + "Strategic Management - Seminar/01 - Monday - 16:10-17:00 - Business School - Strategic Management - Seminar/01 Event Type Seminar Click here to submit... 📅 2026-10-26"]
+        try! (heading + "\n\n" + lines.map { "- [ ] " + sw + $0 }.joined(separator: "\n") + "\n\n" + completed + "\n" + done.joined(separator: "\n") + "\n").write(to: box.appending(path: file), atomically: true, encoding: .utf8)
         let today = Vault.parseDate("2026-10-01")!
         let made = makeNotes(root: box, today: today).sorted()
-        precondition(made == ["Lectures/Strategic Management L06 - Lecture 6.md", "TaskNotes/Tasks/Individual Assignment submission.md",
+        precondition(made == ["Lectures/Strategic Management L06 - Lecture 6.md", "TaskNotes/Tasks/Individual Assignment submission.md", "TaskNotes/Tasks/Team Groupwork Charter Submission box.md",
                               "Tutorials/Management Science and Operations Analytics T01 - Q&A Session.md", "Tutorials/Strategic Management T01 - Seminar 1.md"], "made \(made)")
         precondition(try! String(contentsOf: box.appending(path: made[0]), encoding: .utf8).contains("date: 2026-10-19T15:10"), "lecture date")
         try! fm.removeItem(at: box.appending(path: made[0]))

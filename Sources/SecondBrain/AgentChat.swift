@@ -9,6 +9,7 @@ struct AgentChatCard: View {
     var body: some View {
         let messages = store.chats[code] ?? []
         let busy = store.thinking.contains(code)
+        let title = store.threads.first { $0.id == store.openThread }?.title ?? "Manager"
         Card {
             ScrollViewReader { proxy in
                 ScrollView {
@@ -47,13 +48,24 @@ struct AgentChatCard: View {
                         }
                     }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .id(store.openThread)                                     // a fresh scroll view per conversation, so each opens on its own newest message
+                .defaultScrollAnchor(messages.isEmpty ? .top : .bottom)   // like Messages: a conversation opens at the bottom, not the top
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    Text(title).font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                        .padding(.horizontal, 14).padding(.vertical, 6).glassEffect(.regular, in: .capsule)
+                        .padding(.top, 8).padding(.horizontal, 16).frame(maxWidth: .infinity)
+                }
                 .onChange(of: messages.count) { withAnimation { proxy.scrollTo(busy ? AnyHashable("busy") : AnyHashable(messages.last?.id), anchor: .bottom) }; store.markChatSeen() }
                 .onChange(of: store.chatFocus) {   // a search result: show the message it found
                     guard let focus = store.chatFocus else { return }
                     withAnimation { proxy.scrollTo(focus, anchor: .center) }
                     store.chatFocus = nil
                 }
-                .onAppear { store.markChatSeen() }
+                .onAppear {
+                    store.markChatSeen()
+                    if let focus = store.chatFocus { Task { @MainActor in proxy.scrollTo(focus, anchor: .center); store.chatFocus = nil } }   // a search result opened this conversation
+                    else if let end = messages.last?.id { Task { @MainActor in proxy.scrollTo(end, anchor: .bottom) } }
+                }
                 .onChange(of: busy) { if busy { withAnimation { proxy.scrollTo("busy", anchor: .bottom) } } }
                 .onChange(of: store.streaming[code]) { if busy { proxy.scrollTo("busy", anchor: .bottom) } }
             }
@@ -69,11 +81,11 @@ struct AgentChatCard: View {
                     let ready = !busy && !draft.trimmingCharacters(in: .whitespaces).isEmpty
                     if busy {
                         Button { store.stopChat(code) } label: {
-                            Image(systemName: "stop.fill").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white).frame(width: 24, height: 24).background(Color.ink2, in: .circle)
+                            Image(systemName: "stop.fill").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white).frame(width: 24, height: 24).glassEffect(.regular.tint(Color.ink2.opacity(0.8)).interactive(), in: .circle)
                         }.buttonStyle(.plain).help("Stop").accessibilityLabel("Stop")
                     } else if ready {
                         Button(action: send) {
-                            Image(systemName: "arrow.up").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.white).frame(width: 24, height: 24).background(IM.blue, in: .circle)
+                            Image(systemName: "arrow.up").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.white).frame(width: 24, height: 24).glassEffect(.regular.tint(IM.blue).interactive(), in: .circle)
                         }.buttonStyle(.plain).accessibilityLabel("Send")
                     }
                 }

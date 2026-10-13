@@ -4,6 +4,7 @@ import SwiftUI
 struct AppNotice: Identifiable {
     let id: String; let source: String; let icon: String; let tint: Color
     let title: String; var body = ""; var time = ""; var go: Page? = nil
+    var thread: UUID? = nil     // a Manager conversation to open
 }
 
 extension Store {
@@ -27,6 +28,11 @@ extension Store {
             let verb = j.state == .done ? "finished" : j.state == .failed ? "couldn’t finish" : "was sent back"
             out.append(AppNotice(id: "done-\(j.id)", source: "Agents", icon: j.state == .done ? "checkmark" : "exclamationmark", tint: j.state == .done ? NoteColor.done : Color.redFG,
                                  title: "\(Agent.Label(j.agent)) \(verb)", body: j.title, time: j.created.formatted(.relative(presentation: .numeric, unitsStyle: .narrow)), go: note.map { .note($0.id) } ?? .messages))
+        }
+        for t in threads where t.unread == true {
+            let last = messages(of: t).last
+            out.append(AppNotice(id: "chat-\(t.id)", source: "Manager", icon: "message.fill", tint: IM.blue, title: t.title, body: clipped(last?.text.senderAndBody.body.replacingOccurrences(of: "\n", with: " ") ?? "", 90),
+                                 time: (last?.time ?? t.created).formatted(.relative(presentation: .numeric, unitsStyle: .narrow)), go: .messages, thread: t.id))
         }
         for h in headsUps().prefix(3) {
             out.append(AppNotice(id: "heads-\(h.gotIt ?? h.text)", source: "Manager", icon: "bell.fill", tint: Color(light: 0xC77A00, dark: 0xF0B366), title: h.text, go: h.go))
@@ -70,7 +76,10 @@ struct NoticeCard: View {
     let notice: AppNotice; let dismiss: () -> Void
     @State private var hover = false
     var body: some View {
-        Button { if let go = notice.go { store.page = go } } label: {
+        Button {
+            if let t = notice.thread { store.openChat(t) }
+            if let go = notice.go { store.page = go }
+        } label: {
             HStack(alignment: .top, spacing: 9) {
                 Image(systemName: notice.icon).font(.system(size: 12, weight: .semibold)).foregroundStyle(notice.tint)
                     .frame(width: 28, height: 28).background(notice.tint.opacity(0.18), in: .rect(cornerRadius: 8))

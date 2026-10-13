@@ -356,13 +356,13 @@ struct NotePage: View {
         }
         .sheet(item: $work) { AgentWorkSheet(work: $0, note: url).environment(store) }
         .task(id: url) { load() }
-        .onAppear { editor.openLink = { follow($0) } }
+        .onAppear { editor.openLink = { follow($0) }; store.flushOnQuit[url] = { autosave() } }
         .onChange(of: text) {
             guard text != saved else { return }
             pending?.cancel()
             pending = Task { try? await Task.sleep(for: .milliseconds(700)); if !Task.isCancelled { autosave() } }
         }
-        .onDisappear { pending?.cancel(); autosave() }
+        .onDisappear { pending?.cancel(); autosave(); store.flushOnQuit[url] = nil }
         .onChange(of: store.revision) { if text == saved { load() } }   // live reload unless mid-edit
     }
 

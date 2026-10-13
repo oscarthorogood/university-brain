@@ -27,7 +27,8 @@ struct IMBubble: View {
         Text(LocalizedStringKey(text)).font(.system(size: size)).lineSpacing(2).textSelection(.enabled)
             .foregroundStyle(mine ? Color.white : Color.ink)
             .padding(.horizontal, size * 0.9).padding(.vertical, size * 0.55)
-            .background(mine ? IM.blue : IM.grey, in: IM.shape(mine: mine, tail: tail))
+            .background { if !mine { IM.shape(mine: false, tail: tail).fill(IM.grey.opacity(0.45)) } }   // a little body under the glass, so grey reads on a light page
+            .glassEffect(mine ? .regular.tint(IM.blue.opacity(0.92)) : .regular, in: IM.shape(mine: mine, tail: tail))
     }
 }
 
@@ -35,7 +36,8 @@ struct IMBubble: View {
 struct IMTyping: View {
     var body: some View {
         TypingDots().padding(.horizontal, 16).padding(.vertical, 14)
-            .background(IM.grey, in: IM.shape(mine: false))
+            .background(IM.shape(mine: false).fill(IM.grey.opacity(0.45)))
+            .glassEffect(.regular, in: IM.shape(mine: false))
     }
 }
 
@@ -107,7 +109,9 @@ struct IMStamp: View {
     var body: some View {
         let day = Calendar.current.isDateInToday(date) ? "Today" : date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
         Text("\(Text(day).fontWeight(.semibold)) \(date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)))")
-            .font(.system(size: 10)).foregroundStyle(Color.ink2).frame(maxWidth: .infinity)
+            .font(.system(size: 10)).foregroundStyle(Color.ink2)
+            .padding(.horizontal, 10).padding(.vertical, 3).glassEffect(.regular, in: .capsule)
+            .frame(maxWidth: .infinity)
     }
 }
 
