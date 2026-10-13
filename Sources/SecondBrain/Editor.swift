@@ -725,7 +725,9 @@ struct MarkdownEditor: NSViewRepresentable {
                     continue
                 }
                 let inset: CGFloat = q == nil ? 0 : 14
-                s.addAttributes([.font: font(13, first ? .bold : .regular, mono: true), .paragraphStyle: paragraph(first: inset, head: inset, before: 3)], range: at(rowRange))
+                s.addAttribute(.font, value: font(13, first ? .bold : .regular, mono: true), range: at(rowRange))
+                // the whole line, as every other kind of line does: a paragraph takes its style from its first character, which in a callout is the hidden `>`
+                s.addAttribute(.paragraphStyle, value: paragraph(first: inset, head: inset, before: 3), range: r)
                 let rowNS = row as NSString, pipes = pipePositions(in: rowNS, from: 0)
                 for p in pipes { s.addAttribute(.foregroundColor, value: faint, range: at(NSRange(location: cut + p, length: 1))) }
                 inline(r, t, s)
