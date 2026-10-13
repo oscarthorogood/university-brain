@@ -82,8 +82,8 @@ enum NoteText {
         tv.setSelectedRange(NSRange(location: sel.location + (s as NSString).length, length: 0))
     }
 
-    /// Puts a block (a table, a divider) on its own lines after the selection.
-    func block(_ s: String) {
+    /// Puts a block (a table, a divider) on its own lines after the selection. A table has the caret put in its first cell.
+    func block(_ s: String, focusTable: Bool = false) {
         guard let tv = textView else { return }
         focus()
         let ns = tv.string as NSString
@@ -92,6 +92,7 @@ enum NoteText {
         let text = before + s + "\n"
         replace(NSRange(location: at, length: 0), with: text)
         tv.setSelectedRange(NSRange(location: at + (text as NSString).length, length: 0))
+        if focusTable { let loc = at + (before as NSString).length; Task { @MainActor [weak tv] in tv?.focusTable(at: loc) } }
     }
 }
 
@@ -99,11 +100,16 @@ enum NoteText {
 final class MDTextView: NSTextView {
     weak var controller: EditorController?
     var decorations: [MarkdownStyler.Decoration] = []
+    /// The tables drawn as grids (see EditorTables.swift): where each is in the text, and its view.
+    var tableBlocks: [MarkdownStyler.TableBlock] = []
+    var tableViews: [TableGridView] = []
+    var positioningTables = false
 
     /// Styles the text and keeps the drawn extras in step with it.
     func restyle() {
         guard let storage = textStorage else { return }
         decorations = MarkdownStyler.apply(to: storage)
+        syncTables()
         needsDisplay = true
     }
 
@@ -304,6 +310,7 @@ struct MarkdownEditor: NSViewRepresentable {
         guard let lm = tv.layoutManager, let tc = tv.textContainer else { return nil }
         let w = max(proposal.width ?? 600, 100)
         tc.containerSize = NSSize(width: w, height: .greatestFiniteMagnitude)
+        tv.updateTableHeights()      // the tables' gaps are as tall as their grids need at this width
         lm.ensureLayout(for: tc)
         let h = lm.usedRect(for: tc).height + tv.textContainerInset.height * 2
         return CGSize(width: w, height: max(h + 140, 360))
@@ -387,6 +394,12 @@ struct MarkdownEditor: NSViewRepresentable {
             return range.length
         }
 
+        /// Once the text is laid out, each table's grid goes over its gap.
+        func layoutManager(_ lm: NSLayoutManager, didCompleteLayoutFor textContainer: NSTextContainer?, atEnd layoutFinishedFlag: Bool) {
+            guard layoutFinishedFlag, let tv = lm.firstTextView as? MDTextView, !tv.tableViews.isEmpty else { return }
+            Task { @MainActor [weak tv] in tv?.positionTables() }
+        }
+
         private func run(_ key: NSAttributedString.Key, at i: Int, in st: NSTextStorage) -> NSRange? {
             guard i >= 0, i < st.length else { return nil }
             var r = NSRange()
@@ -399,6 +412,15 @@ struct MarkdownEditor: NSViewRepresentable {
         func textView(_ tv: NSTextView, willChangeSelectionFromCharacterRange old: NSRange, toCharacterRange new: NSRange) -> NSRange {
             guard new.length == 0, let st = tv.textStorage, st.length > 0 else { return new }
             let ns = st.string as NSString
+            // A table's lines are hidden under its grid, so the caret never rests in them: arriving from above or below, the grid takes it; anywhere else it goes past the table.
+            if let mtv = tv as? MDTextView, let k = mtv.tableBlocks.firstIndex(where: { new.location >= $0.content.location && new.location <= NSMaxRange($0.content) }), k < mtv.tableViews.count {
+                let b = mtv.tableBlocks[k]
+                let above = old.location < b.content.location, below = old.location > NSMaxRange(b.content)
+                guard above || below else { return NSRange(location: min(NSMaxRange(b.content) + 1, st.length), length: 0) }
+                let grid = mtv.tableViews[k]
+                Task { @MainActor [weak grid] in grid?.focusCell(row: above ? 0 : max(grid?.model.cells.count ?? 1, 1) - 1, col: 0, selectAll: true) }
+                return old
+            }
             let movingBack = new.location < old.location
             var loc = min(new.location, st.length)
             var step = old.length == 0 ? loc - old.location : 0        // -1 or 1 for one press of an arrow key; anything else is a click or a bigger jump
@@ -679,6 +701,9 @@ struct MarkdownEditor: NSViewRepresentable {
         s.beginEditing()
         s.setAttributes([.font: font(baseSize), .foregroundColor: ink, .paragraphStyle: paragraph()], range: full)
         var widths: [Int] = []      // the table's column widths, in characters
+        // the lines of the tables that are drawn as grids: the first line holds the gap the grid sits over, the others take no room
+        var gridLines: [Int: (ordinal: Int, first: Bool)] = [:]
+        for (k, b) in tableBlocks(in: ns).enumerated() { for (i, l) in b.lines.enumerated() { gridLines[l.location] = (k, i == 0) } }
         for (idx, r) in lines.enumerated() {
             let t = ns.substring(with: r)
             let len = (t as NSString).length
@@ -706,7 +731,19 @@ struct MarkdownEditor: NSViewRepresentable {
             }
             if fenced { s.addAttributes([.font: font(13, mono: true), .foregroundColor: ink], range: r); continue }
 
-            // a table: monospaced, columns lined up, a faint line under each row. Inside a quote or callout the row sits after the `>` marker.
+            // a table with a header and a `| --- |` line is a grid laid over the text: its characters are hidden
+            if let g = gridLines[r.location] {
+                inTable = false
+                if let q {
+                    hide(q.range, leading: true)
+                    quote = (start: quote?.start ?? r.location, end: NSMaxRange(r), tint: quote?.tint)
+                }
+                hide(all)
+                s.addAttributes([.font: font(g.first ? 12 : 1), .paragraphStyle: g.first ? gridParagraph(height: tableHeights[g.ordinal] ?? 90) : collapsedLine], range: ns.lineRange(for: r))
+                continue
+            }
+
+            // any other table: monospaced, columns lined up, a faint line under each row. Inside a quote or callout the row sits after the `>` marker.
             let cut = q?.range.length ?? 0
             let rowRange = NSRange(location: cut, length: len - cut)
             let row = (t as NSString).substring(with: rowRange)
@@ -925,7 +962,7 @@ struct EditorToolbar: View {
             } label: { Text("Aa").font(.system(size: 18)).frame(width: 48, height: 36).contentShape(.rect) }
                 .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize().help("Text style")
             tool("checklist", "Checklist") { editor.linePrefix("- [ ] ") }
-            tool("tablecells", "Table") { editor.block("| Column | Column |\n| --- | --- |\n|  |  |") }
+            tool("tablecells", "Table") { editor.block("|  |  |\n| --- | --- |\n|  |  |", focusTable: true) }
             tool("paperclip", "Attach a file") { attach() }
             tool("link", "Link to a note") { editor.wrap("[[", "]]") }
             tool("waveform.circle", "Dictate: speak and it types into the note") { editor.focus(); Dictation.start() }

@@ -1218,6 +1218,7 @@ enum Check {
         CalendarSync.checkNotes()
         Vault.checkEditing()
         EditorLogic.check()
+        TableModel.check()
         AgentFiles.check()
         ChatCheck.run()
         Manager.check()
