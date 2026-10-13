@@ -1218,7 +1218,7 @@ enum Check {
         CalendarSync.checkNotes()
         Vault.checkEditing()
         EditorLogic.check()
-        TableModel.check()
+        MainActor.assumeIsolated { TableModel.check() }      // `--check` runs on the main thread
         AgentFiles.check()
         ChatCheck.run()
         Manager.check()
