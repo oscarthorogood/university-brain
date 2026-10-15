@@ -287,8 +287,8 @@ extension Store {
                 guard !(revisionText ?? "").contains(n.title) else { continue }
                 score = 30; why = "Written up recently with no revision set"; suffix = 0   // once per lecture
             case ("scribe", _):
-                guard (n.when ?? .distantFuture) <= .now else { continue }
-                if hasSource { score = 50; why = "Delivered, slides linked, not written up" }
+                guard (n.when ?? .distantFuture) <= .now.addingTimeInterval(-7200) else { continue }   // the note has a start time: wait until the class is over, not part-way through
+                if hasSource { score = 50 + Double(max(0, 5 + (due ?? -5))); why = "Delivered, slides linked, not written up" }   // the newest class first: it is freshest in mind and nearest its tutorial
                 else {   // no slides after two days: organise what Oscar's own notes say, once (a filled Definitions or Key concepts means that pass is done)
                     let notesBody = Sections.body("Notes", in: text) ?? ""
                     guard n.folder == "Lectures", let d = due, d <= -2, Sections.hasContent("Notes", in: text, template: tpl), notesBody.split(whereSeparator: \.isWhitespace).count >= 40,
@@ -377,7 +377,7 @@ extension Store {
         // work: the Manager does it, with no tick
         update { $0.state = .working }
         thinking.insert(agent)
-        var summary = "", planText = "", ok = true, nothing = false, stopped = false, session: String?, moved: [[String]] = [], work: AgentWork?
+        var summary = "", planText = "", ok = true, nothing = false, stopped = false, session: String?, moved: [[String]] = [], work: AgentWork?, asks: [String] = []
         switch job {
         case .sorting(let files, _):
             // exact copies of files already in Resources/ are decided here, byte for byte: Claude never sees them
@@ -397,6 +397,7 @@ extension Store {
             else if plan.text.hasPrefix("NOTHING:") || (Vault.moves(in: plan.text).isEmpty && plan.text.prefix(240).localizedCaseInsensitiveContains("nothing")) { if trashed.isEmpty { nothing = true } else { summary = plan.text } }
             else if let planSession = plan.session {
                 planText = plan.text
+                asks = Agent.askLines(plan.text)   // what the Sorter couldn't place without guessing: Oscar is asked once the filing is checked
                 update { $0.plan = plan.text }
                 var done: [String] = [], failed: [String] = []
                 for m in Vault.moves(in: plan.text) {
@@ -488,6 +489,10 @@ extension Store {
             }
         }
         let hasUndo = !(undo.restore.isEmpty && undo.created.isEmpty && undo.moves.isEmpty)
+        // what the Manager itself just wrote isn't you typing: the next job in the chain may start at once (see `inUse`)
+        for rel in Set(item.paths).union(edited).union(undo.created) {
+            if let m = try? root.appending(path: rel).resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate { agentWrites[rel] = m }
+        }
         update { $0.undo = hasUndo ? undo : nil; $0.outputs = outputs.isEmpty ? nil : outputs; $0.result = summary; $0.session = session }
         startCooling(agent, rel0 ?? item.key); markHandled(item.key)
 
@@ -506,6 +511,10 @@ extension Store {
             log(agent, "\(item.title)\(line.map { " — " + $0 } ?? "") · Manager \(note)" + (advice == nil ? "" : " · read the \(courses.map { Agent.courseName($0) }.joined(separator: ", ")) briefing"), undo: hasUndo ? id : nil)
             // and it texts you in the chat
             chats[Agent.manager.id, default: []].append(Message(fromAgent: true, text: "I've finished “\(item.title)”\(line.map { ": " + $0 } ?? "")." + (verdict.flags.isEmpty ? "" : " My check flagged: \(verdict.flags.joined(separator: "; "))"), change: hasUndo ? id : nil))
+            if !asks.isEmpty {
+                nudge("**Needs your call**\n\nI couldn’t place \(asks.count == 1 ? "this" : "these") without guessing, so \(asks.count == 1 ? "it is" : "they are") still in Unsorted:\n\n" + asks.prefix(5).map { "• " + $0 }.joined(separator: "\n"),
+                      chips: [Message.Chip(label: "Help me sort these", prompt: "Help me file what is left in Unsorted. For each file, tell me where you think it goes and why, and file the ones I confirm.")])
+            }
             scheduleAutopilot(after: 3)   // what it just did may be what the next job was waiting for (filing slides → a write-up; a filled brief → an outline)
         }
     }
@@ -557,6 +566,8 @@ extension Store {
                     let r = Review.checkEdit(rel: rel, before: beforeText, after: after, sections: work?.sections, template: Sections.template(forFolder: folder, root: root))
                     v.problems += r.problems; v.flags += r.flags
                     if item.agent == "scribe", !after.lowercased().contains("slide"), !Vault.rawItems(after, "resources").isEmpty { v.flags.append("the write-up cites no slide numbers") }
+                    // `summary` is how the app tells a note is written up: without it the same note comes back as work (the notes-only pass names sections and leaves it empty on purpose)
+                    if item.agent == "scribe", work?.sections == nil, Vault.frontmatter(after)["summary"].map({ $0.trimmingCharacters(in: CharacterSet(charactersIn: "\" ")).isEmpty }) ?? true { v.flags.append("`summary` is still empty, so the note would look unwritten: write it in one or two sentences") }
                     if ["librarian", "researcher"].contains(item.agent) { v.problems += await Review.deadLinks(in: after, before: beforeText) }
                     if item.agent == "writer", let w = work?.sections {   // is what it wrote a plan, not finished prose?
                         for s in w.prefix(3) { if let b = Sections.body(s, in: after), b.count > 200, let d = await Review.judge("Is this an outline, plan or list of evidence rather than finished paragraphs written for submission?", of: b) { v.flags.append("“\(s)”: \(d)"); break } }

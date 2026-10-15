@@ -267,7 +267,8 @@ enum Agent {
         return await run("""
         \(intro)\(advice.map { "\n\n\($0)" } ?? "")\n\n\(items)
         Reply with a short plan: one or two lines per item naming its exact destination and which notes you'll link or update. Don't change anything yet.
-        If an item is unclear, say so and leave it out rather than guessing.
+        Slides and documents belong to a Lecture or Tutorial note: name it, say you'll add the file to its `resources` (creating the note from its template first if Calendar Sync has the class and the vault has no note), and for raw notes say which note's Notes section they'll be folded into word for word.
+        If you can't place an item without guessing (which course, which session, or what it is), leave it out, say why in the plan, and add one line for it, exactly `ASK: <filename> — <the one question that would settle it>`; the app asks Oscar. Don't ask about anything you can place.
         If there is genuinely nothing you can file without guessing, reply with a single line starting `NOTHING:` and the reason, and stop.
         End with one line per file that should move, exactly in this form (paths from the vault root, no backticks):
         MOVE: <current path> -> <destination path>

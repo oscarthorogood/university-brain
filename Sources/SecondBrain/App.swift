@@ -317,7 +317,7 @@ struct SecondBrainApp: App {
         if echo { chats[m, default: []].append(Message(fromAgent: false, text: shown)) }
         streamEpoch += 1
         let epoch = streamEpoch
-        let team = Agent.teamLog(activity)
+        let team = [Agent.teamLog(activity), stateDigest()].filter { !$0.isEmpty }.joined(separator: "\n\n")
         let general = mode == m
         let editing = general || Agent.writesNotes(mode) || Manager.isEdit(shown)
         let root = Vault.root
@@ -346,13 +346,14 @@ struct SecondBrainApp: App {
             log(mode, "Couldn’t do “\(shown.prefix(50))” as \(Agent.label(mode)): \(why.prefix(80))")
             return reply
         }
-        var text = reply.text, change: UUID?
+        let next = Agent.splitNext(reply.text)   // what it suggested doing next becomes quick replies under the answer
+        var text = next.body, change: UUID?
         if reply.session != nil {
             lastMode = mode
             if editing, let edits = await recordEdits(since: started, existing: existing, by: mode, root: root) { text += "\n\n" + edits.line; change = edits.item }
             if general { text += performMoves(in: reply.text, root: root) }
         }
-        chats[m, default: []].append(Message(fromAgent: true, text: text, change: change))
+        chats[m, default: []].append(Message(fromAgent: true, text: text, change: change, chips: reply.session == nil || next.chips.isEmpty ? nil : next.chips))
         log(mode, reply.session == nil ? "Couldn’t answer “\(shown.prefix(60))”" : "Answered “\(shown.prefix(60))”")
         return reply
     }
@@ -401,6 +402,8 @@ struct SecondBrainApp: App {
         }
     }
     @ObservationIgnored private var watcher: VaultWatcher?
+    /// When each note the Manager itself last wrote was modified (vault path → that file's modification date), so `inUse` can tell its writes from yours.
+    @ObservationIgnored var agentWrites: [String: Date] = [:]
     var needs: [String: [Need]] = [:]
     var activity: [Activity] = Activity.load()
     init() {
@@ -1228,6 +1231,7 @@ enum Check {
         AgentFiles.check()
         ChatCheck.run()
         Manager.check()
+        Agent.checkProactive()
         let tags = TagsPage.build(notes); precondition(!tags.isEmpty, "tags are indexed from frontmatter")
         let week: (Date?) -> Int = { d in d.map { Int((Double(Calendar.current.dateComponents([.day], from: Vault.currentSemesterStart, to: $0).day ?? 0) / 7).rounded(.down)) + 1 } ?? 0 }
         let mapped = CourseGraph.build(notes.filter { $0.course == "SM" && CourseGraph.row($0) != nil }, week: week)
