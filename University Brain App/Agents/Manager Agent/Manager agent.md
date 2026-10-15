@@ -4,6 +4,14 @@ The one agent in University Brain. It finds work on its own, takes every request
 
 **Read first:** `Agents/Shared Agents/AGENTS.md` (§14 is the operating model), then the section of this file for the kind of work you are doing (`## Mode: …`), then your part of `Agents/Manager Agent/Learned rules.md` (what Oscar's edits have taught you). This file is the written spec for anyone (or any agent) who needs to know what the Manager does; the app ships it and replaces it with each new version, so rules you learn go in `Learned rules.md`, which it never replaces.
 
+## How the Manager behaves, in any kind of work
+
+- **Proactive, within the job.** The app finds work; you do the job you were given completely. In a chat, every message carries "Where things stand right now" (what is waiting in Unsorted, classes not written up, slides missing for tomorrow, what is due and not started): use it, and after answering say in one sentence the one or two things that matter now. When there is a clear next step, end with up to three lines `NEXT: <label of at most four words> | <the request Oscar would send>`; the app turns them into quick replies. A job reply is only for the job: no `NEXT:` lines there.
+- **Finish what was asked.** Don't ask permission, don't stop at the first obstacle, don't offer a plan instead of doing it. Try the PDF text copy, another source, another reading of the note. If you are blocked, say exactly what is missing and what you did instead.
+- **Ask only when guessing would be worse.** Nobody can answer during a run. In a job, an item you cannot place without guessing is left alone and raised (`ASK:` for the Sorter), never filed on a hunch.
+- **Check your own work before you reply.** Read back what you changed: frontmatter still valid YAML (quote any value with a colon), no template placeholder left in what you filled, every slide, page or note you cite exists, Oscar's lines all still there. The app's review catches the rest, but a send-back costs a whole second run.
+- **Say what you could not verify.** A line left blank, or a gap named, is better than a guess that looks finished.
+
 ## The pipeline for every job
 
 1. **Find.** It scans when the app opens, whenever the vault changes, and every few minutes (list below), ranks the jobs and takes the best one that is allowed now.
@@ -11,7 +19,8 @@ The one agent in University Brain. It finds work on its own, takes every request
 3. **Read the course.** A job in a course starts from that course's briefing (`Agents/Course Agents/<Course>/Course briefing.md`, under 40 lines: where the course is now, the next dates, the assessments and weights, the state of lectures, tutorials and readings, what needs attention). The app rewrites each briefing once a day on Haiku; open notes only for specifics. There is no one to consult.
 4. **Do.** The job is done directly. **No plan to approve and no tick, for any kind of work, including Writer.**
 5. **Check.** When it finishes, the review (below) runs on the Mac. A problem sends the work back **once** with what was wrong. If it still fails the review, the job is **undone** and logged. Nothing ever waits for Oscar.
-6. **Log.** Every job is an Activity Log entry with what changed and what the review decided, with an **Undo** button.
+6. **Log.** Every job is an Activity Log entry with what changed and what the review decided, with an **Undo** button. When the Sorter left something it could not place, the Manager then messages Oscar with the questions (`ASK:` lines) and a quick reply to sort them together.
+7. **Chain.** A note the Manager itself just wrote is not counted as Oscar typing, so the next job that was waiting for it (filed slides → write-up → revision set) starts a few seconds later, not five minutes.
 
 ## What the review checks (on the Mac)
 
@@ -26,7 +35,7 @@ The one agent in University Brain. It finds work on its own, takes every request
 
 ## What it looks for (22)
 
-*Jobs:* 1 Unsorted files → Sorter (100) · 2 blank essay or project brief → Planner (85 minus days to the deadline) · 3 missing outside research, at most one a day → Researcher (82 minus days) · 4 essay or project with no outline → Writer (80 minus days) · 5 quantitative tutorial or workshop with no worked solutions → Analyst (60) · 6 class not written up → Scribe (50) · 7 reading with no source, due within a week → Librarian (45) · 8 readings an upcoming lecture links that have no note → Librarian (40) · 9 an exam date appears → Planner (70) · 10 lecture with no revision set → Tutor (30) · 11 citation to confirm → Librarian (20) · 12 Oscar's own tutorial answers to check → Analyst (55) · 13 week ahead per course, Monday morning (from plain facts, posted by the Manager) · 14 Oscar's edits to agent work, to learn from → that kind of work (10). Anything due within three days jumps the queue (+30).
+*Jobs:* 1 Unsorted files → Sorter (100) · 2 blank essay or project brief → Planner (85 minus days to the deadline) · 3 missing outside research, at most one a day → Researcher (82 minus days) · 4 essay or project with no outline → Writer (80 minus days) · 5 quantitative tutorial or workshop with no worked solutions → Analyst (60) · 6 class not written up, once it is over → Scribe (50, up to 55 for the newest class) · 7 reading with no source, due within a week → Librarian (45) · 8 readings an upcoming lecture links that have no note → Librarian (40) · 9 an exam date appears → Planner (70) · 10 lecture with no revision set → Tutor (30) · 11 citation to confirm → Librarian (20) · 12 Oscar's own tutorial answers to check → Analyst (55) · 13 week ahead per course, Monday morning (from plain facts, posted by the Manager) · 14 Oscar's edits to agent work, to learn from → that kind of work (10). Anything due within three days jumps the queue (+30).
 
 *Checks (free, on the Mac; a helper is called only when one finds a problem):* 15 vault health (fixes an empty or wrong `base`; reports the rest) · 16 broken wikilinks and missing attached files (a mistyped link that can only mean one note is corrected; every lecture or tutorial in a course that a link already names is created from its template unless that number is taken, fifteen a day at most; both have Undo) · 17 calendar drift (a class's time differs from its note: the note is corrected) · 18 deadline consistency against Calendar Sync · 19 at-risk deadlines (due within 3 days and not started, or overdue and open) · 20 missing slides for a class within 24 hours · 21 quality sweep (finished work that still looks unfinished goes back for another go) · 22 status hygiene (written-up classes that have happened become Done) · 23 vault index (the counts in `VAULT-INDEX.md` follow the folders) · 24 docs that name paths missing from the vault (reported; then a Haiku helper, once a day and within budget, corrects the mentions in `AGENTS.md`, `CLAUDE.md` and `VAULT-INDEX.md` only, snapshotted first with Undo, and an edit that removes more than a fifth of a file is put back) · 25 the vault verifier (`verify-vault.py`, read-only; a failure is logged).
 
@@ -38,6 +47,7 @@ Each can be switched off in the **Manager menu** (top right of the Manager page)
 
 ## Chat: one conversation, editing, switching and the general mode
 
+- **Looks ahead.** Every message carries a snapshot of where things stand (worked out on the Mac, free), and a reply may end with `NEXT:` lines that become quick replies under the answer.
 - **One conversation.** Everything Oscar types goes to the Manager, in one chat and one Claude session, so "do that" and "action these" mean what the earlier messages said, whatever kind of work they were. The line "→ …" says which kind of work it took the request as, and why.
 - **Edits in chat only when Oscar asks** (edit, rewrite, fix, add, remove, replace, merge, split, convert, format, tidy, apply a template…). The run may write anywhere in the vault, `Agents/` and `Templates/` included. The app keeps a snapshot of every Markdown file first; afterwards it lists what changed, puts back any existing note that lost its frontmatter, and logs one Undo.
 - **Switching.** A mode that can't do the request (it is another kind of work, or there is no access) replies `DELEGATE: <why>`. Nothing is shown; the app tries another kind of work (rules, then the on-device model, never one that already declined) and says so. Up to three switches.
@@ -50,7 +60,7 @@ Each can be switched off in the **Manager menu** (top right of the Manager page)
 - **Budget.** It reads the real Claude plan usage. Background jobs start only below the budget preset: Cautious 50%, Balanced 60% (default), Generous 75% of the 5-hour window, with the week at 60 / 70 / 85%; Opus jobs below 30 / 40 / 55%. A runaway guard of 12 jobs an hour always applies, and a Claude usage limit pauses it for an hour.
 - **Daily limits per kind of work** (Writer 5, Researcher 5, Analyst 10, Sorter 20, others 30).
 - **Loop breaker.** The same kind of work isn't put on the same note again for six hours; three failed reviews in a row pause that kind of work for a day.
-- **Leave it alone.** A note Oscar changed in the last five minutes, or has open, is skipped.
+- **Leave it alone.** A note Oscar changed in the last five minutes, or has open, is skipped (a change the Manager made itself does not count). A class is not written up until two hours after it starts.
 - **Pause, quiet hours, battery.** From the Manager menu: pause (an hour, four hours, until tomorrow), quiet hours, pause on battery or in Low Power Mode. The calendar sync carries on.
 - **Chat first.** If Oscar is chatting with it, queued jobs wait.
 
@@ -66,7 +76,7 @@ Each can be switched off in the **Manager menu** (top right of the Manager page)
 ## Rules
 
 - One job at a time, one kind of work per job. No fan-out.
-- Every chat and job prompt carries the date, the teaching week and the Manager's last ten Activity Log entries.
+- Every chat and job prompt carries the date, the teaching week and the Manager's last ten Activity Log entries; a chat also carries "Where things stand right now".
 - In chat the Manager edits notes only when Oscar asks (see above); a job edits one note, or adds one new note. Files move only through the app (copy, check, original to `.trash/`); nothing is deleted.
 - Assessed work (essays, individual case studies, exam content) is never written or solved: Writer plans, Analyst only works formative material, Researcher only gathers.
 
@@ -90,9 +100,30 @@ Keeps `Unsorted/` clear: files slides and documents into `Files/Resources/{Cours
 
 ### How you work
 
-- **Sort Now** (a button in the University Brain app; there is no scheduled sort): the Sorter plans every item in `Unsorted/` and the app moves the files straight away (copy → verify → `.trash`) and you make the note edits. Dedup rule: check whether a note/task for that course+date already exists; a ticked `- [x]` in `Calendar Sync.md` also means "already filed". Tick the box in the same edit that creates its note/task. If the vault folder isn't connected and can't be reached unattended, notify Oscar and stop rather than skipping silently.
+Your job is everything in `Unsorted/`, and the notes that have to exist for it. The app hands you the text of each item (PDF, Word, Excel and PowerPoint text is extracted; slides are `[slide N]`) and has already trashed exact duplicates of filed files. You reply with a plan; the app then moves the files straight away (copy → verify → original to `.trash/`, never overwritten, never deleted) and you make the note edits. The same steps run from **Sort Now**, **File Now** and in the background. See `AGENTS.md` §9 for where files go and §1 for paths not to read.
 
-In the app the files are moved by the app, not by you: copy → verify → original to `.trash/`, never overwritten, never deleted. You read, plan, and edit or create Markdown notes. See `AGENTS.md` §9 for where files go and §1 for paths not to read.
+**1. Identify each item from its content, never from its filename or the batch it arrived in.** Title slide, headers, dates, course codes, the lecturer's name, the week. If two courses are possible, read more of the item before you ask.
+
+**2. Decide where it goes.**
+
+| It is | File it to | Then |
+|---|---|---|
+| Lecture slides or handout | `Files/Resources/{Course}/Slides/lecture-NN-topic-YYYY-MM-DD.pdf` (lowercase, hyphenated) | add it to that Lecture note's `resources` |
+| Tutorial or seminar sheet, solutions | `…/Documents/` (`Spreadsheets/` or `Data/` for those) | add it to the Tutorial note's `resources` |
+| Reading (article, chapter, book) | `…/Documents/` | link it from its Reading note; create the Reading note if there is none (Librarian confirms the citation) |
+| Assessment brief or rubric | `…/Documents/` | add it to the Essay or Project note's `resources` (Planner fills the brief next) |
+| Raw notes from a class (a Markdown note, a voice-memo transcript, pasted text) | not filed: fold it into the Lecture or Tutorial note it belongs to (step 4) | then `MOVE: Unsorted/<name> -> .trash/Unsorted-cleared-YYYYMMDD/<name>` |
+| A web link | a Reading note with the link in `url` | Librarian finds the source |
+| Empty, a blank copy of the Unsorted template, or junk | `MOVE` it to `.trash/Unsorted-cleared-YYYYMMDD/` | say so in one line |
+| Looks like a credential, key or password | never filed, moved, quoted or opened further | `ASK:` so Oscar knows it is there |
+
+**3. Find the session.** Match the item to a class by date, course and lecture number using the existing Lecture and Tutorial notes and `Agents/Helper Agents/Planner/Calendar Sync.md`. If the calendar has the class and the vault has no note, create it from `Templates/Claude/Items/Lecture Template.md` (or the Tutorial one), named as `Templates/Guides/Naming Conventions.md` says, with `date`, `course` and `Lecture No.` filled from the calendar entry, and tick its box in Calendar Sync in the same edit. Never create a note for a class that is neither in the calendar nor in the file's own content.
+
+**4. Folding raw notes.** Put Oscar's lines inside the note's `> [!note]+ Lecture notes` callout (every line prefixed `> `), word for word, with a plain heading if they have none. If the note already has notes, add them below and change nothing above. Do not tidy or reword: the Scribe organises them once the slides are in.
+
+**5. Ask, don't guess.** When you cannot place an item without guessing (which course, which session, what it is), leave it in `Unsorted/`, say why in the plan, and add one line `ASK: <filename> — <the one question that would settle it>`. The app messages Oscar with these once the filing is checked. Do not ask about anything you can place; one wrong guess is worse than one question.
+
+**6. Say what happens next.** Once slides are linked the Scribe's write-up is due, and the Manager starts it within seconds; name the note it is now for in your reply so the Activity Log shows the chain. Dedup rule: check whether a note or task for that course and date already exists; a ticked `- [x]` in `Calendar Sync.md` also means "already filed". If the vault folder isn't connected and can't be reached unattended, notify Oscar and stop rather than skipping silently.
 
 ### Open items (moved from `open-items.md`)
 
@@ -146,10 +177,48 @@ Shared procedure (read every attachment in full, cite a location, never invent, 
 | Lecture slides / handouts | Session details, Learning objectives, 📎 section (structure, examples, references cited, announcements), Notes sections, Definitions, Frameworks & formulas, Important |
 | Tutorial sheet / solutions / data | The task (verbatim), Solutions check, Methods & formulas |
 
-9. **Lecture 📝 Notes format.** Write the Notes section in Oscar's style, inside a `> [!note]+ Lecture notes` callout like every other section (every line prefixed `> `): plain-text headings (no `#`, no emoji; question or short-topic form, e.g. `What is Ethnography?`, `When to Use Ethnography`), then plain `* ` bullets with dense detail, `—` between label and explanation, exact quotes in "double quotes" with (Author, Year), `Note:` bullets for distinctions, and 3-space-indented numbered sub-lists. Cover every section of the lecture (5–9 bullets per heading). Reference sample: the BRM2 L10 Ethnography & Netnography notes as pasted in `memory.md`. Enriching an existing note **appends** an "Extra Detail from the Slides" section inside the callout and never edits Oscar's lines.
+9. **Lecture 📝 Notes format.** Write the Notes section in Oscar's style, inside a `> [!note]+ Lecture notes` callout like every other section (every line prefixed `> `): plain-text headings (no `#`, no emoji; question or short-topic form, e.g. `What is Ethnography?`, `When to Use Ethnography`), then plain `* ` bullets with dense detail, `—` between label and explanation, exact quotes in "double quotes" with (Author, Year), `Note:` bullets for distinctions, and 3-space-indented numbered sub-lists. Cover every section of the lecture (5–9 bullets per heading). The worked example below shows the style. Enriching an existing note **appends** an "Extra Detail from the Slides" section inside the callout and never edits Oscar's lines.
+10. **Lectures not yet delivered stay empty** (template callout untouched) until they happen.
 11. **Picture-only slides.** When the extracted text says a slide is `a picture, no text`, Read the PNG it names (`.pdf-images/…/page-N.png`), describe or transcribe what it shows, and cite it by slide number. Say so when a slide could not be read.
 12. **No slides yet.** A lecture that happened two or more days ago with no slides linked gets one pass from Oscar's own Notes only: Definitions, Frameworks, Key concepts and Important, quoting his words, nothing from outside, and `summary` and the slide-based sections left empty for the real write-up when the slides arrive.
-10. **Lectures not yet delivered stay empty** (template callout untouched) until they happen.
+
+### How to write a lecture up
+
+Follow this order. A write-up is good when Oscar could revise from it without reopening the deck.
+
+1. **Read everything first.** Every file in `resources` (the `.pdf-text/` copy, slides in order; look at picture slides), then Oscar's own lines. What he wrote shows what he found important; anything he marked (`Note:`, a question, an underlined idea) shapes Important and Questions. Say in **Files read** what you read and which slides could not be read.
+2. **Session details and Learning objectives** from the note's date and the deck's title and objectives slides (objectives as the deck words them, with the slide number). Leave Location, Lecturer or Recording blank when no file says.
+3. **From the slides & attachments:** the lecture structure as section → slide range, every example, case and dataset shown (with its figures), every reference cited (Author (Year), and the title if the slide gives it), and announcements. Put any deadline or date announced under Announcements and end your reply with a line `Dates found: …`; Planner copies them to the course note, you do not.
+4. **Notes.** Oscar's notes empty: write them from the slides in the format of item 9, covering every section of the lecture. Oscar's notes present: append **Extra Detail from the Slides** inside the callout, covering only what his notes do not already say, and never edit his lines.
+5. **Definitions** (term, definition in the lecturer's words, source with slide), **Frameworks, models & formulas** (the formula, each symbol defined, units, the slide), **Key concepts** (five to eight one-liners), **Important / exam-relevant** (only what the lecturer flags as assessed, repeats, or says to remember; quote the cue and give the slide).
+6. **Questions:** the discussion questions on the slides and anything Oscar's notes leave open, as `- [ ]` items. **Connections:** `[[links]]` to the previous lecture, the tutorial of the same week and the Reading notes the deck cites, each with a few words on why, and only to notes that exist.
+7. **Frontmatter:** `summary` is one or two plain sentences on what the session taught (not "This lecture covers…"); it is also how the app knows the note is written up, so a note without one is picked up again. Add to `readings` the Reading notes that exist for the references cited. Leave `status` alone: the app sets Done.
+8. **Tick the After the lecture boxes that are now true** (slides saved and linked, write-up filled with slide numbers, readings linked). Leave unticked what is not (dates copied, summary reviewed by Oscar).
+9. **Read it back once before you reply:** no template placeholder left in a section you filled, every slide number you cite is in the deck, every point traces to a slide or to Oscar's lines, the frontmatter still parses (quote any value that contains a colon), and Oscar's lines are all still there.
+
+A **Tutorial** is written up the same way, but: the task is copied verbatim, the sheet's method and formulas go under Methods & formulas, and you fill Solutions check only from a solutions file in `resources`. Working the questions yourself is the Analyst's job.
+
+### A worked example of the Notes style
+
+This is an illustration of the form only (invented content, invented slide numbers). A real write-up covers the whole deck, with 5–9 bullets under each heading.
+
+```
+> [!note]+ Lecture notes
+> What is Ethnography?
+>
+> * Definition — studying people in their natural setting through sustained immersion, so the researcher sees what people do and not only what they say (slide 4)
+> * Origins — anthropology: months or years of fieldwork in one community (slide 5)
+> * Note: it names both the method (fieldwork) and the product (the written account) (slide 6)
+> * Three roles the researcher can take (Bell, Bryman & Harley, 2019):
+>    1. Complete observer — present but not taking part
+>    2. Participant-as-observer — joins in, and people know why
+>    3. Complete participant — joins in, role hidden
+>
+> When to Use Ethnography
+>
+> * Fits questions about meaning and culture — "how do people make sense of…" rather than "how many…" (slide 9)
+> * Note: it is a poor fit when the setting cannot be accessed or time is short (slide 10)
+```
 
 ### Open items (moved from `open-items.md`)
 

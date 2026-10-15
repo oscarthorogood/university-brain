@@ -101,10 +101,12 @@ extension Store {
         log(Agent.manager.id, "\(Agent.Label(agent)) jobs can start again: you resumed them.")
         revision += 1
     }
-    /// A note you changed in the last five minutes, or have open, is left alone.
+    /// A note you changed in the last five minutes, or have open, is left alone. A change the Manager made itself doesn't count: the next job in a chain
+    /// (filed slides, then the write-up, then the revision set) would otherwise wait five minutes for a note nobody is typing in.
     func inUse(_ url: URL) -> Bool {
         if case .note(let open) = page, open == url { return true }
         let m = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+        if let mine = agentWrites[Vault.rel(url)], m <= mine { return false }
         return m > .now.addingTimeInterval(-300)
     }
 
